@@ -1,0 +1,75 @@
+@import "tailwindcss";
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  font-size: 16px;
+}
+
+#root {
+  width: 100%;
+  min-height: 100vh;
+  background-color: #ebebeb;
+  overflow: scroll;
+  scroll-behavior: smooth;
+  /* padding-left: 1.3rem;
+  padding-right: 1.3rem; */
+  /* padding-top: 1rem; */
+}
+
+.container-wrap {
+  background-color: #fff;
+  border-radius: 24px;
+  padding: 16px;
+}
+
+.history-container {
+  padding: 30px;
+  background-color: #fff;
+  border-radius: 24px;
+}
+
+.transfer-container {
+  padding: 0.9375rem;
+  background-color: #fff;
+  border-radius: 24px;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+/* Hide scrollbar for IE, Edge and Firefox */
+.no-scrollbar {
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
+}
+
+.customSkeleton {
+  width: 100%;
+  height: 450px;
+  border-radius: 20px;
+  .adm-skeleton.adm-skeleton-paragraph-line {
+    border-radius: 10px;
+    border: 0;
+    height: 50px;
+    margin: 20px 0;
+  }
+}
+
+@keyframes bounce {
+  0%,
+  100% {
+    transform: translateY(-25%);
+    animation-timing-function: cubic-bezier(0.8, 0, 1, 1);
+  }
+  50% {
+    transform: none;
+    animation-timing-function: cubic-bezier(0, 0, 0.2, 1);
+  }
+}
+.animate-bounce {
+  animation: bounce 1s infinite;
+}

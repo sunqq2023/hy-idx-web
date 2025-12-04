@@ -1,0 +1,264 @@
+import { arrowSvg, claimMixBgSvg, miningSvg } from '@/assets'
+import AdaptiveNumber, { NumberType } from '@/components/AdaptiveNumber'
+import {
+  MiningMachineProductionLogicABI,
+  MiningMachineProductionLogicAddress
+} from '@/constants'
+import { MachineInfo } from '@/constants/types'
+import { useSequentialContractWrite } from '@/hooks/useSequentialContractWrite'
+import { Button, Divider, Modal } from 'antd-mobile'
+import { memo, useEffect, useRef, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
+import { FixedSizeList as List } from 'react-window'
+import dayjs from 'dayjs'
+import { formatEther } from 'viem'
+
+const formatTime = (timestamp: number) => {
+  return dayjs.unix(timestamp).format('MM月 DD日 HH:mm:ss')
+}
+
+const ClaimMix = () => {
+  const location = useLocation()
+  const { machineList, mixPointsToBeClaimed } = location.state
+  const { executeSequentialCalls } = useSequentialContractWrite()
+  const [isClaimingMIX, setIsClaimingMIX] = useState(false)
+  const navigate = useNavigate()
+  const [listHeight, setListHeight] = useState(0)
+  const listContainerRef = useRef<HTMLDivElement>(null)
+
+  const producedMixList = machineList.filter(
+    (item: MachineInfo) => item.unclaimedMix! > 0
+  )
+
+  const handleCloseModal = () => {
+    Modal.clear()
+    navigate('/user')
+  }
+
+const handleClaimMix = async () => {
+  try {
+    setIsClaimingMIX(true);
+
+    if (producedMixList.length === 0) {
+      setIsClaimingMIX(false);
+      return;
+    }
+
+    // 提取需要领取的矿机ID数组
+    const machineIds = producedMixList.map(item => item.id);
+    
+    const contractCall = {
+      address: MiningMachineProductionLogicAddress as `0x${string}`,
+      abi: MiningMachineProductionLogicABI,
+      functionName: 'claimMixByMachineIds', 
+      args: [machineIds]  // 传入矿机ID数组
+    };
+
+    const [result] = await executeSequentialCalls([contractCall]);
+    
+    setIsClaimingMIX(false);
+
+    if (result?.success) {
+      // 处理领取数量（增加空值和类型检查）
+      let totalClaimed;
+      try {
+        // 优先使用合约返回值，验证有效性
+        if (result.data != null) {
+          // 确保数据可以转换为bigint
+          const data = BigInt(result.data.toString());
+          totalClaimed = Number(formatEther(data));
+        } else {
+          // 合约未返回数据时使用前端已知的待领取量
+          totalClaimed = mixPointsToBeClaimed;
+        }
+      } catch (e) {
+        console.warn('解析合约返回值失败，使用备选值:', e);
+        totalClaimed = mixPointsToBeClaimed;
+      }
+
+      Modal.show({
+        bodyStyle: {
+          background: '#000000',
+          color: '#ffffff',
+          width: '75vw',
+          padding: '15px',
+          borderRadius: '20px'
+        },
+        showCloseButton: true,
+        closeOnMaskClick: true,
+        content: (
+          <div className="pt-[15px] text-white text-[15px] flex flex-col gap-4">
+            <div className="text-[#B195FF]">提示</div>
+            <div>
+              <div className="mb-4">
+                你已成功提取所有MIX收益：
+                <AdaptiveNumber
+                  type={NumberType.BALANCE}
+                  value={totalClaimed}
+                  decimalSubLen={2}
+                  className="font-bold text-[15px]"
+                />
+                ，已存入你的钱包中。
+              </div>
+              <button
+                className="w-full bg-[#895EFF] rounded-3xl text-white py-2"
+                onClick={handleCloseModal}
+              >
+                确认
+              </button>
+            </div>
+          </div>
+        )
+      });
+    }
+  } catch (error) {
+    console.error('领取MIX失败:', error);
+    setIsClaimingMIX(false); // 出错时重置状态
+  }
+};
+
+
+  const handlBack = () => {
+    navigate('/user')
+  }
+
+  // 动态计算高度
+  useEffect(() => {
+    if (!listContainerRef.current) return
+
+    const calculateHeight = () => {
+      const windowHeight = window.innerHeight
+      const topSectionHeight = 270
+      const newHeight = windowHeight - topSectionHeight
+      setListHeight(newHeight)
+    }
+
+    // 初始化计算
+    calculateHeight()
+
+    // 监听窗口变化（如旋转屏幕、键盘弹出等）
+    window.addEventListener('resize', calculateHeight)
+    return () => window.removeEventListener('resize', calculateHeight)
+  }, [])
+
+  return (
+    <div className="px-[21px]">
+      <div className="flex pt-4 mb-4">
+        <Button
+          onClick={handlBack}
+          className="!p-[0] !rounded-2xl"
+          loading={isClaimingMIX}
+        >
+          <img src={arrowSvg} alt="" />
+        </Button>
+        <span className="m-auto text-[19px] font-bold">收益</span>
+      </div>
+
+      <div className="bg-black rounded-2xl ">
+        <div
+          style={{
+            backgroundImage: `url(${claimMixBgSvg})`,
+            width: '100%',
+            height: '170px',
+            backgroundSize: 'cover',
+            padding: '0 20px',
+            gap: '5px',
+            borderRadius: '1rem'
+          }}
+        >
+          <div className="flex   text-white items-center pt-[18%]">
+            <AdaptiveNumber
+              type={NumberType.BALANCE}
+              value={mixPointsToBeClaimed}
+              decimalSubLen={2}
+              className="ml-2 mr-1.5  font-bold text-[26px]"
+            />
+            <div className="text-[11px] pt-[8px] ">MIX</div>
+          </div>
+          <Button
+            disabled={isClaimingMIX}
+            onClick={handleClaimMix}
+            className="w-full !bg-[#7334FE] !rounded-2xl !py-2 !my-3  !items-center  !p-0 !text-white !border-none !text-[15px]"
+          >
+            提取到钱包
+          </Button>
+        </div>
+      </div>
+
+      <div
+        ref={listContainerRef}
+        style={{ height: `${listHeight}px` }}
+        className="no-scrollbar bg-white rounded-2xl p-[15px] mt-4"
+      >
+        <List
+          height={listHeight}
+          width="100%"
+          itemCount={producedMixList.length}
+          itemSize={70}
+          itemData={producedMixList}
+        >
+          {Row}
+        </List>
+      </div>
+    </div>
+  )
+}
+
+const Row = memo(
+  ({
+    index,
+    style,
+    data
+  }: {
+    data: MachineInfo[]
+    index: number
+    style: React.CSSProperties
+  }) => {
+    const item = data[index]
+    return (
+      <div
+        style={{
+          ...style,
+          height: '70px'
+        }}
+      >
+        <div className="flex text-[12px] items-center gap-2">
+          <img src={miningSvg} alt="" width={37} height={37} />
+
+          <div className="w-full">
+            <div className="flex justify-between">
+              矿机产出
+              <div className="flex items-center">
+                <div className="text-[16px]">+</div>
+                <AdaptiveNumber
+                  type={NumberType.BALANCE}
+                  value={+formatEther(BigInt(item.unclaimedMix!))}
+                  decimalSubLen={4}
+                  className="ml-2 mr-1.5  font-bold "
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-between">
+              <div className="text-[#7E7878]">
+                {formatTime(item.createTime)}
+              </div>
+              <div>MIX积分</div>
+            </div>
+          </div>
+        </div>
+
+        <Divider
+          style={{
+            width: '87%',
+            marginLeft: 'auto',
+            marginBottom: '0'
+          }}
+        />
+        <div className="w-full flex justify-end"></div>
+      </div>
+    )
+  }
+)
+
+export default ClaimMix

@@ -1,0 +1,13 @@
+.adm-tabs {
+    --active-title-color: #000000 !important;
+    --active-line-height: 0 !important;
+    --title-font-size: 0.75rem !important;
+}
+
+.adm-tabs-tab-active {
+    font-weight: 600 !important;
+}
+
+.machine-name {
+    background: linear-gradient(90deg, rgba(165, 115, 71, 0) 0%, rgba(187, 112, 84, 1) 100%);
+}

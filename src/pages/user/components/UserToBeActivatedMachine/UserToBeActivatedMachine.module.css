@@ -1,0 +1,8 @@
+.adm-tabs {
+    --active-title-color: #000000 !important;
+    --active-line-color: #000000 !important;
+}
+
+.adm-tabs-tab-active {
+    font-weight: 600;
+}

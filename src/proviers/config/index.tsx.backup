@@ -1,0 +1,60 @@
+import { getDefaultConfig } from '@rainbow-me/rainbowkit'
+import { trustWallet } from '@rainbow-me/rainbowkit/wallets'
+import { http } from 'wagmi'
+import { bsc, bscTestnet } from 'wagmi/chains'
+import {
+  metaMaskWallet,
+  walletConnectWallet
+} from '@rainbow-me/rainbowkit/wallets'
+import { tokenPocketWallet } from '@rainbow-me/rainbowkit/wallets'
+
+const localhost = {
+  id: 1337,
+  name: 'local',
+  network: 'local',
+  contracts: {
+    // 添加Multicall3合约地址（替换为你实际部署的地址）
+    multicall3: {
+      address: '0xe78A0F7E598Cc8b0Bb87894B0F60dD2a88d6a8Ab'
+    }
+  },
+  nativeCurrency: {
+    name: 'Ether',
+    symbol: 'ETH',
+    decimals: 18
+  },
+  rpcUrls: {
+    default: {
+      http: ['http://202.124.251.169:8545']
+    },
+    public: {
+      http: ['http://202.124.251.169:8545']
+    }
+  },
+  blockExplorers: {
+    default: {
+      name: 'Etherscan',
+      url: 'http://202.124.251.169:8545'
+    }
+  },
+  testnet: true
+}
+
+const config = getDefaultConfig({
+  appName: 'My RainbowKit App',
+  projectId: 'ca156ff839a84bdaa5f992ac616f1dd6',
+  chains: [bsc, bscTestnet, localhost],
+  wallets: [
+    {
+      groupName: 'Popular',
+      wallets: [
+        tokenPocketWallet,
+        trustWallet,
+        metaMaskWallet,
+        walletConnectWallet
+      ]
+    }
+  ]
+})
+
+export default config

@@ -1,0 +1,9 @@
+<svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="16" height="16" fill="none" customFrame="#000000">
+	<g id="组合 3440">
+		<circle id="椭圆 46" cx="8" cy="8" r="8" fill="rgb(111,75,190)" />
+		<path id="矢量 171" d="M8.25042 10.6465L8.25042 6.52173L7.89328 6.52173L7.53613 6.52173" fill-rule="nonzero" stroke="rgb(255,255,255)" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" />
+		<path id="矢量 170" d="M8 3C8.55228 3 9 3.44772 9 4C9 4.55228 8.55228 5 8 5C7.44772 5 7 4.55228 7 4C7 3.44772 7.44772 3 8 3Z" fill="rgb(127.5,127.5,127.5)" fill-rule="evenodd" />
+		<path id="矢量 170" d="M9 4C9 3.44772 8.55228 3 8 3C7.44772 3 7 3.44772 7 4C7 4.55228 7.44772 5 8 5C8.55228 5 9 4.55228 9 4Z" fill="rgb(255,255,255)" fill-rule="evenodd" />
+		<path id="矢量 172" d="M7.5 11L8.93018 11" stroke="rgb(255,255,255)" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" />
+	</g>
+</svg>
