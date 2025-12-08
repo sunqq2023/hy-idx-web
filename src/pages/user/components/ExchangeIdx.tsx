@@ -1,5 +1,5 @@
-import { arrowSvg, blackExchangeSvg, whiteExchangeSvg } from '@/assets'
-import AdaptiveNumber, { NumberType } from '@/components/AdaptiveNumber'
+import { arrowSvg, blackExchangeSvg, whiteExchangeSvg } from "@/assets";
+import AdaptiveNumber, { NumberType } from "@/components/AdaptiveNumber";
 import {
   CHAIN_ID,
   MiningMachineProductionLogicABI,
@@ -7,81 +7,81 @@ import {
   MiningMachineSystemLogicABI,
   MiningMachineSystemLogicAddress,
   MiningMachineSystemStorageABI,
-  MiningMachineSystemStorageAddress
-} from '@/constants'
-import { MachineInfo } from '@/constants/types'
-import { useSequentialContractWrite } from '@/hooks/useSequentialContractWrite'
-import { Button, Divider, Modal, Toast } from 'antd-mobile'
-import { memo, useCallback, useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { FixedSizeList as List } from 'react-window'
-import { formatEther, parseEther, TransactionReceipt } from 'viem'
-import config from '@/proviers/config'
-import { useAccount } from 'wagmi'
+  MiningMachineSystemStorageAddress,
+} from "@/constants";
+import { MachineInfo } from "@/constants/types";
+import { useSequentialContractWrite } from "@/hooks/useSequentialContractWrite";
+import { Button, Divider, Modal, Toast } from "antd-mobile";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { FixedSizeList as List } from "react-window";
+import { formatEther, parseEther, TransactionReceipt } from "viem";
+import config from "@/proviers/config";
+import { useAccount } from "wagmi";
 import {
   readContract,
   writeContract,
   waitForTransactionReceipt,
-  multicall
-} from '@wagmi/core'
-import { formatTime } from '@/utils/helper'
-import EmptyComp from '@/components/EmptyComp'
+  multicall,
+} from "@wagmi/core";
+import { formatTime } from "@/utils/helper";
+import EmptyComp from "@/components/EmptyComp";
 
 interface IReleaseInfo {
   //  锁仓 IDX 总数量。
-  totalAmount: number
+  totalAmount: number;
   //  锁仓开始时间。
-  startTime: number
+  startTime: number;
   //  已释放数量。
-  releasedAmount: number
+  releasedAmount: number;
   //  当前可领取数量。
-  releasableAmount: number
+  releasableAmount: number;
   //  剩余未释放数量。
-  remainingAmount: number
+  remainingAmount: number;
   //  剩余锁仓时间（秒，锁仓期内有效）。
-  remainingLockTime: number
+  remainingLockTime: number;
   //  剩余释放时间（秒，释放期内有效）。
-  remainingReleaseTime: number
-  id: number
+  remainingReleaseTime: number;
+  id: number;
 }
 
 const ExchangeIdx = () => {
-  const { address } = useAccount()
-  const [mixBalance, setMixBalance] = useState('')
-  const [machineList, setMachineList] = useState<IReleaseInfo[]>([])
-  const [usdtToIdxRate, setUsdtToIdxRate] = useState('')
+  const { address } = useAccount();
+  const [mixBalance, setMixBalance] = useState("");
+  const [machineList, setMachineList] = useState<IReleaseInfo[]>([]);
+  const [usdtToIdxRate, setUsdtToIdxRate] = useState("");
 
-  const [idxToBeClaimed, setIdxToBeClaimed] = useState(0)
-  const [remainingAmount, setRemainingAmount] = useState(0)
-  const [releasedAmount, setReleasedAmount] = useState(0)
+  const [idxToBeClaimed, setIdxToBeClaimed] = useState(0);
+  const [remainingAmount, setRemainingAmount] = useState(0);
+  const [releasedAmount, setReleasedAmount] = useState(0);
 
-  const { executeSequentialCalls } = useSequentialContractWrite()
-  const [isExchangingIDX, setIsExchangingIDX] = useState(false)
-  const navigate = useNavigate()
-  const [listHeight, setListHeight] = useState(0)
-  const listContainerRef = useRef<HTMLDivElement>(null)
+  const { executeSequentialCalls } = useSequentialContractWrite();
+  const [isExchangingIDX, setIsExchangingIDX] = useState(false);
+  const navigate = useNavigate();
+  const [listHeight, setListHeight] = useState(0);
+  const listContainerRef = useRef<HTMLDivElement>(null);
 
-  const [isClaimingIDX, setIsClaimingIDX] = useState(false)
+  const [isClaimingIDX, setIsClaimingIDX] = useState(false);
 
   const handleQuery = useCallback(async () => {
     try {
       const bigNumIds = await readContract(config, {
         address: MiningMachineProductionLogicAddress,
         abi: MiningMachineProductionLogicABI,
-        functionName: 'getUserReleaseIds',
-        args: [address]
-      })
+        functionName: "getUserReleaseIds",
+        args: [address],
+      });
 
       const contracts = (bigNumIds as bigint[]).map((id) => ({
         address: MiningMachineProductionLogicAddress,
         abi: MiningMachineProductionLogicABI,
-        functionName: 'getReleaseInfo',
-        args: [address, id]
-      }))
+        functionName: "getReleaseInfo",
+        args: [address, id],
+      }));
 
       const result = await multicall(config, {
-        contracts
-      })
+        contracts,
+      });
 
       const data = result.map((item, i) => {
         return {
@@ -99,148 +99,148 @@ const ExchangeIdx = () => {
           remainingLockTime: Number(item.result[5]),
           //  剩余释放时间（秒，释放期内有效）。
           remainingReleaseTime: Number(item.result[6]),
-          id: Number(bigNumIds[i])
-        }
-      })
+          id: Number(bigNumIds[i]),
+        };
+      });
 
-      setMachineList(data)
+      setMachineList(data);
 
-      setReleasedAmount(data.reduce((acc, cur) => acc + cur.releasedAmount, 0))
+      setReleasedAmount(data.reduce((acc, cur) => acc + cur.releasedAmount, 0));
       setRemainingAmount(
         data.reduce((acc, cur) => acc + cur.remainingAmount, 0)
-      )
+      );
       setIdxToBeClaimed(
         data.reduce((acc, cur) => acc + cur.releasableAmount, 0)
-      )
-      console.log('release Info', data)
+      );
+      console.log("release Info", data);
     } catch (error) {
-      console.error(error)
+      console.error(error);
     }
-  }, [address])
+  }, [address]);
 
   useEffect(() => {
-    handleQuery()
-  }, [handleQuery])
+    handleQuery();
+  }, [handleQuery]);
 
   const queryMIXBalance = useCallback(async () => {
     try {
       const res = await readContract(config, {
         address: MiningMachineSystemStorageAddress,
         abi: MiningMachineSystemStorageABI,
-        functionName: 'mixBalances',
-        args: [address]
-      })
-      setMixBalance(res ? formatEther(res) : '0')
+        functionName: "mixBalances",
+        args: [address],
+      });
+      setMixBalance(res ? formatEther(res) : "0");
     } catch (error) {
-      console.error(error)
+      console.error(error);
     }
-  }, [address])
+  }, [address]);
 
   useEffect(() => {
-    queryMIXBalance()
-  }, [queryMIXBalance])
+    queryMIXBalance();
+  }, [queryMIXBalance]);
 
   const getUsdtToIdxRate = async () => {
     try {
       const data = await readContract(config, {
         address: MiningMachineSystemLogicAddress,
         abi: MiningMachineSystemLogicABI,
-        functionName: 'getIDXAmount',
-        args: [1]
-      })
+        functionName: "getIDXAmount",
+        args: [1],
+      });
 
-      const rate = data ? formatEther(data) : '0'
-      setUsdtToIdxRate(rate)
+      const rate = data ? formatEther(data) : "0";
+      setUsdtToIdxRate(rate);
     } catch (error) {
-      console.error(error)
+      console.error(error);
     }
-  }
+  };
 
   useEffect(() => {
-    getUsdtToIdxRate()
-  }, [])
+    getUsdtToIdxRate();
+  }, []);
 
   const handleExchangeMixToIDX = async () => {
     if (+mixBalance < 100) {
       Toast.show({
-        content: 'MIX余额不足',
-        position: 'center'
-      })
-      return
+        content: "MIX余额不足",
+        position: "center",
+      });
+      return;
     }
 
     try {
-      setIsExchangingIDX(true)
+      setIsExchangingIDX(true);
 
-      const exchangeMixCount = Math.floor(+mixBalance / 100)
+      const exchangeMixCount = Math.floor(+mixBalance / 100);
 
-      console.log('aaa', exchangeMixCount)
+      console.log("aaa", exchangeMixCount);
       const hash = await writeContract(config, {
         address: MiningMachineProductionLogicAddress as `0x${string}`,
         abi: MiningMachineProductionLogicABI,
-        functionName: 'convertMIXtoIDX',
-        args: [exchangeMixCount]
-      })
+        functionName: "convertMIXtoIDX",
+        args: [exchangeMixCount],
+      });
 
       await waitForTransactionReceipt(config, {
         hash,
-        chainId: CHAIN_ID
-      })
+        chainId: CHAIN_ID,
+      });
       Toast.show({
-        content: '兑换成功',
-        position: 'center'
-      })
-      queryMIXBalance()
-      handleQuery()
+        content: "兑换成功",
+        position: "center",
+      });
+      queryMIXBalance();
+      handleQuery();
     } catch (error) {
-      console.error(error)
+      console.error(error);
     } finally {
-      setIsExchangingIDX(false)
+      setIsExchangingIDX(false);
     }
-  }
+  };
 
   const handleCloseModal = () => {
-    Modal.clear()
-  }
+    Modal.clear();
+  };
 
   const handleClaimIDX = async () => {
     try {
       // console.log(123, machineList.filter(item => item.totalAmount !== item.releasedAmount))
       const notClaimList = machineList.filter(
-        (item) => item.totalAmount !== item.releasedAmount
-      )
-      setIsClaimingIDX(true)
+        (item) => item.releasableAmount > 0
+      );
+      setIsClaimingIDX(true);
 
       const multiContractsCalls = notClaimList.map((item) => ({
         address: MiningMachineProductionLogicAddress as `0x${string}`,
         abi: MiningMachineProductionLogicABI,
-        functionName: 'claimReleasedIdx',
+        functionName: "claimReleasedIdx",
         args: [item.id],
         onConfirmed: (receipt: TransactionReceipt, index: number) => {
           // 这里可以执行其他操作，比如更新UI或触发下一个操作
-          console.log(`Approval confirmed for call ${index + 1}`)
-        }
-      }))
+          console.log(`Approval confirmed for call ${index + 1}`);
+        },
+      }));
 
-      const res = await executeSequentialCalls(multiContractsCalls)
-      setIsClaimingIDX(false)
+      const res = await executeSequentialCalls(multiContractsCalls);
+      setIsClaimingIDX(false);
       const extractedIdxAmount = res.reduce((acc, cur, index) => {
         if (cur.success) {
-          acc += notClaimList[index].releasableAmount
+          acc += notClaimList[index].releasableAmount;
         }
-        return acc
-      }, 0)
-      const isAtLeastOneSuccess = res.find((item) => item.success)
+        return acc;
+      }, 0);
+      const isAtLeastOneSuccess = res.find((item) => item.success);
 
       if (isAtLeastOneSuccess) {
-        handleQuery()
+        handleQuery();
         Modal.show({
           bodyStyle: {
-            background: '#000000',
-            color: '#ffffff',
-            width: '75vw',
-            padding: '15px',
-            borderRadius: '20px'
+            background: "#000000",
+            color: "#ffffff",
+            width: "75vw",
+            padding: "15px",
+            borderRadius: "20px",
           },
           showCloseButton: true,
           closeOnMaskClick: true,
@@ -266,36 +266,36 @@ const ExchangeIdx = () => {
                 </button>
               </div>
             </div>
-          )
-        })
+          ),
+        });
       }
     } catch (error) {
-      console.error(error)
-      setIsClaimingIDX(false)
+      console.error(error);
+      setIsClaimingIDX(false);
     }
-  }
+  };
   const handlBack = () => {
-    navigate('/user')
-  }
+    navigate("/user");
+  };
 
   // 动态计算高度
   useEffect(() => {
-    if (!listContainerRef.current) return
+    if (!listContainerRef.current) return;
 
     const calculateHeight = () => {
-      const windowHeight = window.innerHeight
-      const topSectionHeight = 435
-      const newHeight = windowHeight - topSectionHeight
-      setListHeight(newHeight)
-    }
+      const windowHeight = window.innerHeight;
+      const topSectionHeight = 435;
+      const newHeight = windowHeight - topSectionHeight;
+      setListHeight(newHeight);
+    };
 
     // 初始化计算
-    calculateHeight()
+    calculateHeight();
 
     // 监听窗口变化（如旋转屏幕、键盘弹出等）
-    window.addEventListener('resize', calculateHeight)
-    return () => window.removeEventListener('resize', calculateHeight)
-  }, [])
+    window.addEventListener("resize", calculateHeight);
+    return () => window.removeEventListener("resize", calculateHeight);
+  }, []);
 
   return (
     <div className="px-[21px]">
@@ -312,12 +312,12 @@ const ExchangeIdx = () => {
 
       <div
         style={{
-          background: '#000',
-          width: '100%',
-          padding: '12px 20px',
-          gap: '5px',
-          borderRadius: '24px',
-          color: '#fff'
+          background: "#000",
+          width: "100%",
+          padding: "12px 20px",
+          gap: "5px",
+          borderRadius: "24px",
+          color: "#fff",
         }}
       >
         <div className="text-[12px]">待兑换MIX</div>
@@ -399,9 +399,9 @@ const ExchangeIdx = () => {
             <Divider
               direction="vertical"
               style={{
-                color: '#1677ff',
-                borderColor: '#bdbdbd',
-                height: '40px'
+                color: "#1677ff",
+                borderColor: "#bdbdbd",
+                height: "40px",
               }}
             />
             <div className="flex-1 flex-col items-start">
@@ -442,25 +442,25 @@ const ExchangeIdx = () => {
         </div>
       </div>
     </div>
-  )
-}
+  );
+};
 
 const Row = memo(
   ({
     index,
     style,
-    data
+    data,
   }: {
-    data: IReleaseInfo[]
-    index: number
-    style: React.CSSProperties
+    data: IReleaseInfo[];
+    index: number;
+    style: React.CSSProperties;
   }) => {
-    const item = data[index]
+    const item = data[index];
     return (
       <div
         style={{
           ...style,
-          height: '70px'
+          height: "70px",
         }}
       >
         <div className="flex text-[12px] items-center gap-2">
@@ -500,8 +500,8 @@ const Row = memo(
 
         <Divider />
       </div>
-    )
+    );
   }
-)
+);
 
-export default ExchangeIdx
+export default ExchangeIdx;
