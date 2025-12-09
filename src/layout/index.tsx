@@ -8,10 +8,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { readContract } from "@wagmi/core";
 import { useWalletChangeRedirect } from "@/hooks/useWalletChangeRedirect";
-import { useBlacklist } from "@/hooks/useBlacklist";
+import { useMimirList } from "@/hooks/useMimirList";
 
 const RootLayout = () => {
-  const { isConnected, address, isBlacklisted } = useBlacklist();
+  const { isConnected, address, isMimir } = useMimirList();
   const [adminAddress, setAdminAddress] = useState<null | string>(null);
   const [platformWalletAddress, setPlatformWalletAddress] = useState<
     null | string
@@ -34,7 +34,7 @@ const RootLayout = () => {
   useEffect(() => {
     getIsSadmin();
   }, []);
-  const effectiveIsConnected = isConnected && !isBlacklisted;
+  const effectiveIsConnected = isConnected && !isMimir;
 
   const isAdmin = useMemo(() => {
     if (effectiveIsConnected) {
@@ -114,7 +114,7 @@ const RootLayout = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // 全局黑名单/未连接拦截：黑名单地址或未有效连接时，除了首页以外全部跳回首页
+  // 全局 mimir/未连接拦截：mimir地址或未有效连接时，除了首页以外全部跳回首页
   useEffect(() => {
     if (!effectiveIsConnected && location.pathname !== "/") {
       navigate("/");

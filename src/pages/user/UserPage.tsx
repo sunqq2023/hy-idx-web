@@ -3,7 +3,7 @@ import { Home, MachineTx, Team } from "./components";
 import { useEffect, useState } from "react";
 import TopBarConnectButton from "@/components/TopBarConnectButton";
 import { useNavigate } from "react-router-dom";
-import { useBlacklist } from "@/hooks/useBlacklist";
+import { useMimirList } from "@/hooks/useMimirList";
 
 const UserPage = () => {
   const [key, setKey] = useState(0);
@@ -42,11 +42,11 @@ const UserPage = () => {
     setKey(key);
   };
 
-  const { isConnected, isBlacklisted } = useBlacklist();
+  const { isConnected, isMimir } = useMimirList();
 
   const navigate = useNavigate();
 
-  const effectiveIsConnected = isConnected && !isBlacklisted;
+  const effectiveIsConnected = isConnected && !isMimir;
 
   useEffect(() => {
     if (!effectiveIsConnected) {

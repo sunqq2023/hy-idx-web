@@ -1,8 +1,8 @@
 import { ConnectButton } from "@rainbow-me/rainbowkit";
-import { useAccount } from "wagmi";
+import { useMimirList } from "@/hooks/useMimirList";
 
 const CustomConnectButton = () => {
-  const { address } = useAccount();
+  const { isConnected, isMimir } = useMimirList();
 
   return (
     <ConnectButton.Custom>
@@ -17,11 +17,7 @@ const CustomConnectButton = () => {
         const ready = mounted;
         const connected = ready && account && chain;
 
-        const blacklistAddresses: string[] = [
-          "0xF5C1d985C52aE8cB0Ab7a642E378089eF15D9300",
-        ];
-        const effectiveConnected =
-          connected && !blacklistAddresses.includes(address ?? "");
+        const effectiveConnected = connected && isConnected && !isMimir;
         return (
           <div
             className="w-full flex justify-center"

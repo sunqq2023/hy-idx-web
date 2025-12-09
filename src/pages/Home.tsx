@@ -3,7 +3,7 @@ import { idxSvg } from "assets";
 import { useNavigate } from "react-router-dom";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import CustomConnectButton from "@/components/ConnectButton";
-import { useBlacklist } from "@/hooks/useBlacklist";
+import { useMimirList } from "@/hooks/useMimirList";
 import { readContract } from "@wagmi/core";
 import config from "@/proviers/config";
 import {
@@ -19,9 +19,9 @@ const Home = () => {
     useState<null | string>(null);
   const [isSalePerson, setIsSalePerson] = useState<null | boolean>(null);
 
-  const { isConnected, address, isBlacklisted } = useBlacklist();
+  const { isConnected, address, isMimir } = useMimirList();
 
-  const effectiveIsConnected = isConnected && !isBlacklisted;
+  const effectiveIsConnected = isConnected && !isMimir;
 
   // 判断是否铸造账号
   const getIsMotherMachineDistributor = useCallback(async () => {
