@@ -1,10 +1,10 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react-swc'
-import tailwindcss from '@tailwindcss/vite'
-import tsconfigPaths from 'vite-tsconfig-paths'
-import svgr from 'vite-plugin-svgr'
-import { nodePolyfills } from 'vite-plugin-node-polyfills'
-import { visualizer } from 'rollup-plugin-visualizer'
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react-swc";
+import tailwindcss from "@tailwindcss/vite";
+import tsconfigPaths from "vite-tsconfig-paths";
+import svgr from "vite-plugin-svgr";
+import { nodePolyfills } from "vite-plugin-node-polyfills";
+import { visualizer } from "rollup-plugin-visualizer";
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -18,32 +18,32 @@ export default defineConfig({
         //   mobx: 'mobx',
         //   'mobx-react-lite': 'mobxReactLite'
         // },
-        chunkFileNames: 'chunks/[name]-[hash].js',
+        chunkFileNames: "chunks/[name]-[hash].js",
         manualChunks(id) {
-          if (id.includes('node_modules')) {
+          if (id.includes("node_modules")) {
             // if (id.includes('tronweb')) {
             //   return 'tronewb3'
             // }
             // if(id.includes('solana')){
             //   return 'solana'
             // }
-            return 'vendor'
+            return "vendor";
           }
-        }
-      }
-    }
+        },
+      },
+    },
   },
   plugins: [
     nodePolyfills({
       crypto: true,
       stream: true,
       buffer: true,
-      process: true
+      process: true,
     }),
     react(),
     tailwindcss(),
     tsconfigPaths(),
-    svgr()
+    svgr(),
     // visualizer({
     //   filename: './dist/stats.html',
     //   open: true,
@@ -52,6 +52,7 @@ export default defineConfig({
     // })
   ],
   server: {
-    port: 3001
-  }
-})
+    host: "0.0.0.0", // 监听所有网络接口
+    port: 3001,
+  },
+});
