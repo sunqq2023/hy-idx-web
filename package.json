@@ -4,10 +4,15 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
+    "dev": "vite --mode development",
+    "dev:test": "vite --mode test",
+    "build": "vite build --mode production",
+    "build:test": "vite build --mode test",
+    "build:dev": "vite build --mode development",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "preview:test": "vite preview --mode test",
+    "verify": "bash verify-build.sh"
   },
   "dependencies": {
     "@ant-design/icons": "^6.0.0",

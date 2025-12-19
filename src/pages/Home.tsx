@@ -1,5 +1,5 @@
 import { Divider } from "antd-mobile";
-import { idxSvg } from "assets";
+import { idxSvg } from "@/assets";
 import { useNavigate } from "react-router-dom";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import CustomConnectButton from "@/components/ConnectButton";
@@ -45,6 +45,8 @@ const Home = () => {
 
   // 判断是否销售账号
   const getIsSalePerson = useCallback(async () => {
+    if (!address) return;
+
     try {
       const result = await readContract(config, {
         address: MiningMachineSystemStorageAddress,

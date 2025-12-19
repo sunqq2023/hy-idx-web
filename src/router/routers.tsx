@@ -1,66 +1,66 @@
-import { lazy } from 'react'
-import { createBrowserRouter, RouteObject } from 'react-router-dom'
+import { lazy } from "react";
+import { createBrowserRouter, RouteObject } from "react-router-dom";
 
-const RootLayout = lazy(() => import('layout'))
-const HomeLayout = lazy(() => import('layout/HomeLayout'))
-const Home = lazy(() => import('pages/Home'))
+const RootLayout = lazy(() => import("@/layout"));
+const HomeLayout = lazy(() => import("@/layout/HomeLayout"));
+const Home = lazy(() => import("@/pages/Home"));
 const MakeMotherMiningMachine = lazy(
-  () => import('pages/MakeMotherMiningMachine')
-)
-const NotFound = lazy(() => import('pages/NotFound'))
-const MakeMHistory = lazy(() => import('pages/MakeMHistory'))
-const SalePersonPage = lazy(() => import('pages/SalePersonPage'))
-const SalePersonTxHistory = lazy(() => import('pages/SalePersonTxHistory'))
-const TransferMachine = lazy(() => import('pages/TransferMachine'))
-const UserPage = lazy(() => import('@/pages/user/UserPage'))
+  () => import("@/pages/MakeMotherMiningMachine")
+);
+const NotFound = lazy(() => import("@/pages/NotFound"));
+const MakeMHistory = lazy(() => import("@/pages/MakeMHistory"));
+const SalePersonPage = lazy(() => import("@/pages/SalePersonPage"));
+const SalePersonTxHistory = lazy(() => import("@/pages/SalePersonTxHistory"));
+const TransferMachine = lazy(() => import("@/pages/TransferMachine"));
+const UserPage = lazy(() => import("@/pages/user/UserPage"));
 const UserTxHistory = lazy(
-  () => import('@/pages/user/components/UserTxHistory')
-)
+  () => import("@/pages/user/components/UserTxHistory")
+);
 // 买入母矿机
 const UserPayForBuyMachine = lazy(
-  () => import('@/pages/user/components/UserPayForBuyMachine')
-)
+  () => import("@/pages/user/components/UserPayForBuyMachine")
+);
 const UserToBeActivatedMachine = lazy(
-  () => import('@/pages/user/components/UserToBeActivatedMachine/index')
-)
+  () => import("@/pages/user/components/UserToBeActivatedMachine/index")
+);
 const UserMachineDetail = lazy(
-  () => import('@/pages/user/components/MachineDetail')
-)
-const UserAddFuel = lazy(() => import('@/pages/user/components/AddFuel'))
-const UserClaimMix = lazy(() => import('@/pages/user/components/ClaimMix'))
-const UserMixBill = lazy(() => import('@/pages/user/components/MixBill'))
+  () => import("@/pages/user/components/MachineDetail")
+);
+const UserAddFuel = lazy(() => import("@/pages/user/components/AddFuel"));
+const UserClaimMix = lazy(() => import("@/pages/user/components/ClaimMix"));
+const UserMixBill = lazy(() => import("@/pages/user/components/MixBill"));
 const UserExchangeIdx = lazy(
-  () => import('@/pages/user/components/ExchangeIdx')
-)
-const UserOrders = lazy(() => import('@/pages/user/components/MyOrders'))
+  () => import("@/pages/user/components/ExchangeIdx")
+);
+const UserOrders = lazy(() => import("@/pages/user/components/MyOrders"));
 const UserPublishMachineTx = lazy(
-  () => import('@/pages/user/components/MyPublishMachineTx')
-)
+  () => import("@/pages/user/components/MyPublishMachineTx")
+);
 const UserSellToPlatform = lazy(
-  () => import('@/pages/user/components/SellToPlatform')
-)
+  () => import("@/pages/user/components/SellToPlatform")
+);
 const UserTransferMachine = lazy(
-  () => import('@/pages/user/components/UserTransferMachine')
-)
+  () => import("@/pages/user/components/UserTransferMachine")
+);
 
 // 买入子矿机
 const UserPayForBuyMachineFromUser = lazy(
-  () => import('@/pages/user/components/PayForBuyMachineFromUser')
-)
+  () => import("@/pages/user/components/PayForBuyMachineFromUser")
+);
 const UserSyntheticMachine = lazy(
-  () => import('@/pages/user/components/SyntheticMachine')
-)
+  () => import("@/pages/user/components/SyntheticMachine")
+);
 
-const Setting = lazy(() => import('@/pages/Setting'))
+const Setting = lazy(() => import("@/pages/Setting"));
 
 export type RouteConfig = RouteObject & {
-  auth?: boolean
-  children?: RouteConfig[]
-}
+  auth?: boolean;
+  children?: RouteConfig[];
+};
 
 const routes: RouteConfig[] = [
   {
-    path: '/',
+    path: "/",
     element: (
       // <ErrorBoundary>
       <RootLayout />
@@ -68,129 +68,129 @@ const routes: RouteConfig[] = [
     auth: true,
     children: [
       {
-        path: '/',
+        path: "/",
         element: <HomeLayout />,
         children: [
           {
             index: true,
             element: <Home />,
-            auth: true
-          }
-        ]
+            auth: true,
+          },
+        ],
       },
       {
-        path: '/setting',
+        path: "/setting",
         auth: true,
-        element: <Setting />
+        element: <Setting />,
       },
 
       {
-        path: '/make-mmm',
+        path: "/make-mmm",
         element: <MakeMotherMiningMachine />,
-        auth: true
+        auth: true,
       },
       {
-        path: '/make-mmm/history',
+        path: "/make-mmm/history",
         element: <MakeMHistory />,
-        auth: true
+        auth: true,
       },
       {
-        path: '/sale-person',
+        path: "/sale-person",
         element: <SalePersonPage />,
-        auth: true
+        auth: true,
       },
       {
-        path: '/sale-person/history',
+        path: "/sale-person/history",
         element: <SalePersonTxHistory />,
-        auth: true
+        auth: true,
       },
       {
-        path: '/transfer-machine',
+        path: "/transfer-machine",
         element: <TransferMachine />,
-        auth: true
+        auth: true,
       },
       {
-        path: '/user',
+        path: "/user",
         element: <UserPage />,
-        auth: true
+        auth: true,
       },
       {
-        path: '/user/history',
+        path: "/user/history",
         element: <UserTxHistory />,
-        auth: true
+        auth: true,
       },
       {
-        path: '/user/payForBuyMachine',
+        path: "/user/payForBuyMachine",
         element: <UserPayForBuyMachine />,
-        auth: true
+        auth: true,
       },
       {
-        path: '/user/toBeActivatedMachine',
+        path: "/user/toBeActivatedMachine",
         element: <UserToBeActivatedMachine />,
-        auth: true
+        auth: true,
       },
       {
-        path: '/user/machineDetail',
+        path: "/user/machineDetail",
         element: <UserMachineDetail />,
-        auth: true
+        auth: true,
       },
       {
-        path: '/user/addFuel',
+        path: "/user/addFuel",
         element: <UserAddFuel />,
-        auth: true
+        auth: true,
       },
       {
-        path: '/user/claimMix',
+        path: "/user/claimMix",
         element: <UserClaimMix />,
-        auth: true
+        auth: true,
       },
       {
-        path: '/user/mixBill',
+        path: "/user/mixBill",
         element: <UserMixBill />,
-        auth: true
+        auth: true,
       },
       {
-        path: '/user/exchangeIdx',
+        path: "/user/exchangeIdx",
         element: <UserExchangeIdx />,
-        auth: true
+        auth: true,
       },
       {
-        path: '/user/myOrders',
+        path: "/user/myOrders",
         element: <UserOrders />,
-        auth: true
+        auth: true,
       },
       {
-        path: '/user/myPublishMachineTx',
+        path: "/user/myPublishMachineTx",
         element: <UserPublishMachineTx />,
-        auth: true
+        auth: true,
       },
       {
-        path: '/user/sellToPlatform',
+        path: "/user/sellToPlatform",
         element: <UserSellToPlatform />,
-        auth: true
+        auth: true,
       },
       {
-        path: '/user/transferMachine',
+        path: "/user/transferMachine",
         element: <UserTransferMachine />,
-        auth: true
+        auth: true,
       },
       {
-        path: '/user/userToUserPay',
+        path: "/user/userToUserPay",
         element: <UserPayForBuyMachineFromUser />,
-        auth: true
+        auth: true,
       },
       {
-        path: '/user/syntheticMachine',
+        path: "/user/syntheticMachine",
         element: <UserSyntheticMachine />,
-        auth: true
-      }
-    ]
+        auth: true,
+      },
+    ],
   },
 
   {
-    path: '/*',
-    element: <NotFound />
-  }
-]
+    path: "/*",
+    element: <NotFound />,
+  },
+];
 
-export const routers = createBrowserRouter(routes)
+export const routers = createBrowserRouter(routes);

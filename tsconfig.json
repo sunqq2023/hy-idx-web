@@ -1,8 +1,8 @@
 {
   "compilerOptions": {
-    "baseUrl": "./src", // 这里指向 src 目录
+    "baseUrl": ".",
     "paths": {
-      "@/*": ["*"] // 不需要再加 src
+      "@/*": ["./src/*"]
     },
     "target": "esnext",
     "lib": ["dom", "dom.iterable", "esnext"],

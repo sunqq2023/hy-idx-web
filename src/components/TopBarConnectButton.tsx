@@ -1,6 +1,8 @@
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { useMimirList } from "@/hooks/useMimirList";
 import classNames from "classnames";
+import { useState } from "react";
+import BindPhoneModal from "./BindPhoneModal";
 
 interface TopBarConnectButtonProps {
   isStudio?: boolean;
@@ -10,6 +12,7 @@ const TopBarConnectButton = ({
   isStudio = false,
 }: TopBarConnectButtonProps) => {
   const { isConnected, isMimir } = useMimirList();
+  const [showBindModal, setShowBindModal] = useState(false);
 
   return (
     <ConnectButton.Custom>
@@ -37,7 +40,7 @@ const TopBarConnectButton = ({
                     onClick={openConnectModal}
                     className={classNames(
                       [!effectiveConnected ? "hidden" : ""],
-                      "bg-black w-[50%] rounded-3xl text-white flex justify-center py-2"
+                      "bg-black w-[50%] rounded-3xl text-white flex justify-center py-2",
                     )}
                   >
                     连接钱包
@@ -85,7 +88,7 @@ const TopBarConnectButton = ({
                     {chain.name}
                   </button> */}
                   <button
-                    onClick={openAccountModal}
+                    onClick={() => setShowBindModal(true)}
                     type="button"
                     className="text-[.75rem] flex items-center gap-1"
                   >
@@ -112,6 +115,12 @@ const TopBarConnectButton = ({
                     )}
                     {account.displayName}
                   </button>
+
+                  {/* 绑定手机号弹窗 */}
+                  <BindPhoneModal
+                    isOpen={showBindModal}
+                    onClose={() => setShowBindModal(false)}
+                  />
                 </div>
               );
             })()}

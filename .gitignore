@@ -60,3 +60,7 @@ dist/
 *.bak
 *.tmp
 *.patch
+# Environment files (only commit examples)
+.env
+.env.local
+.env.*.local

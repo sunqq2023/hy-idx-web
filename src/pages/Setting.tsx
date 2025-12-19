@@ -16,18 +16,21 @@ import {
   IDX_CONTRACTS_ADDRESS,
 } from "@/constants";
 import { validateAddressFnMap } from "@/utils/validateAddress";
-import { Button, Input, TextArea, Toast, Dialog } from "antd-mobile";
+import { Button, Input, TextArea, Toast, Dialog, Checkbox } from "antd-mobile";
 import { useEffect, useState } from "react";
-import { useWriteContract } from "wagmi";
+import { useWriteContract, useAccount } from "wagmi";
 import {
   waitForTransactionReceipt,
   multicall,
   readContract,
 } from "@wagmi/core";
 import config from "@/proviers/config";
-import { parseEther, erc20Abi, formatEther } from "viem";
+import { parseEther, erc20Abi, formatEther, getAddress } from "viem";
+import UpgradeContracts from "@/components/UpgradeContracts";
 
 const Setting = () => {
+  const { address: currentWalletAddress } = useAccount();
+
   /* ===== 新增：本地登录态 ===== */
   const [passed, setPassed] = useState(false); // 是否已通过
   const [inputPwd, setInputPwd] = useState(""); // 输入框实时值
@@ -128,6 +131,18 @@ const Setting = () => {
     useState(false); // 设置推广算力上限中状态
   const [activatedPowerLimitLoading, setActivatedPowerLimitLoading] =
     useState(false); // 设置激活算力上限中状态
+
+  // MIX 操作相关状态
+  const [addMixForOperatorAmount, setAddMixForOperatorAmount] = useState(""); // 给操作员添加 MIX 数量
+  const [subMixForOperatorAmount, setSubMixForOperatorAmount] = useState(""); // 从操作员减少 MIX 数量
+  const [transferMixFromAddress, setTransferMixFromAddress] = useState(""); // 转移 MIX 源地址
+  const [transferMixToAddress, setTransferMixToAddress] = useState(""); // 转移 MIX 目标地址
+  const [transferMixAmount, setTransferMixAmount] = useState(""); // 转移 MIX 数量
+  const [useCurrentWallet, setUseCurrentWallet] = useState(false); // 是否使用当前钱包地址作为源地址
+  const [isAddingMixForOperator, setIsAddingMixForOperator] = useState(false); // 添加 MIX 中状态
+  const [isSubtractingMixForOperator, setIsSubtractingMixForOperator] =
+    useState(false); // 减少 MIX 中状态
+  const [isTransferringMix, setIsTransferringMix] = useState(false); // 转移 MIX 中状态
 
   const handleModifyAdmin = async () => {
     const isValid = validateAddressFnMap?.["EVM"]?.(adminAddress);
@@ -266,14 +281,14 @@ const Setting = () => {
           functionName: "SELLER_INCOME_USD",
           args: [],
         },
-      ];
+      ] as any;
 
       const res = await multicall(config, {
         contracts,
       });
 
-      setPLATFORM_FEE_USD(String(res[0].result));
-      setSELLER_INCOME_USD(String(res[1].result));
+      setPLATFORM_FEE_USD(String(res[0]?.result || ""));
+      setSELLER_INCOME_USD(String(res[1]?.result || ""));
     } catch (error) {
       console.error(error);
     }
@@ -324,7 +339,7 @@ const Setting = () => {
         address: MiningMachineSystemLogicExtendAddress as `0x${string}`,
         abi: MiningMachineSystemLogicExtendABI,
         functionName: "setPromotionPowerLimit",
-        args: [promotionPowerLimit],
+        args: [BigInt(promotionPowerLimit)],
       });
 
       await waitForTransactionReceipt(config, {
@@ -364,7 +379,7 @@ const Setting = () => {
         address: MiningMachineSystemLogicExtendAddress as `0x${string}`,
         abi: MiningMachineSystemLogicExtendABI,
         functionName: "setActivatedPowerLimit",
-        args: [activatedPowerLimit],
+        args: [BigInt(activatedPowerLimit)],
       });
 
       await waitForTransactionReceipt(config, {
@@ -385,6 +400,152 @@ const Setting = () => {
       });
       setActivatedPowerLimitLoading(false);
       console.error(error);
+    }
+  };
+
+  // ===== MIX 操作函数 =====
+
+  // 给操作员添加 MIX
+  const handleAddMixForOperator = async () => {
+    if (!addMixForOperatorAmount || +addMixForOperatorAmount <= 0) {
+      Toast.show({
+        content: "请输入有效的 MIX 数量",
+        position: "center",
+        duration: 2000,
+      });
+      return;
+    }
+
+    try {
+      setIsAddingMixForOperator(true);
+      const hash = await writeContractAsync({
+        address: MiningMachineNodeSystemAddress as `0x${string}`,
+        abi: MiningMachineNodeSystemABI,
+        functionName: "addMixForOperator",
+        args: [parseEther(addMixForOperatorAmount)],
+      });
+
+      await waitForTransactionReceipt(config, {
+        hash,
+      });
+      Toast.show({
+        content: "成功添加 MIX",
+        position: "center",
+      });
+      setAddMixForOperatorAmount("");
+    } catch (error) {
+      Toast.show({
+        content: "添加 MIX 失败",
+        position: "center",
+      });
+      console.error("Add MIX for operator failed:", error);
+    } finally {
+      setIsAddingMixForOperator(false);
+    }
+  };
+
+  // 从操作员减少 MIX
+  const handleSubMixForOperator = async () => {
+    if (!subMixForOperatorAmount || +subMixForOperatorAmount <= 0) {
+      Toast.show({
+        content: "请输入有效的 MIX 数量",
+        position: "center",
+        duration: 2000,
+      });
+      return;
+    }
+
+    try {
+      setIsSubtractingMixForOperator(true);
+      const hash = await writeContractAsync({
+        address: MiningMachineNodeSystemAddress as `0x${string}`,
+        abi: MiningMachineNodeSystemABI,
+        functionName: "subMixForOperator",
+        args: [parseEther(subMixForOperatorAmount)],
+      });
+
+      await waitForTransactionReceipt(config, {
+        hash,
+      });
+      Toast.show({
+        content: "成功减少 MIX",
+        position: "center",
+      });
+      setSubMixForOperatorAmount("");
+    } catch (error) {
+      Toast.show({
+        content: "减少 MIX 失败",
+        position: "center",
+      });
+      console.error("Subtract MIX for operator failed:", error);
+    } finally {
+      setIsSubtractingMixForOperator(false);
+    }
+  };
+
+  // 转移 MIX
+  const handleTransferMix = async () => {
+    const isFromValid = validateAddressFnMap?.["EVM"]?.(transferMixFromAddress);
+    if (!isFromValid) {
+      Toast.show({
+        content: "请输入合法的源地址",
+        position: "center",
+        duration: 2000,
+      });
+      return;
+    }
+
+    const isToValid = validateAddressFnMap?.["EVM"]?.(transferMixToAddress);
+    if (!isToValid) {
+      Toast.show({
+        content: "请输入合法的接收地址",
+        position: "center",
+        duration: 2000,
+      });
+      return;
+    }
+
+    if (!transferMixAmount || +transferMixAmount <= 0) {
+      Toast.show({
+        content: "请输入有效的 MIX 数量",
+        position: "center",
+        duration: 2000,
+      });
+      return;
+    }
+
+    try {
+      setIsTransferringMix(true);
+      const hash = await writeContractAsync({
+        address: MiningMachineNodeSystemAddress as `0x${string}`,
+        abi: MiningMachineNodeSystemABI,
+        functionName: "transferMixBetweenUsers",
+        args: [
+          getAddress(transferMixFromAddress),
+          getAddress(transferMixToAddress),
+          parseEther(transferMixAmount),
+        ],
+      });
+
+      await waitForTransactionReceipt(config, {
+        hash,
+      });
+      Toast.show({
+        content: "成功转移 MIX",
+        position: "center",
+      });
+      setTransferMixFromAddress("");
+      setTransferMixToAddress("");
+      setTransferMixAmount("");
+      setUseCurrentWallet(false);
+    } catch (error) {
+      Toast.show({
+        content: "转移 MIX 失败",
+        position: "center",
+      });
+      console.error("Transfer MIX failed:", error);
+    } finally {
+      setIsTransferringMix(false);
     }
   };
 
@@ -450,13 +611,16 @@ const Setting = () => {
 
   const { writeContractAsync } = useWriteContract();
 
-  const handleChangeAddress = async (type: string, address: string) => {
+  const handleChangeAddress = async (
+    type: "idx" | "usdt" | "pancake" | "pair",
+    address: string,
+  ) => {
     const addressMap = {
       idx: "setIdxToken",
       usdt: "setUsdtToken",
       pancake: "setPancakeRouter",
       pair: "setIdxUsdtPair",
-    };
+    } as const;
 
     try {
       if (type === "idx") {
@@ -472,8 +636,8 @@ const Setting = () => {
       const hash = await writeContractAsync({
         address: MiningMachineSystemStorageAddress,
         abi: MiningMachineSystemStorageABI,
-        functionName: addressMap[type] as string,
-        args: [address],
+        functionName: addressMap[type],
+        args: [getAddress(address)],
       });
 
       await waitForTransactionReceipt(config, {
@@ -578,9 +742,9 @@ const Setting = () => {
         abi: MiningMachineProductionLogicABI,
         functionName: "setLockReleaseParams",
         args: [
-          +lockDuration * 24 * 60 * 60,
-          +releaseDuration * 24 * 60 * 60,
-          +releaseIntervalMinutes * 1440,
+          BigInt(lockDuration) * 24n * 60n * 60n,
+          BigInt(releaseDuration) * 24n * 60n * 60n,
+          BigInt(releaseIntervalMinutes) * 1440n,
         ],
       });
 
@@ -620,7 +784,7 @@ const Setting = () => {
         address: MiningMachineNodeSystemAddress,
         abi: MiningMachineNodeSystemABI,
         functionName: "setNodesAmount",
-        args: [nodeCount],
+        args: [BigInt(nodeCount)],
       });
 
       await waitForTransactionReceipt(config, {
@@ -1836,6 +2000,128 @@ const Setting = () => {
             >
               设置激活算力上限
             </Button>
+          </div>
+
+          {/* MIX 操作管理 */}
+          <div className="bg-white p-3 rounded-2xl mt-2 flex flex-col gap-1">
+            <h2 className="mb-2 font-bold">给操作员添加 MIX</h2>
+            <Input
+              placeholder="输入 MIX 数量"
+              style={{
+                "--font-size": "13px",
+              }}
+              className="!bg-[#f3f3f3] rounded-3xl px-4 py-2 !flex !items-center !justify-center mb-2"
+              value={addMixForOperatorAmount}
+              type="number"
+              onChange={(val) => setAddMixForOperatorAmount(val)}
+            />
+            <Button
+              className="!bg-black !text-white !rounded-3xl !ml-auto !mt-2  !py-1 !w-full"
+              style={{
+                fontSize: "13px",
+              }}
+              loading={isAddingMixForOperator}
+              onClick={handleAddMixForOperator}
+            >
+              添加 MIX
+            </Button>
+          </div>
+
+          <div className="bg-white p-3 rounded-2xl mt-2 flex flex-col gap-1">
+            <h2 className="mb-2 font-bold">从操作员减少 MIX</h2>
+            <Input
+              placeholder="输入 MIX 数量"
+              style={{
+                "--font-size": "13px",
+              }}
+              className="!bg-[#f3f3f3] rounded-3xl px-4 py-2 !flex !items-center !justify-center mb-2"
+              value={subMixForOperatorAmount}
+              type="number"
+              onChange={(val) => setSubMixForOperatorAmount(val)}
+            />
+            <Button
+              className="!bg-black !text-white !rounded-3xl !ml-auto !mt-2  !py-1 !w-full"
+              style={{
+                fontSize: "13px",
+              }}
+              loading={isSubtractingMixForOperator}
+              onClick={handleSubMixForOperator}
+            >
+              减少 MIX
+            </Button>
+          </div>
+
+          <div className="bg-white p-3 rounded-2xl mt-2 flex flex-col gap-1">
+            <div className="mb-2 flex items-center justify-between">
+              <h2 className="font-bold">转移 MIX</h2>
+              <Checkbox
+                checked={useCurrentWallet}
+                onChange={(checked) => {
+                  setUseCurrentWallet(checked);
+                  if (checked && currentWalletAddress) {
+                    setTransferMixFromAddress(currentWalletAddress);
+                  } else if (!checked) {
+                    setTransferMixFromAddress("");
+                  }
+                }}
+                style={{
+                  "--icon-size": "18px",
+                  "--font-size": "13px",
+                }}
+              >
+                使用当前账户
+              </Checkbox>
+            </div>
+            <Input
+              placeholder="输入源地址（从哪个地址转出）"
+              style={{
+                "--font-size": "13px",
+              }}
+              className="!bg-[#f3f3f3] rounded-3xl px-4 py-2 !flex !items-center !justify-center mb-2"
+              value={transferMixFromAddress}
+              onChange={(val) => setTransferMixFromAddress(val)}
+              disabled={useCurrentWallet}
+            />
+            <Input
+              placeholder="输入接收地址（转到哪个地址）"
+              style={{
+                "--font-size": "13px",
+              }}
+              className="!bg-[#f3f3f3] rounded-3xl px-4 py-2 !flex !items-center !justify-center mb-2"
+              value={transferMixToAddress}
+              onChange={(val) => setTransferMixToAddress(val)}
+            />
+            <Input
+              placeholder="输入 MIX 数量"
+              style={{
+                "--font-size": "13px",
+              }}
+              className="!bg-[#f3f3f3] rounded-3xl px-4 py-2 !flex !items-center !justify-center mb-2"
+              value={transferMixAmount}
+              type="number"
+              onChange={(val) => setTransferMixAmount(val)}
+            />
+            <Button
+              className="!bg-black !text-white !rounded-3xl !ml-auto !mt-2  !py-1 !w-full"
+              style={{
+                fontSize: "13px",
+              }}
+              loading={isTransferringMix}
+              onClick={handleTransferMix}
+            >
+              转移 MIX
+            </Button>
+          </div>
+
+          {/* 一键升级合约 */}
+          <div
+            style={{
+              marginTop: "40px",
+              borderTop: "2px solid #e0e0e0",
+              paddingTop: "20px",
+            }}
+          >
+            <UpgradeContracts />
           </div>
         </div>
       )}
