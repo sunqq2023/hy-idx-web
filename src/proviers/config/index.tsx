@@ -57,7 +57,7 @@ const localhost = {
 
 const config = getDefaultConfig({
   appName: "My RainbowKit App",
-  projectId: "ca156ff839a84bdaa5f992ac616f1dd6",
+  projectId: "c6c2a2e243f4e96a433941e477c33844",
   chains: [customBsc, bscTestnet, localhost], // 使用自定义BSC配置替代默认的bsc
   wallets: [
     {
