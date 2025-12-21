@@ -1,2 +1,12 @@
 # SPA fallback - 所有路由都返回 index.html
+# 排除静态资源路径，避免无限循环
+/assets/*  200
+/chunks/*  200
+/*.js      200
+/*.css     200
+/*.svg     200
+/*.png     200
+/*.jpg     200
+/*.ico     200
+/*.json    200
 /*    /index.html   200

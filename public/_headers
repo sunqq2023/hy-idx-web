@@ -5,9 +5,18 @@
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: geolocation=(), microphone=(), camera=()
 
-# 允许在 WebView 中加载
+# HTML 文件不缓存，确保总是获取最新版本
 /*.html
   X-Frame-Options: ALLOWALL
+  Cache-Control: no-cache, no-store, must-revalidate
+  Pragma: no-cache
+  Expires: 0
+
+# index.html 特别处理
+/index.html
+  Cache-Control: no-cache, no-store, must-revalidate
+  Pragma: no-cache
+  Expires: 0
 
 # 静态资源缓存
 /assets/*
