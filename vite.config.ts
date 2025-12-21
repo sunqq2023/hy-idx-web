@@ -12,7 +12,17 @@ export default defineConfig({
     // 增加 chunk 大小警告阈值，避免警告
     chunkSizeWarningLimit: 1000,
     // 优化构建性能
-    target: "es2015", // 兼容更多设备
+    // 使用 es2020 以更好地支持 BigInt 和现代 JavaScript 特性
+    target: "es2020", // 支持 BigInt 和现代特性，同时保持较好的兼容性
+    // 确保模块顺序正确，避免初始化错误
+    modulePreload: {
+      polyfill: true,
+    },
+    // 优化依赖预构建，确保正确的加载顺序
+    commonjsOptions: {
+      include: [/node_modules/],
+      transformMixedEsModules: true,
+    },
     rollupOptions: {
       // external: ['react', 'react-dom/client','mobx', 'mobx-react-lite'], // 指定不打包的库
       output: {
@@ -22,61 +32,42 @@ export default defineConfig({
         //   mobx: 'mobx',
         //   'mobx-react-lite': 'mobxReactLite'
         // },
-        chunkFileNames: "chunks/[name]-[hash].js",
-        // 拆分更小的 chunks，避免单个文件过大导致 Android WebView 加载失败
+        chunkFileNames: (chunkInfo) => {
+          // 确保 react-vendor chunk 有固定的名称前缀，便于识别和优先加载
+          if (chunkInfo.name === "react-vendor") {
+            return "chunks/react-vendor-[hash].js";
+          }
+          return "chunks/[name]-[hash].js";
+        },
+        // 暂时将所有依赖合并到一个 vendor chunk，确保 React 正确加载
+        // 这样可以避免代码分割导致的加载顺序问题
         manualChunks(id) {
           if (id.includes("node_modules")) {
-            // 将大型库单独打包，避免 vendor 包过大
-            // Web3 核心库
-            if (id.includes("wagmi")) {
-              return "wagmi";
-            }
-            if (id.includes("viem")) {
-              return "viem";
-            }
-            // Web3 UI 库 - 进一步拆分
-            if (id.includes("@rainbow-me/rainbowkit")) {
-              return "rainbowkit";
-            }
-            if (id.includes("@ant-design/web3")) {
-              return "ant-web3";
-            }
-            // React 相关
-            if (id.includes("react") || id.includes("react-dom")) {
-              return "react-vendor";
-            }
-            if (id.includes("@tanstack/react-query")) {
-              return "react-query";
-            }
-            // UI 库
-            if (id.includes("antd-mobile")) {
-              return "antd-mobile";
-            }
-            // 加密和工具库
-            if (id.includes("ethers")) {
-              return "ethers";
-            }
-            if (id.includes("crypto-js") || id.includes("@noble")) {
-              return "crypto-libs";
-            }
-            // 其他大型库
-            if (id.includes("lodash")) {
-              return "lodash";
-            }
-            if (id.includes("dayjs")) {
-              return "dayjs";
-            }
-            // if (id.includes('tronweb')) {
-            //   return 'tronewb3'
-            // }
-            // if(id.includes('solana')){
-            //   return 'solana'
-            // }
+            // 将所有 node_modules 合并到一个 vendor chunk
+            // 这样可以确保所有依赖按正确的顺序加载，避免 React 相关错误
             return "vendor";
           }
         },
       },
     },
+  },
+  resolve: {
+    // 确保只有一个 React 实例
+    dedupe: ["react", "react-dom"],
+  },
+  optimizeDeps: {
+    // 确保 React 相关库按正确顺序预构建
+    include: [
+      "react",
+      "react-dom",
+      "@tanstack/react-query",
+      "wagmi",
+      "viem",
+      "@rainbow-me/rainbowkit",
+      "antd-mobile",
+    ],
+    // 强制预构建，避免运行时错误
+    force: false,
   },
   plugins: [
     nodePolyfills({
