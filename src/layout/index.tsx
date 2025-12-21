@@ -1,8 +1,6 @@
 import TopBar from "@/components/TopBar";
-import {
-  MiningMachineSystemStorageABI,
-  MiningMachineSystemStorageAddress,
-} from "@/constants";
+import { MiningMachineSystemStorageABI } from "@/constants";
+import { useChainConfig } from "@/hooks/useChainConfig";
 import config from "@/proviers/config";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
@@ -12,29 +10,53 @@ import { useMimirList } from "@/hooks/useMimirList";
 
 const RootLayout = () => {
   const { isConnected, address, isMimir } = useMimirList();
+  const chainConfig = useChainConfig();
   const [adminAddress, setAdminAddress] = useState<null | string>(null);
   const [platformWalletAddress, setPlatformWalletAddress] = useState<
     null | string
   >(null);
   const [isSalePerson, setIsSalePerson] = useState<null | boolean>(null);
 
-  const getIsSadmin = async () => {
+  const effectiveIsConnected = isConnected && !isMimir;
+
+  const getIsSadmin = useCallback(async () => {
+    // 只在钱包连接后才调用
+    if (!effectiveIsConnected) return;
+
     try {
       const res = await readContract(config, {
-        address: MiningMachineSystemStorageAddress,
+        address: chainConfig.STORAGE_ADDRESS as `0x${string}`,
         abi: MiningMachineSystemStorageABI,
         functionName: "sadmin",
       });
       setAdminAddress(res as string);
-    } catch (error) {
-      console.error(error);
+    } catch (error: unknown) {
+      // 静默处理合约不存在或函数返回空数据的错误
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : typeof error === "string"
+          ? error
+          : String(error);
+      if (
+        errorMessage.includes("returned no data") ||
+        errorMessage.includes("does not have the function") ||
+        errorMessage.includes("is not a contract")
+      ) {
+        console.warn(
+          `⚠️ Contract ${chainConfig.STORAGE_ADDRESS} may not be deployed or function 'sadmin' not available:`,
+          errorMessage
+        );
+        setAdminAddress(null);
+      } else {
+        console.error("Error fetching sadmin:", error);
+      }
     }
-  };
+  }, [chainConfig.STORAGE_ADDRESS, effectiveIsConnected]);
 
   useEffect(() => {
     getIsSadmin();
-  }, []);
-  const effectiveIsConnected = isConnected && !isMimir;
+  }, [getIsSadmin]);
 
   const isAdmin = useMemo(() => {
     if (effectiveIsConnected) {
@@ -55,17 +77,36 @@ const RootLayout = () => {
   const getIsPlatformWalletRole = useCallback(async () => {
     try {
       const result = await readContract(config, {
-        address: MiningMachineSystemStorageAddress,
+        address: chainConfig.STORAGE_ADDRESS as `0x${string}`,
         abi: MiningMachineSystemStorageABI,
         functionName: "platformWallet",
         args: [],
       });
 
       setPlatformWalletAddress(result as string);
-    } catch (error) {
-      console.log(error);
+    } catch (error: unknown) {
+      // 静默处理合约不存在或函数返回空数据的错误
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : typeof error === "string"
+          ? error
+          : String(error);
+      if (
+        errorMessage.includes("returned no data") ||
+        errorMessage.includes("does not have the function") ||
+        errorMessage.includes("is not a contract")
+      ) {
+        console.warn(
+          `⚠️ Contract ${chainConfig.STORAGE_ADDRESS} may not be deployed or function 'platformWallet' not available:`,
+          errorMessage
+        );
+        setPlatformWalletAddress(null);
+      } else {
+        console.error("Error fetching platformWallet:", error);
+      }
     }
-  }, []);
+  }, [chainConfig.STORAGE_ADDRESS]);
 
   useEffect(() => {
     getIsPlatformWalletRole();
@@ -73,19 +114,42 @@ const RootLayout = () => {
 
   // 判断是否销售账号
   const getIsSalePerson = useCallback(async () => {
-    if (!address) return;
+    if (!address) {
+      setIsSalePerson(false);
+      return;
+    }
     try {
       const result = await readContract(config, {
-        address: MiningMachineSystemStorageAddress,
+        address: chainConfig.STORAGE_ADDRESS as `0x${string}`,
         abi: MiningMachineSystemStorageABI,
         functionName: "isMotherMachineDistributor",
         args: [address],
       });
       setIsSalePerson(result as boolean);
-    } catch (error) {
-      console.log(error);
+    } catch (error: unknown) {
+      // 静默处理合约不存在或函数返回空数据的错误
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : typeof error === "string"
+          ? error
+          : String(error);
+      if (
+        errorMessage.includes("returned no data") ||
+        errorMessage.includes("does not have the function") ||
+        errorMessage.includes("is not a contract")
+      ) {
+        console.warn(
+          `⚠️ Contract ${chainConfig.STORAGE_ADDRESS} may not be deployed or function 'isMotherMachineDistributor' not available:`,
+          errorMessage
+        );
+        setIsSalePerson(false);
+      } else {
+        console.error("Error fetching isMotherMachineDistributor:", error);
+        setIsSalePerson(false);
+      }
     }
-  }, [address]);
+  }, [address, chainConfig.STORAGE_ADDRESS]);
 
   useEffect(() => {
     getIsSalePerson();

@@ -42,6 +42,7 @@ export const prodEvmChains = [
 ];
 
 // 根据环境变量决定使用的链
+// 部署到线上时，应该同时支持主网和测试网，让用户通过钱包切换
 const getActiveChains = () => {
   const chainId = Number(import.meta.env.VITE_CHAIN_ID);
   const rpcUrl = import.meta.env.VITE_RPC_URL as string;
@@ -58,15 +59,18 @@ const getActiveChains = () => {
     return [localhost];
   }
 
-  // 如果是测试网环境（chainId = 97），使用 bscTestnet
-  if (chainId === 97) {
-    console.log("🧪 Using BSC Testnet chain");
-    return [bscTestnet];
+  // 生产环境：同时支持主网和测试网
+  // 这样用户可以通过钱包切换网络，应用会自动使用对应的合约地址
+  console.log("🚀 Using production chains (Mainnet + Testnet)");
+  // 将 bscTestnet 添加到生产链列表中，确保同时支持主网和测试网
+  const allChains = [...prodEvmChains];
+
+  // 如果 bscTestnet 不在列表中，添加它
+  if (!allChains.find(chain => chain.id === bscTestnet.id)) {
+    allChains.push(bscTestnet);
   }
 
-  // 否则使用生产链
-  console.log("🚀 Using production chains");
-  return prodEvmChains;
+  return allChains;
 };
 
 export const renderChains = [btc, ...prodEvmChains, solana, ton, tron];

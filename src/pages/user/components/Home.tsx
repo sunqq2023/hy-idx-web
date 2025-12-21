@@ -5,15 +5,7 @@ import {
   selectedSvg,
   usdtSvg,
 } from "@/assets";
-import {
-  Button,
-  Checkbox,
-  Divider,
-  ErrorBlock,
-  Skeleton,
-  Tabs,
-  Toast,
-} from "antd-mobile";
+import { Button, Checkbox, Divider, Skeleton, Tabs, Toast } from "antd-mobile";
 import React, { memo, useCallback, useEffect, useRef, useState } from "react";
 import config from "@/proviers/config";
 import { FixedSizeList as List } from "react-window";
@@ -26,25 +18,22 @@ import {
   readContract,
   multicall,
   getBalance,
-  writeContract,
   waitForTransactionReceipt,
 } from "@wagmi/core";
-import { erc20Abi, formatEther, formatUnits, parseEther } from "viem";
+import { erc20Abi, formatEther, formatUnits } from "viem";
 import AdaptiveNumber, { NumberType } from "@/components/AdaptiveNumber";
 import {
   CHAIN_ID,
-  IDX_CONTRACTS_ADDRESS,
   MiningMachineProductionLogicABI,
-  MiningMachineProductionLogicAddress,
   MiningMachineSystemStorageABI,
-  MiningMachineSystemStorageAddress,
   USDT_CONTRACTS_ADDRESS,
   MiningMachineSystemStorageExtendABI,
-  MiningMachineSystemStorageExtendAddress,
   MiningMachineSystemLogicExtendABI,
-  MiningMachineSystemLogicExtendAddress,
 } from "@/constants";
+import { useChainConfig } from "@/hooks/useChainConfig";
 import EmptyComp from "@/components/EmptyComp";
+import { BindWalletModal } from "@/components/BindWalletModal";
+import { sendSignedRequest } from "@/utils/rsaSignature";
 
 interface HomeProps {
   onStudioStatusChange?: (isStudio: boolean) => void;
@@ -55,6 +44,19 @@ export const Home = ({
   onStudioStatusChange,
   onStudioMarkerStatusChange,
 }: HomeProps) => {
+  const { address: userAddress } = useAccount();
+  const chainConfig = useChainConfig();
+
+  // 使用动态地址，而不是静态导出的地址
+  const MiningMachineSystemStorageExtendAddress =
+    chainConfig.EXTEND_STORAGE_ADDRESS;
+  const MiningMachineSystemLogicExtendAddress =
+    chainConfig.EXTEND_LOGIC_ADDRESS;
+  const MiningMachineSystemStorageAddress = chainConfig.STORAGE_ADDRESS;
+  const MiningMachineProductionLogicAddress =
+    chainConfig.PRODUCTION_LOGIC_ADDRESS;
+  const IDX_CONTRACTS_ADDRESS = chainConfig.IDX_TOKEN;
+
   const [machineList, setMachineList] = useState<MachineInfo[]>([]);
   const [allList, setAllList] = useState<MachineInfo[]>([]);
   const [startedList, setStartedList] = useState<MachineInfo[]>([]);
@@ -70,13 +72,17 @@ export const Home = ({
 
   const [fuelList, setFuelList] = useState<MachineInfo[]>([]);
 
+  // 绑定钱包相关状态
+  const [showBindModal, setShowBindModal] = useState(false);
+  const [pendingPhone, setPendingPhone] = useState<string>("");
+  const [isBinding, setIsBinding] = useState(false);
+
   const navigate = useNavigate();
   const location = useLocation(); // 添加路由位置监听
 
   const [tabs, setTabs] = useState(["全部(0)", "已启动(0)", "未开机(0)"]);
   const [tabKey, setTabKey] = useState("0");
 
-  const { address: userAddress } = useAccount();
   const { writeContractAsync } = useWriteContract();
 
   // 检查工作室状态
@@ -189,11 +195,122 @@ export const Home = ({
     }
   }, [userAddress]);
 
+  // 检查待确认的地址绑定
+  const checkPendingBinding = useCallback(async () => {
+    if (!userAddress) return;
+
+    // 检查 BIND_ADDRESS_URL 是否配置
+    if (!chainConfig.BIND_ADDRESS_URL) {
+      console.warn("⚠️ BIND_ADDRESS_URL 未配置，跳过绑定检查");
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `${chainConfig.BIND_ADDRESS_URL}/mix/getPhoneByAddress/${userAddress}`
+      );
+      const result = await response.json();
+
+      if (result.data?.success === false && result.data?.errorCode === "BINDING_PENDING" && result.data?.phone) {
+        setPendingPhone(result.data.phone);
+        setShowBindModal(true);
+      }
+    } catch (error) {
+      // 静默处理错误，不阻塞 UI
+      console.debug("检查待确认绑定失败:", error);
+    }
+  }, [userAddress, chainConfig.BIND_ADDRESS_URL]);
+
+  // 处理同意绑定
+  const handleAgreeBinding = useCallback(async () => {
+    if (!userAddress || !pendingPhone) return;
+
+    // 检查 BIND_ADDRESS_URL 是否配置
+    if (!chainConfig.BIND_ADDRESS_URL) {
+      Toast.show({
+        content: "绑定服务未配置",
+        position: "center",
+      });
+      return;
+    }
+
+    try {
+      setIsBinding(true);
+      Toast.show({
+        content: "正在绑定...",
+        position: "center",
+      });
+
+      // 调用后端接口确认绑定（接口内部会调用合约）
+      const result = await sendSignedRequest<{
+        code: number;
+        message?: string;
+        data?: {
+          success: boolean;
+          message?: string;
+          errorCode?: string;
+        };
+      }>(
+        "POST",
+        `${chainConfig.BIND_ADDRESS_URL}/mix/confirmBinding`,
+        {
+          phone: pendingPhone,
+          address: userAddress,
+        }
+      );
+      // 检查 result.code 和 result.data.success
+      if (result.code !== 200 || !result.data?.success) {
+        const errorMsg =
+          (result.data && (result.data.message || result.data.errorCode)) ||
+          result.message ||
+          "绑定失败";
+        Toast.show({
+          content: errorMsg,
+          position: "center",
+          duration: 3000,
+        });
+        setIsBinding(false);
+        throw new Error(errorMsg);
+      }
+
+      console.log("绑定成功:", result);
+
+      Toast.show({
+        content: "绑定成功",
+        position: "center",
+      });
+
+      setShowBindModal(false);
+      setPendingPhone("");
+    } catch (error) {
+      console.error("绑定失败:", error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      Toast.show({
+        content: `绑定失败: ${errorMessage}`,
+        position: "center",
+        duration: 3000,
+      });
+    } finally {
+      setIsBinding(false);
+    }
+  }, [userAddress, pendingPhone, chainConfig.BIND_ADDRESS_URL]);
+
+  // 处理拒绝绑定
+  const handleRejectBinding = useCallback(() => {
+    Toast.show({
+      content: "已拒绝绑定",
+      position: "center",
+    });
+    setShowBindModal(false);
+    setPendingPhone("");
+  }, []);
+
   // 检查空投权限
   useEffect(() => {
     checkAirdropPermission();
     checkStudioStatus();
-  }, [checkAirdropPermission, checkStudioStatus]);
+    checkPendingBinding();
+  }, [checkAirdropPermission, checkStudioStatus, checkPendingBinding]);
 
   // 检查空投矿机权限
   useEffect(() => {
@@ -237,10 +354,22 @@ export const Home = ({
         contracts,
       });
 
-      setIdxBalance(result[0].result ? formatEther(result[0].result) : "0");
-      setUsdtBalance(result[1].result ? formatEther(result[1].result) : "0");
+      setIdxBalance(
+        result[0].result && typeof result[0].result === "bigint"
+          ? formatEther(result[0].result)
+          : "0"
+      );
+      setUsdtBalance(
+        result[1].result && typeof result[1].result === "bigint"
+          ? formatEther(result[1].result)
+          : "0"
+      );
       setMixBalance(
-        Number(result[2].result ? formatEther(result[2].result) : "0")
+        Number(
+          result[2].result && typeof result[2].result === "bigint"
+            ? formatEther(result[2].result)
+            : "0"
+        )
       );
     } catch (error) {
       console.error(error);
@@ -321,10 +450,10 @@ export const Home = ({
 
       const contracts = bignumToNumber.map((e) => {
         return {
-          address: MiningMachineSystemStorageAddress,
-          abi: MiningMachineSystemStorageABI,
-          functionName: "getMachineLifecycle",
-          args: [e],
+          address: MiningMachineSystemStorageAddress as `0x${string}`,
+          abi: MiningMachineSystemStorageABI as const,
+          functionName: "getMachineLifecycle" as const,
+          args: [e] as const,
         };
       });
       const data2 = await multicall(config, {
@@ -357,7 +486,7 @@ export const Home = ({
       // 获取子矿机生命剩余
       const remainingContract = childListResult.map((item) => {
         return {
-          address: MiningMachineProductionLogicAddress,
+          address: MiningMachineProductionLogicAddress as `0x${string}`,
           abi: MiningMachineProductionLogicABI,
           functionName: "viewMachineProduction",
           args: [item.id],
@@ -369,12 +498,13 @@ export const Home = ({
       });
 
       const result3 = childListResult.map((item, i) => {
-        if (data3[i].status === "success") {
+        if (data3[i].status === "success" && data3[i].result) {
+          const res = data3[i].result as readonly bigint[];
           return {
             ...item,
-            unclaimedChildCount: Number(data3[i].result[2]),
-            producedMix: Number(data3[i].result[3]),
-            unclaimedMix: Number(data3[i].result[5]),
+            unclaimedChildCount: Number(res[2]),
+            producedMix: Number(res[3]),
+            unclaimedMix: Number(res[5]),
           };
         }
         return {
@@ -386,7 +516,7 @@ export const Home = ({
       });
 
       const contractsWithOnSale = result.map((item) => ({
-        address: MiningMachineSystemStorageAddress,
+        address: MiningMachineSystemStorageAddress as `0x${string}`,
         abi: MiningMachineSystemStorageABI,
         functionName: "_isOnSale",
         args: [item.id],
@@ -739,7 +869,11 @@ export const Home = ({
 
       // 根据错误类型显示不同的提示
       let errorMessage = "空投矿机失败";
-      const errorObj = error as any;
+      const errorObj = error as {
+        name?: string;
+        code?: number;
+        message?: string;
+      };
       if (
         errorObj?.name === "UserRejectedRequestError" ||
         errorObj?.code === 4001
@@ -1123,6 +1257,18 @@ export const Home = ({
           </div>
         </div>
       )}
+
+      {/* 绑定钱包弹窗 */}
+      <BindWalletModal
+        visible={showBindModal}
+        mallAccount={pendingPhone}
+        onAgree={handleAgreeBinding}
+        onReject={handleRejectBinding}
+        onClose={() => {
+          setShowBindModal(false);
+          setPendingPhone("");
+        }}
+      />
     </div>
   );
 };

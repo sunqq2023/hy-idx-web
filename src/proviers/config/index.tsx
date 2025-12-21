@@ -7,6 +7,41 @@ import {
 } from "@rainbow-me/rainbowkit/wallets";
 import { tokenPocketWallet } from "@rainbow-me/rainbowkit/wallets";
 
+// 扩展 Window 接口以包含 TokenPocket 属性
+interface WindowWithTokenPocket extends Window {
+  tokenpocket?: unknown;
+  tp?: unknown;
+}
+
+// 调试：检查 TokenPocket 环境
+if (typeof window !== "undefined" && import.meta.env.DEV) {
+  // 检查是否有 TokenPocket 浏览器扩展
+  const win = window as WindowWithTokenPocket;
+  const hasTokenPocketExtension =
+    typeof win.tokenpocket !== "undefined" || typeof win.tp !== "undefined";
+
+  const isMobile = /Mobile|Android|iOS/i.test(navigator.userAgent);
+
+  console.log("🔍 TokenPocket Environment Check:", {
+    hasTokenPocketExtension,
+    userAgent: navigator.userAgent,
+    isMobile,
+    recommendation: hasTokenPocketExtension
+      ? "✅ TokenPocket extension detected, should work"
+      : isMobile
+      ? "📱 Mobile device detected, will use deep link"
+      : "⚠️ Desktop browser without TokenPocket extension - install extension or use another wallet",
+  });
+
+  // 如果桌面端没有扩展，给出提示
+  if (!hasTokenPocketExtension && !isMobile) {
+    console.warn(
+      "⚠️ TokenPocket extension not detected. " +
+        "Install TokenPocket browser extension or use MetaMask/Trust Wallet instead."
+    );
+  }
+}
+
 // 自定义BSC链配置，使用更稳定的RPC节点
 const customBsc = {
   ...bsc,
