@@ -13,7 +13,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import styles from "./Home.module.css";
 import UserPageCheckableItem from "./UserPageCheckableItem";
 import { MachineInfo } from "@/constants/types";
-import { useAccount, useWriteContract } from "wagmi";
+import { useAccount, useWriteContract, useChainId } from "wagmi";
 import {
   readContract,
   multicall,
@@ -51,6 +51,7 @@ export const Home = ({
   onStudioMarkerStatusChange,
 }: HomeProps) => {
   const { address: userAddress } = useAccount();
+  const chainId = useChainId(); // 获取当前连接的链ID
   const chainConfig = useChainConfig();
 
   // 使用动态地址，而不是静态导出的地址
@@ -384,7 +385,7 @@ export const Home = ({
         // 等待交易确认（会轮询 RPC 节点检查交易状态）
         receipt = await waitForTransactionReceipt(config, {
           hash,
-          chainId: CHAIN_ID,
+          chainId: chainId, // 使用动态链ID
           confirmations: 1,
           timeout: 60_000,
         });
@@ -642,7 +643,7 @@ export const Home = ({
     try {
       const data = await getBalance(config, {
         address: userAddress,
-        chainId: CHAIN_ID,
+        chainId: chainId, // 使用动态链ID，而不是硬编码的 CHAIN_ID
       });
       const bnbBalance = formatUnits(data.value, data.decimals);
       setBnbBalance(bnbBalance);
@@ -692,7 +693,13 @@ export const Home = ({
     } catch (error) {
       console.error(error);
     }
-  }, [userAddress]);
+  }, [
+    userAddress,
+    chainId,
+    IDX_CONTRACTS_ADDRESS,
+    USDT_CONTRACTS_ADDRESS,
+    MiningMachineSystemStorageAddress,
+  ]);
 
   useEffect(() => {
     handleQueryUserBalance();
@@ -1071,7 +1078,7 @@ export const Home = ({
 
       await waitForTransactionReceipt(config, {
         hash,
-        chainId: CHAIN_ID,
+        chainId: chainId, // 使用动态链ID
       });
 
       Toast.show({
@@ -1148,7 +1155,7 @@ export const Home = ({
 
       const receipt = await waitForTransactionReceipt(config, {
         hash,
-        chainId: CHAIN_ID,
+        chainId: chainId, // 使用动态链ID
       });
 
       console.log("=== 交易确认详情 ===");
