@@ -36,6 +36,11 @@ import EmptyComp from "@/components/EmptyComp";
 import { BindWalletModal } from "@/components/BindWalletModal";
 import { sendSignedRequest } from "@/utils/rsaSignature";
 
+// 导入调试工具（仅开发环境）
+if (import.meta.env.DEV) {
+  import("@/utils/debugSignature");
+}
+
 interface HomeProps {
   onStudioStatusChange?: (isStudio: boolean) => void;
   onStudioMarkerStatusChange?: (canMarkStudio: boolean) => void;

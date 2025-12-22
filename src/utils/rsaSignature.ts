@@ -168,8 +168,9 @@ export async function sendSignedRequest<T = unknown>(
     完整URL: url,
     签名路径: urlPath,
     签名前50字符: signature.substring(0, 50) + "...",
+    签名完整: signature,
     时间戳: timestamp,
-    APIKey前20字符: finalApiKey.substring(0, 20) + "...",
+    APIKey: finalApiKey,
     请求体: bodyString,
   });
 
@@ -192,6 +193,14 @@ export async function sendSignedRequest<T = unknown>(
     console.error("❌ 请求失败:", {
       status: response.status,
       statusText: response.statusText,
+      url: url,
+      method: method,
+      headers: {
+        "MIX-API-Key": finalApiKey,
+        "X-Signature": signature.substring(0, 50) + "...",
+        "X-Timestamp": timestamp,
+      },
+      requestBody: bodyString,
       errorData,
     });
     throw new Error(errorData.message || `HTTP ${response.status}`);
