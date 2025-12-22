@@ -5,7 +5,7 @@ const RootLayout = lazy(() => import("@/layout"));
 const HomeLayout = lazy(() => import("@/layout/HomeLayout"));
 const Home = lazy(() => import("@/pages/Home"));
 const MakeMotherMiningMachine = lazy(
-  () => import("@/pages/MakeMotherMiningMachine")
+  () => import("@/pages/MakeMotherMiningMachine"),
 );
 const NotFound = lazy(() => import("@/pages/NotFound"));
 const MakeMHistory = lazy(() => import("@/pages/MakeMHistory"));
@@ -14,41 +14,41 @@ const SalePersonTxHistory = lazy(() => import("@/pages/SalePersonTxHistory"));
 const TransferMachine = lazy(() => import("@/pages/TransferMachine"));
 const UserPage = lazy(() => import("@/pages/user/UserPage"));
 const UserTxHistory = lazy(
-  () => import("@/pages/user/components/UserTxHistory")
+  () => import("@/pages/user/components/UserTxHistory"),
 );
 // 买入母矿机
 const UserPayForBuyMachine = lazy(
-  () => import("@/pages/user/components/UserPayForBuyMachine")
+  () => import("@/pages/user/components/UserPayForBuyMachine"),
 );
 const UserToBeActivatedMachine = lazy(
-  () => import("@/pages/user/components/UserToBeActivatedMachine/index")
+  () => import("@/pages/user/components/UserToBeActivatedMachine/index"),
 );
 const UserMachineDetail = lazy(
-  () => import("@/pages/user/components/MachineDetail")
+  () => import("@/pages/user/components/MachineDetail"),
 );
 const UserAddFuel = lazy(() => import("@/pages/user/components/AddFuel"));
 const UserClaimMix = lazy(() => import("@/pages/user/components/ClaimMix"));
 const UserMixBill = lazy(() => import("@/pages/user/components/MixBill"));
 const UserExchangeIdx = lazy(
-  () => import("@/pages/user/components/ExchangeIdx")
+  () => import("@/pages/user/components/ExchangeIdx"),
 );
 const UserOrders = lazy(() => import("@/pages/user/components/MyOrders"));
 const UserPublishMachineTx = lazy(
-  () => import("@/pages/user/components/MyPublishMachineTx")
+  () => import("@/pages/user/components/MyPublishMachineTx"),
 );
 const UserSellToPlatform = lazy(
-  () => import("@/pages/user/components/SellToPlatform")
+  () => import("@/pages/user/components/SellToPlatform"),
 );
 const UserTransferMachine = lazy(
-  () => import("@/pages/user/components/UserTransferMachine")
+  () => import("@/pages/user/components/UserTransferMachine"),
 );
 
 // 买入子矿机
 const UserPayForBuyMachineFromUser = lazy(
-  () => import("@/pages/user/components/PayForBuyMachineFromUser")
+  () => import("@/pages/user/components/PayForBuyMachineFromUser"),
 );
 const UserSyntheticMachine = lazy(
-  () => import("@/pages/user/components/SyntheticMachine")
+  () => import("@/pages/user/components/SyntheticMachine"),
 );
 
 const Setting = lazy(() => import("@/pages/Setting"));

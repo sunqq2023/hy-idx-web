@@ -8,12 +8,10 @@ import config from '@/proviers/config'
 
 import {
   MiningMachineHistoryABI,
-  MiningMachineHistoryAddress,
   MiningMachineSystemLogicABI,
-  MiningMachineSystemLogicAddress,
   MiningMachineSystemStorageABI,
-  MiningMachineSystemStorageAddress
 } from '@/constants'
+import { useChainConfig } from '@/hooks/useChainConfig'
 import { formatTime, shortenAddress } from '@/utils/helper'
 interface Item {
   id: number
@@ -27,6 +25,7 @@ interface Item {
 
 const MakeMHistory = () => {
   const navigate = useNavigate()
+  const chainConfig = useChainConfig()
   const [pageData, setPageData] = useState<Item[]>([])
   const [cloneData, setCloneData] = useState<Item[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -57,13 +56,13 @@ const MakeMHistory = () => {
       const result = []
       for (let index = 1; index < 100; index++) {
         const data = await readContract(config, {
-          address: MiningMachineSystemStorageAddress,
+          address: chainConfig.STORAGE_ADDRESS as `0x${string}`,
           abi: MiningMachineSystemStorageABI,
           functionName: 'batchInfos',
           args: [index]
         })
         const batchDistributorUsername = await readContract(config, {
-          address: MiningMachineSystemLogicAddress,
+          address: chainConfig.LOGIC_ADDRESS as `0x${string}`,
           abi: MiningMachineSystemLogicABI,
           functionName: 'batchDistributorUsernames',
           args: [index]
@@ -88,7 +87,7 @@ const MakeMHistory = () => {
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [chainConfig.STORAGE_ADDRESS, chainConfig.LOGIC_ADDRESS])
 
   useEffect(() => {
     handleQuery()

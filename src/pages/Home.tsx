@@ -8,7 +8,6 @@ import { readContract } from "@wagmi/core";
 import config from "@/proviers/config";
 import { MiningMachineSystemStorageABI } from "@/constants";
 import { useChainConfig } from "@/hooks/useChainConfig";
-import ChainDebugInfo from "@/components/ChainDebugInfo";
 import orderStore from "@/stores/orderStore";
 
 const Home = () => {
@@ -76,8 +75,8 @@ const Home = () => {
         error instanceof Error
           ? error.message
           : typeof error === "string"
-          ? error
-          : String(error);
+            ? error
+            : String(error);
       if (
         errorMessage.includes("returned no data") ||
         errorMessage.includes("does not have the function") ||
@@ -85,7 +84,7 @@ const Home = () => {
       ) {
         console.warn(
           `⚠️ Contract ${chainConfig.STORAGE_ADDRESS} may not be deployed or function 'platformWallet' not available:`,
-          errorMessage
+          errorMessage,
         );
         setMotherMachineDistributorAddress(null);
       } else {
@@ -125,8 +124,8 @@ const Home = () => {
         error instanceof Error
           ? error.message
           : typeof error === "string"
-          ? error
-          : String(error);
+            ? error
+            : String(error);
       if (
         errorMessage.includes("returned no data") ||
         errorMessage.includes("does not have the function") ||
@@ -134,7 +133,7 @@ const Home = () => {
       ) {
         console.warn(
           `⚠️ Contract ${chainConfig.STORAGE_ADDRESS} may not be deployed or function 'isMotherMachineDistributor' not available:`,
-          errorMessage
+          errorMessage,
         );
         setIsSalePerson(false);
       } else {
@@ -170,8 +169,8 @@ const Home = () => {
         error instanceof Error
           ? error.message
           : typeof error === "string"
-          ? error
-          : String(error);
+            ? error
+            : String(error);
       if (
         errorMessage.includes("returned no data") ||
         errorMessage.includes("does not have the function") ||
@@ -179,7 +178,7 @@ const Home = () => {
       ) {
         console.warn(
           `⚠️ Contract ${chainConfig.STORAGE_ADDRESS} may not be deployed or function 'sadmin' not available:`,
-          errorMessage
+          errorMessage,
         );
         setAdminAddress(null);
       } else {
@@ -276,9 +275,6 @@ const Home = () => {
 
   return (
     <div className="px-[1.3125rem]">
-      {/* Debug component - remove after testing */}
-      <ChainDebugInfo />
-
       <div className="bg-white rounded-3xl p-4 mt-10 flex flex-col items-center ">
         <div className="mt-8 flex justify-center">
           <img src={idxSvg} alt="" />

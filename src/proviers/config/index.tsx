@@ -29,15 +29,15 @@ if (typeof window !== "undefined" && import.meta.env.DEV) {
     recommendation: hasTokenPocketExtension
       ? "✅ TokenPocket extension detected, should work"
       : isMobile
-      ? "📱 Mobile device detected, will use deep link"
-      : "⚠️ Desktop browser without TokenPocket extension - install extension or use another wallet",
+        ? "📱 Mobile device detected, will use deep link"
+        : "⚠️ Desktop browser without TokenPocket extension - install extension or use another wallet",
   });
 
   // 如果桌面端没有扩展，给出提示
   if (!hasTokenPocketExtension && !isMobile) {
     console.warn(
       "⚠️ TokenPocket extension not detected. " +
-        "Install TokenPocket browser extension or use MetaMask/Trust Wallet instead."
+        "Install TokenPocket browser extension or use MetaMask/Trust Wallet instead.",
     );
   }
 }
@@ -48,11 +48,24 @@ const customBsc = {
   rpcUrls: {
     default: {
       http: [
-        "https://rpc.ankr.com/bsc/ac79e83cf02a544dbb9b3f4c5d5478b2510b921e7d5739ded8791a932e8de0a6",
+        "https://bsc.publicnode.com", // 优先使用 PublicNode（与后端一致）
         "https://bsc-dataseed1.binance.org",
         "https://bsc-dataseed2.binance.org",
-        "https://bsc-dataseed3.binance.org",
-        "https://bsc.publicnode.com",
+        "https://rpc.ankr.com/bsc/ac79e83cf02a544dbb9b3f4c5d5478b2510b921e7d5739ded8791a932e8de0a6",
+      ],
+    },
+  },
+};
+
+// 自定义BSC测试网配置，使用更快的RPC节点
+const customBscTestnet = {
+  ...bscTestnet,
+  rpcUrls: {
+    default: {
+      http: [
+        "https://bsc-testnet.publicnode.com", // 优先使用 PublicNode（与后端一致）
+        "https://data-seed-prebsc-1-s1.binance.org:8545",
+        "https://data-seed-prebsc-2-s1.binance.org:8545",
       ],
     },
   },
@@ -92,8 +105,8 @@ const localhost = {
 
 const config = getDefaultConfig({
   appName: "My RainbowKit App",
-  projectId: "c6c2a2e243f4e96a433941e477c33844",
-  chains: [customBsc, bscTestnet, localhost], // 使用自定义BSC配置替代默认的bsc
+  projectId: "c6c2a2e243f4e96a433941e477c33844", // TODO: 如果无法访问，请创建新的 Project ID
+  chains: [customBsc, customBscTestnet, localhost], // 使用自定义配置
   wallets: [
     {
       groupName: "Popular",

@@ -99,9 +99,19 @@ export default defineConfig({
         rewrite: (path) => path.replace(/^\/api/, ""),
       },
       "/mix": {
-        target: process.env.VITE_API_BASE_URL || "http://127.0.0.1:8090",
+        target: process.env.VITE_API_BASE_URL || "https://www.ihealth.vip/api",
         changeOrigin: true,
         secure: false,
+        rewrite: (path) => path, // 保持 /mix 路径
+        configure: (proxy, _options) => {
+          proxy.on("proxyRes", (proxyRes) => {
+            // 移除后端返回的重复 CORS 头
+            delete proxyRes.headers["access-control-allow-origin"];
+            delete proxyRes.headers["access-control-allow-credentials"];
+            delete proxyRes.headers["access-control-allow-methods"];
+            delete proxyRes.headers["access-control-allow-headers"];
+          });
+        },
       },
     },
   },

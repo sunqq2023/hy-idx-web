@@ -1,1259 +1,1254 @@
 const MiningMachineNodeSystemABI = [
   {
-    "type": "constructor",
-    "inputs": [
+    type: "constructor",
+    inputs: [
       {
-        "name": "storageAddress",
-        "type": "address",
-        "internalType": "address"
+        name: "storageAddress",
+        type: "address",
+        internalType: "address",
       },
       {
-        "name": "miningMachineSystemLogic",
-        "type": "address",
-        "internalType": "address"
+        name: "miningMachineSystemLogic",
+        type: "address",
+        internalType: "address",
       },
       {
-        "name": "historyAddress",
-        "type": "address",
-        "internalType": "address"
+        name: "historyAddress",
+        type: "address",
+        internalType: "address",
       },
       {
-        "name": "mixOperatorAddress",
-        "type": "address",
-        "internalType": "address"
-      }
+        name: "mixOperatorAddress",
+        type: "address",
+        internalType: "address",
+      },
     ],
-    "stateMutability": "nonpayable"
+    stateMutability: "nonpayable",
   },
   {
-    "type": "function",
-    "name": "addMixByPhone",
-    "inputs": [
+    type: "function",
+    name: "addMixByPhone",
+    inputs: [
       {
-        "name": "phone",
-        "type": "string",
-        "internalType": "string"
+        name: "phone",
+        type: "string",
+        internalType: "string",
       },
       {
-        "name": "amount",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: "amount",
+        type: "uint256",
+        internalType: "uint256",
+      },
     ],
-    "outputs": [
+    outputs: [
       {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: "",
+        type: "uint256",
+        internalType: "uint256",
+      },
     ],
-    "stateMutability": "nonpayable"
+    stateMutability: "nonpayable",
   },
   {
-    "type": "function",
-    "name": "addMixForOperator",
-    "inputs": [
+    type: "function",
+    name: "addMixForOperator",
+    inputs: [
       {
-        "name": "amount",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: "amount",
+        type: "uint256",
+        internalType: "uint256",
+      },
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    outputs: [],
+    stateMutability: "nonpayable",
   },
   {
-    "type": "function",
-    "name": "addMixForUser",
-    "inputs": [
+    type: "function",
+    name: "addMixForUser",
+    inputs: [
       {
-        "name": "user",
-        "type": "address",
-        "internalType": "address"
+        name: "user",
+        type: "address",
+        internalType: "address",
       },
       {
-        "name": "amount",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: "amount",
+        type: "uint256",
+        internalType: "uint256",
+      },
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    outputs: [],
+    stateMutability: "nonpayable",
   },
   {
-    "type": "function",
-    "name": "addressToPhone",
-    "inputs": [
+    type: "function",
+    name: "addressToPhone",
+    inputs: [
       {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
+        name: "",
+        type: "address",
+        internalType: "address",
+      },
     ],
-    "outputs": [
+    outputs: [
       {
-        "name": "",
-        "type": "string",
-        "internalType": "string"
-      }
+        name: "",
+        type: "string",
+        internalType: "string",
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: "view",
   },
   {
-    "type": "function",
-    "name": "boundUserPhone",
-    "inputs": [
+    type: "function",
+    name: "boundUserPhone",
+    inputs: [
       {
-        "name": "phone",
-        "type": "string",
-        "internalType": "string"
+        name: "phone",
+        type: "string",
+        internalType: "string",
+      },
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "changeUserAddress",
+    inputs: [
+      {
+        name: "phone",
+        type: "string",
+        internalType: "string",
       },
       {
-        "name": "user",
-        "type": "address",
-        "internalType": "address"
-      }
+        name: "newUser",
+        type: "address",
+        internalType: "address",
+      },
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    outputs: [],
+    stateMutability: "nonpayable",
   },
   {
-    "type": "function",
-    "name": "changeUserAddress",
-    "inputs": [
+    type: "function",
+    name: "changeUserPhone",
+    inputs: [
       {
-        "name": "phone",
-        "type": "string",
-        "internalType": "string"
+        name: "oldPhone",
+        type: "string",
+        internalType: "string",
       },
       {
-        "name": "newUser",
-        "type": "address",
-        "internalType": "address"
-      }
+        name: "newPhone",
+        type: "string",
+        internalType: "string",
+      },
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    outputs: [],
+    stateMutability: "nonpayable",
   },
   {
-    "type": "function",
-    "name": "changeUserPhone",
-    "inputs": [
+    type: "function",
+    name: "claimMixReward",
+    inputs: [],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "createNode",
+    inputs: [],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "destroyedMachineCount",
+    inputs: [
       {
-        "name": "oldPhone",
-        "type": "string",
-        "internalType": "string"
+        name: "",
+        type: "address",
+        internalType: "address",
+      },
+    ],
+    outputs: [
+      {
+        name: "",
+        type: "uint256",
+        internalType: "uint256",
+      },
+    ],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getAddressByPhone",
+    inputs: [
+      {
+        name: "phone",
+        type: "string",
+        internalType: "string",
+      },
+    ],
+    outputs: [
+      {
+        name: "",
+        type: "address",
+        internalType: "address",
+      },
+    ],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getDailyFuelData",
+    inputs: [
+      {
+        name: "dayTimestamp",
+        type: "uint256",
+        internalType: "uint256",
+      },
+    ],
+    outputs: [
+      {
+        name: "timestamp",
+        type: "uint256",
+        internalType: "uint256",
       },
       {
-        "name": "newPhone",
-        "type": "string",
-        "internalType": "string"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "claimMixReward",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "createNode",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "destroyedMachineCount",
-    "inputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "getAddressByPhone",
-    "inputs": [
-      {
-        "name": "phone",
-        "type": "string",
-        "internalType": "string"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "getDailyFuelData",
-    "inputs": [
-      {
-        "name": "dayTimestamp",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "timestamp",
-        "type": "uint256",
-        "internalType": "uint256"
+        name: "totalCount",
+        type: "uint256",
+        internalType: "uint256",
       },
       {
-        "name": "totalCount",
-        "type": "uint256",
-        "internalType": "uint256"
+        name: "totalFuelAmount",
+        type: "uint256",
+        internalType: "uint256",
       },
       {
-        "name": "totalFuelAmount",
-        "type": "uint256",
-        "internalType": "uint256"
+        name: "totalFuelValue",
+        type: "uint256",
+        internalType: "uint256",
+      },
+    ],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getMixByPhone",
+    inputs: [
+      {
+        name: "phone",
+        type: "string",
+        internalType: "string",
+      },
+    ],
+    outputs: [
+      {
+        name: "",
+        type: "uint256",
+        internalType: "uint256",
+      },
+    ],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getTotalActiveNodeCount",
+    inputs: [],
+    outputs: [
+      {
+        name: "",
+        type: "uint256",
+        internalType: "uint256",
+      },
+    ],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getTotalNodeCount",
+    inputs: [],
+    outputs: [
+      {
+        name: "",
+        type: "uint256",
+        internalType: "uint256",
+      },
+    ],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getUserActiveNodeCount",
+    inputs: [
+      {
+        name: "user",
+        type: "address",
+        internalType: "address",
+      },
+    ],
+    outputs: [
+      {
+        name: "",
+        type: "uint256",
+        internalType: "uint256",
+      },
+    ],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getUserCurrentAvailableMix",
+    inputs: [
+      {
+        name: "user",
+        type: "address",
+        internalType: "address",
+      },
+    ],
+    outputs: [
+      {
+        name: "",
+        type: "uint256",
+        internalType: "uint256",
+      },
+    ],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getUserMixBalance",
+    inputs: [
+      {
+        name: "user",
+        type: "address",
+        internalType: "address",
+      },
+    ],
+    outputs: [
+      {
+        name: "",
+        type: "uint256",
+        internalType: "uint256",
+      },
+    ],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getUserNodeCount",
+    inputs: [
+      {
+        name: "user",
+        type: "address",
+        internalType: "address",
+      },
+    ],
+    outputs: [
+      {
+        name: "",
+        type: "uint256",
+        internalType: "uint256",
+      },
+    ],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getUserPhone",
+    inputs: [
+      {
+        name: "user",
+        type: "address",
+        internalType: "address",
+      },
+    ],
+    outputs: [
+      {
+        name: "",
+        type: "string",
+        internalType: "string",
+      },
+    ],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getYesterdayTimestamp",
+    inputs: [
+      {
+        name: "timestamp",
+        type: "uint256",
+        internalType: "uint256",
+      },
+    ],
+    outputs: [
+      {
+        name: "",
+        type: "uint256",
+        internalType: "uint256",
+      },
+    ],
+    stateMutability: "pure",
+  },
+  {
+    type: "function",
+    name: "hasUserClaimedMix",
+    inputs: [
+      {
+        name: "user",
+        type: "address",
+        internalType: "address",
       },
       {
-        "name": "totalFuelValue",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: "dayTimestamp",
+        type: "uint256",
+        internalType: "uint256",
+      },
     ],
-    "stateMutability": "view"
+    outputs: [
+      {
+        name: "",
+        type: "bool",
+        internalType: "bool",
+      },
+    ],
+    stateMutability: "view",
   },
   {
-    "type": "function",
-    "name": "getMixByPhone",
-    "inputs": [
+    type: "function",
+    name: "history",
+    inputs: [],
+    outputs: [
       {
-        "name": "phone",
-        "type": "string",
-        "internalType": "string"
-      }
+        name: "",
+        type: "address",
+        internalType: "contract MiningMachineHistory",
+      },
     ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
+    stateMutability: "view",
   },
   {
-    "type": "function",
-    "name": "getTotalActiveNodeCount",
-    "inputs": [],
-    "outputs": [
+    type: "function",
+    name: "isAddressBound",
+    inputs: [
       {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: "user",
+        type: "address",
+        internalType: "address",
+      },
     ],
-    "stateMutability": "view"
+    outputs: [
+      {
+        name: "",
+        type: "bool",
+        internalType: "bool",
+      },
+    ],
+    stateMutability: "view",
   },
   {
-    "type": "function",
-    "name": "getTotalNodeCount",
-    "inputs": [],
-    "outputs": [
+    type: "function",
+    name: "isPhoneBound",
+    inputs: [
       {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: "phone",
+        type: "string",
+        internalType: "string",
+      },
     ],
-    "stateMutability": "view"
+    outputs: [
+      {
+        name: "",
+        type: "bool",
+        internalType: "bool",
+      },
+    ],
+    stateMutability: "view",
   },
   {
-    "type": "function",
-    "name": "getUserActiveNodeCount",
-    "inputs": [
+    type: "function",
+    name: "machineDestroyedRecorded",
+    inputs: [
       {
-        "name": "user",
-        "type": "address",
-        "internalType": "address"
-      }
+        name: "",
+        type: "uint256",
+        internalType: "uint256",
+      },
     ],
-    "outputs": [
+    outputs: [
       {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: "",
+        type: "bool",
+        internalType: "bool",
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: "view",
   },
   {
-    "type": "function",
-    "name": "getUserCurrentAvailableMix",
-    "inputs": [
+    type: "function",
+    name: "migrateDestroyedMachineCount",
+    inputs: [
       {
-        "name": "user",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "getUserMixBalance",
-    "inputs": [
-      {
-        "name": "user",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "getUserNodeCount",
-    "inputs": [
-      {
-        "name": "user",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "getUserPhone",
-    "inputs": [
-      {
-        "name": "user",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "string",
-        "internalType": "string"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "getYesterdayTimestamp",
-    "inputs": [
-      {
-        "name": "timestamp",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "pure"
-  },
-  {
-    "type": "function",
-    "name": "hasUserClaimedMix",
-    "inputs": [
-      {
-        "name": "user",
-        "type": "address",
-        "internalType": "address"
+        name: "users",
+        type: "address[]",
+        internalType: "address[]",
       },
       {
-        "name": "dayTimestamp",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: "counts",
+        type: "uint256[]",
+        internalType: "uint256[]",
+      },
     ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool",
-        "internalType": "bool"
-      }
-    ],
-    "stateMutability": "view"
+    outputs: [],
+    stateMutability: "nonpayable",
   },
   {
-    "type": "function",
-    "name": "history",
-    "inputs": [],
-    "outputs": [
+    type: "function",
+    name: "migrateMachineDestroyedRecorded",
+    inputs: [
       {
-        "name": "",
-        "type": "address",
-        "internalType": "contract MiningMachineHistory"
-      }
+        name: "machineIds",
+        type: "uint256[]",
+        internalType: "uint256[]",
+      },
     ],
-    "stateMutability": "view"
+    outputs: [],
+    stateMutability: "nonpayable",
   },
   {
-    "type": "function",
-    "name": "isAddressBound",
-    "inputs": [
+    type: "function",
+    name: "migrateNodes",
+    inputs: [
       {
-        "name": "user",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool",
-        "internalType": "bool"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "isPhoneBound",
-    "inputs": [
-      {
-        "name": "phone",
-        "type": "string",
-        "internalType": "string"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool",
-        "internalType": "bool"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "machineDestroyedRecorded",
-    "inputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool",
-        "internalType": "bool"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "migrateDestroyedMachineCount",
-    "inputs": [
-      {
-        "name": "users",
-        "type": "address[]",
-        "internalType": "address[]"
+        name: "owners",
+        type: "address[]",
+        internalType: "address[]",
       },
       {
-        "name": "counts",
-        "type": "uint256[]",
-        "internalType": "uint256[]"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "migrateMachineDestroyedRecorded",
-    "inputs": [
-      {
-        "name": "machineIds",
-        "type": "uint256[]",
-        "internalType": "uint256[]"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "migrateNodes",
-    "inputs": [
-      {
-        "name": "owners",
-        "type": "address[]",
-        "internalType": "address[]"
+        name: "creationTimes",
+        type: "uint256[]",
+        internalType: "uint256[]",
       },
       {
-        "name": "creationTimes",
-        "type": "uint256[]",
-        "internalType": "uint256[]"
+        name: "actives",
+        type: "bool[]",
+        internalType: "bool[]",
+      },
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "migrateUserMixRewardClaimed",
+    inputs: [
+      {
+        name: "users",
+        type: "address[]",
+        internalType: "address[]",
       },
       {
-        "name": "actives",
-        "type": "bool[]",
-        "internalType": "bool[]"
-      }
+        name: "dayTimestamps",
+        type: "uint256[]",
+        internalType: "uint256[]",
+      },
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    outputs: [],
+    stateMutability: "nonpayable",
   },
   {
-    "type": "function",
-    "name": "migrateUserMixRewardClaimed",
-    "inputs": [
+    type: "function",
+    name: "migrationOperator",
+    inputs: [],
+    outputs: [
       {
-        "name": "users",
-        "type": "address[]",
-        "internalType": "address[]"
+        name: "",
+        type: "address",
+        internalType: "address",
+      },
+    ],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "mixOperator",
+    inputs: [],
+    outputs: [
+      {
+        name: "",
+        type: "address",
+        internalType: "address",
+      },
+    ],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "nodes",
+    inputs: [
+      {
+        name: "",
+        type: "uint256",
+        internalType: "uint256",
+      },
+    ],
+    outputs: [
+      {
+        name: "owner",
+        type: "address",
+        internalType: "address",
       },
       {
-        "name": "dayTimestamps",
-        "type": "uint256[]",
-        "internalType": "uint256[]"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "migrationOperator",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "mixOperator",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "nodes",
-    "inputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "owner",
-        "type": "address",
-        "internalType": "address"
+        name: "creationTime",
+        type: "uint256",
+        internalType: "uint256",
       },
       {
-        "name": "creationTime",
-        "type": "uint256",
-        "internalType": "uint256"
+        name: "active",
+        type: "bool",
+        internalType: "bool",
+      },
+    ],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "nodesAmount",
+    inputs: [],
+    outputs: [
+      {
+        name: "",
+        type: "uint256",
+        internalType: "uint256",
+      },
+    ],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "phoneToAddress",
+    inputs: [
+      {
+        name: "",
+        type: "string",
+        internalType: "string",
+      },
+    ],
+    outputs: [
+      {
+        name: "",
+        type: "address",
+        internalType: "address",
+      },
+    ],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "recordMachineDestroyed",
+    inputs: [
+      {
+        name: "machineId",
+        type: "uint256",
+        internalType: "uint256",
       },
       {
-        "name": "active",
-        "type": "bool",
-        "internalType": "bool"
-      }
+        name: "owner",
+        type: "address",
+        internalType: "address",
+      },
     ],
-    "stateMutability": "view"
+    outputs: [],
+    stateMutability: "nonpayable",
   },
   {
-    "type": "function",
-    "name": "nodesAmount",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
+    type: "function",
+    name: "removeMigrationOperator",
+    inputs: [],
+    outputs: [],
+    stateMutability: "nonpayable",
   },
   {
-    "type": "function",
-    "name": "phoneToAddress",
-    "inputs": [
+    type: "function",
+    name: "setMixOperator",
+    inputs: [
       {
-        "name": "",
-        "type": "string",
-        "internalType": "string"
-      }
+        name: "newOperator",
+        type: "address",
+        internalType: "address",
+      },
     ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "stateMutability": "view"
+    outputs: [],
+    stateMutability: "nonpayable",
   },
   {
-    "type": "function",
-    "name": "recordMachineDestroyed",
-    "inputs": [
+    type: "function",
+    name: "setNodesAmount",
+    inputs: [
       {
-        "name": "machineId",
-        "type": "uint256",
-        "internalType": "uint256"
+        name: "_newAmount",
+        type: "uint256",
+        internalType: "uint256",
+      },
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "setSystemLogic",
+    inputs: [
+      {
+        name: "logicAddress",
+        type: "address",
+        internalType: "address",
       },
       {
-        "name": "owner",
-        "type": "address",
-        "internalType": "address"
-      }
+        name: "storAddress",
+        type: "address",
+        internalType: "address",
+      },
+      {
+        name: "_historyAddress",
+        type: "address",
+        internalType: "address",
+      },
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    outputs: [],
+    stateMutability: "nonpayable",
   },
   {
-    "type": "function",
-    "name": "removeMigrationOperator",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "setMixOperator",
-    "inputs": [
+    type: "function",
+    name: "store",
+    inputs: [],
+    outputs: [
       {
-        "name": "newOperator",
-        "type": "address",
-        "internalType": "address"
-      }
+        name: "",
+        type: "address",
+        internalType: "contract MiningMachineSystemStorage",
+      },
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    stateMutability: "view",
   },
   {
-    "type": "function",
-    "name": "setNodesAmount",
-    "inputs": [
+    type: "function",
+    name: "subMixByPhone",
+    inputs: [
       {
-        "name": "_newAmount",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: "phone",
+        type: "string",
+        internalType: "string",
+      },
+      {
+        name: "amount",
+        type: "uint256",
+        internalType: "uint256",
+      },
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "setSystemLogic",
-    "inputs": [
+    outputs: [
       {
-        "name": "logicAddress",
-        "type": "address",
-        "internalType": "address"
+        name: "",
+        type: "uint256",
+        internalType: "uint256",
       },
-      {
-        "name": "storAddress",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "_historyAddress",
-        "type": "address",
-        "internalType": "address"
-      }
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    stateMutability: "nonpayable",
   },
   {
-    "type": "function",
-    "name": "store",
-    "inputs": [],
-    "outputs": [
+    type: "function",
+    name: "subMixForOperator",
+    inputs: [
       {
-        "name": "",
-        "type": "address",
-        "internalType": "contract MiningMachineSystemStorage"
-      }
+        name: "amount",
+        type: "uint256",
+        internalType: "uint256",
+      },
     ],
-    "stateMutability": "view"
+    outputs: [],
+    stateMutability: "nonpayable",
   },
   {
-    "type": "function",
-    "name": "subMixByPhone",
-    "inputs": [
+    type: "function",
+    name: "subMixForUser",
+    inputs: [
       {
-        "name": "phone",
-        "type": "string",
-        "internalType": "string"
+        name: "user",
+        type: "address",
+        internalType: "address",
       },
       {
-        "name": "amount",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: "amount",
+        type: "uint256",
+        internalType: "uint256",
+      },
     ],
-    "outputs": [
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "systemLogic",
+    inputs: [],
+    outputs: [
       {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: "",
+        type: "address",
+        internalType: "contract MiningMachineSystemLogic",
+      },
     ],
-    "stateMutability": "nonpayable"
+    stateMutability: "view",
   },
   {
-    "type": "function",
-    "name": "subMixForOperator",
-    "inputs": [
+    type: "function",
+    name: "transferMix",
+    inputs: [
       {
-        "name": "amount",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: "to",
+        type: "address",
+        internalType: "address",
+      },
+      {
+        name: "amount",
+        type: "uint256",
+        internalType: "uint256",
+      },
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    outputs: [],
+    stateMutability: "nonpayable",
   },
   {
-    "type": "function",
-    "name": "subMixForUser",
-    "inputs": [
+    type: "function",
+    name: "transferMixBetweenUsers",
+    inputs: [
       {
-        "name": "user",
-        "type": "address",
-        "internalType": "address"
+        name: "from",
+        type: "address",
+        internalType: "address",
       },
       {
-        "name": "amount",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: "to",
+        type: "address",
+        internalType: "address",
+      },
+      {
+        name: "amount",
+        type: "uint256",
+        internalType: "uint256",
+      },
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    outputs: [],
+    stateMutability: "nonpayable",
   },
   {
-    "type": "function",
-    "name": "systemLogic",
-    "inputs": [],
-    "outputs": [
+    type: "function",
+    name: "unboundUserPhone",
+    inputs: [
       {
-        "name": "",
-        "type": "address",
-        "internalType": "contract MiningMachineSystemLogic"
-      }
+        name: "phone",
+        type: "string",
+        internalType: "string",
+      },
     ],
-    "stateMutability": "view"
+    outputs: [],
+    stateMutability: "nonpayable",
   },
   {
-    "type": "function",
-    "name": "transferMix",
-    "inputs": [
+    type: "function",
+    name: "userMixRewardClaimed",
+    inputs: [
       {
-        "name": "to",
-        "type": "address",
-        "internalType": "address"
+        name: "",
+        type: "address",
+        internalType: "address",
       },
       {
-        "name": "amount",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: "",
+        type: "uint256",
+        internalType: "uint256",
+      },
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "transferMixBetweenUsers",
-    "inputs": [
+    outputs: [
       {
-        "name": "from",
-        "type": "address",
-        "internalType": "address"
+        name: "",
+        type: "bool",
+        internalType: "bool",
       },
-      {
-        "name": "to",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "amount",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    stateMutability: "view",
   },
   {
-    "type": "function",
-    "name": "unboundUserPhone",
-    "inputs": [
+    type: "function",
+    name: "userNodes",
+    inputs: [
       {
-        "name": "phone",
-        "type": "string",
-        "internalType": "string"
-      }
+        name: "",
+        type: "address",
+        internalType: "address",
+      },
+      {
+        name: "",
+        type: "uint256",
+        internalType: "uint256",
+      },
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "userMixRewardClaimed",
-    "inputs": [
+    outputs: [
       {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
+        name: "",
+        type: "uint256",
+        internalType: "uint256",
       },
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
     ],
-    "outputs": [
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "withdrawToken",
+    inputs: [
       {
-        "name": "",
-        "type": "bool",
-        "internalType": "bool"
-      }
+        name: "token",
+        type: "address",
+        internalType: "address",
+      },
+      {
+        name: "amount",
+        type: "uint256",
+        internalType: "uint256",
+      },
     ],
-    "stateMutability": "view"
+    outputs: [],
+    stateMutability: "nonpayable",
   },
   {
-    "type": "function",
-    "name": "userNodes",
-    "inputs": [
+    type: "event",
+    name: "DailyFuelDataUpdated",
+    inputs: [
       {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
+        name: "dayTimestamp",
+        type: "uint256",
+        indexed: true,
+        internalType: "uint256",
       },
       {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: "totalCount",
+        type: "uint256",
+        indexed: false,
+        internalType: "uint256",
+      },
+      {
+        name: "totalFuelAmount",
+        type: "uint256",
+        indexed: false,
+        internalType: "uint256",
+      },
+      {
+        name: "totalFuelValue",
+        type: "uint256",
+        indexed: false,
+        internalType: "uint256",
+      },
     ],
-    "outputs": [
+    anonymous: false,
+  },
+  {
+    type: "event",
+    name: "MachineDestroyedRecorded",
+    inputs: [
       {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: "user",
+        type: "address",
+        indexed: true,
+        internalType: "address",
+      },
+      {
+        name: "machineId",
+        type: "uint256",
+        indexed: false,
+        internalType: "uint256",
+      },
+      {
+        name: "newCount",
+        type: "uint256",
+        indexed: false,
+        internalType: "uint256",
+      },
     ],
-    "stateMutability": "view"
+    anonymous: false,
   },
   {
-    "type": "function",
-    "name": "withdrawToken",
-    "inputs": [
+    type: "event",
+    name: "MixBalanceChanged",
+    inputs: [
       {
-        "name": "token",
-        "type": "address",
-        "internalType": "address"
+        name: "from",
+        type: "address",
+        indexed: true,
+        internalType: "address",
       },
       {
-        "name": "amount",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: "to",
+        type: "address",
+        indexed: true,
+        internalType: "address",
+      },
+      {
+        name: "amount",
+        type: "uint256",
+        indexed: false,
+        internalType: "uint256",
+      },
+      {
+        name: "action",
+        type: "string",
+        indexed: false,
+        internalType: "string",
+      },
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    anonymous: false,
   },
   {
-    "type": "event",
-    "name": "DailyFuelDataUpdated",
-    "inputs": [
+    type: "event",
+    name: "MixRewardClaimed",
+    inputs: [
       {
-        "name": "dayTimestamp",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
+        name: "user",
+        type: "address",
+        indexed: true,
+        internalType: "address",
       },
       {
-        "name": "totalCount",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
+        name: "mixAmount",
+        type: "uint256",
+        indexed: false,
+        internalType: "uint256",
       },
       {
-        "name": "totalFuelAmount",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
+        name: "dayTimestamp",
+        type: "uint256",
+        indexed: true,
+        internalType: "uint256",
       },
-      {
-        "name": "totalFuelValue",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      }
     ],
-    "anonymous": false
+    anonymous: false,
   },
   {
-    "type": "event",
-    "name": "MachineDestroyedRecorded",
-    "inputs": [
+    type: "event",
+    name: "NodeCreated",
+    inputs: [
       {
-        "name": "user",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        name: "user",
+        type: "address",
+        indexed: true,
+        internalType: "address",
       },
       {
-        "name": "machineId",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
+        name: "nodeId",
+        type: "uint256",
+        indexed: false,
+        internalType: "uint256",
       },
       {
-        "name": "newCount",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      }
+        name: "machinesConsumed",
+        type: "uint256",
+        indexed: false,
+        internalType: "uint256",
+      },
     ],
-    "anonymous": false
+    anonymous: false,
   },
   {
-    "type": "event",
-    "name": "MixBalanceChanged",
-    "inputs": [
+    type: "event",
+    name: "NodesAmountUpdated",
+    inputs: [
       {
-        "name": "from",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        name: "oldValue",
+        type: "uint256",
+        indexed: false,
+        internalType: "uint256",
       },
       {
-        "name": "to",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        name: "newValue",
+        type: "uint256",
+        indexed: false,
+        internalType: "uint256",
       },
-      {
-        "name": "amount",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      },
-      {
-        "name": "action",
-        "type": "string",
-        "indexed": false,
-        "internalType": "string"
-      }
     ],
-    "anonymous": false
+    anonymous: false,
   },
   {
-    "type": "event",
-    "name": "MixRewardClaimed",
-    "inputs": [
+    type: "event",
+    name: "PhoneBound",
+    inputs: [
       {
-        "name": "user",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        name: "user",
+        type: "address",
+        indexed: true,
+        internalType: "address",
       },
       {
-        "name": "mixAmount",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
+        name: "phone",
+        type: "string",
+        indexed: false,
+        internalType: "string",
       },
-      {
-        "name": "dayTimestamp",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
-      }
     ],
-    "anonymous": false
+    anonymous: false,
   },
   {
-    "type": "event",
-    "name": "NodeCreated",
-    "inputs": [
+    type: "event",
+    name: "PhoneUnbound",
+    inputs: [
       {
-        "name": "user",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        name: "user",
+        type: "address",
+        indexed: true,
+        internalType: "address",
       },
       {
-        "name": "nodeId",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
+        name: "phone",
+        type: "string",
+        indexed: false,
+        internalType: "string",
       },
-      {
-        "name": "machinesConsumed",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      }
     ],
-    "anonymous": false
+    anonymous: false,
   },
   {
-    "type": "event",
-    "name": "NodesAmountUpdated",
-    "inputs": [
+    type: "event",
+    name: "UserAddressChanged",
+    inputs: [
       {
-        "name": "oldValue",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
+        name: "user",
+        type: "address",
+        indexed: true,
+        internalType: "address",
       },
       {
-        "name": "newValue",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      }
+        name: "phone",
+        type: "string",
+        indexed: false,
+        internalType: "string",
+      },
     ],
-    "anonymous": false
+    anonymous: false,
   },
   {
-    "type": "event",
-    "name": "PhoneBound",
-    "inputs": [
+    type: "event",
+    name: "UserPhoneChanged",
+    inputs: [
       {
-        "name": "user",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        name: "user",
+        type: "address",
+        indexed: true,
+        internalType: "address",
       },
       {
-        "name": "phone",
-        "type": "string",
-        "indexed": false,
-        "internalType": "string"
-      }
+        name: "oldPhone",
+        type: "string",
+        indexed: false,
+        internalType: "string",
+      },
+      {
+        name: "newPhone",
+        type: "string",
+        indexed: false,
+        internalType: "string",
+      },
     ],
-    "anonymous": false
+    anonymous: false,
   },
   {
-    "type": "event",
-    "name": "PhoneUnbound",
-    "inputs": [
+    type: "error",
+    name: "AddressAlreadyBound",
+    inputs: [
       {
-        "name": "user",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        name: "user",
+        type: "address",
+        internalType: "address",
       },
-      {
-        "name": "phone",
-        "type": "string",
-        "indexed": false,
-        "internalType": "string"
-      }
     ],
-    "anonymous": false
   },
   {
-    "type": "event",
-    "name": "UserAddressChanged",
-    "inputs": [
+    type: "error",
+    name: "InsufficientBalance",
+    inputs: [
       {
-        "name": "user",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        name: "account",
+        type: "address",
+        internalType: "address",
       },
       {
-        "name": "phone",
-        "type": "string",
-        "indexed": false,
-        "internalType": "string"
-      }
+        name: "required",
+        type: "uint256",
+        internalType: "uint256",
+      },
+      {
+        name: "available",
+        type: "uint256",
+        internalType: "uint256",
+      },
     ],
-    "anonymous": false
   },
   {
-    "type": "event",
-    "name": "UserPhoneChanged",
-    "inputs": [
+    type: "error",
+    name: "InvalidAmount",
+    inputs: [],
+  },
+  {
+    type: "error",
+    name: "NewPhoneAlreadyBound",
+    inputs: [
       {
-        "name": "user",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        name: "phone",
+        type: "string",
+        internalType: "string",
       },
-      {
-        "name": "oldPhone",
-        "type": "string",
-        "indexed": false,
-        "internalType": "string"
-      },
-      {
-        "name": "newPhone",
-        "type": "string",
-        "indexed": false,
-        "internalType": "string"
-      }
     ],
-    "anonymous": false
   },
   {
-    "type": "error",
-    "name": "AddressAlreadyBound",
-    "inputs": [
+    type: "error",
+    name: "PhoneAlreadyBound",
+    inputs: [
       {
-        "name": "user",
-        "type": "address",
-        "internalType": "address"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "InsufficientBalance",
-    "inputs": [
-      {
-        "name": "account",
-        "type": "address",
-        "internalType": "address"
+        name: "phone",
+        type: "string",
+        internalType: "string",
       },
+    ],
+  },
+  {
+    type: "error",
+    name: "PhoneEmpty",
+    inputs: [],
+  },
+  {
+    type: "error",
+    name: "PhoneNotBound",
+    inputs: [
       {
-        "name": "required",
-        "type": "uint256",
-        "internalType": "uint256"
+        name: "phone",
+        type: "string",
+        internalType: "string",
       },
-      {
-        "name": "available",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
+    ],
   },
   {
-    "type": "error",
-    "name": "InvalidAmount",
-    "inputs": []
+    type: "error",
+    name: "SameAddress",
+    inputs: [],
   },
   {
-    "type": "error",
-    "name": "NewPhoneAlreadyBound",
-    "inputs": [
-      {
-        "name": "phone",
-        "type": "string",
-        "internalType": "string"
-      }
-    ]
+    type: "error",
+    name: "UserAddressEmpty",
+    inputs: [],
   },
   {
-    "type": "error",
-    "name": "PhoneAlreadyBound",
-    "inputs": [
-      {
-        "name": "phone",
-        "type": "string",
-        "internalType": "string"
-      }
-    ]
+    type: "error",
+    name: "ZeroAddress",
+    inputs: [],
   },
-  {
-    "type": "error",
-    "name": "PhoneEmpty",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "PhoneNotBound",
-    "inputs": [
-      {
-        "name": "phone",
-        "type": "string",
-        "internalType": "string"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "SameAddress",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "UserAddressEmpty",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "ZeroAddress",
-    "inputs": []
-  }
 ] as const;
 
 export default MiningMachineNodeSystemABI;

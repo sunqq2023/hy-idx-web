@@ -82,7 +82,7 @@ const BSC_TESTNET_CONFIG: ChainContractAddresses = {
   LOGIC_ADDRESS: "0xbD1f0Fb5aaDc22201d1d3e7bb5F66D6a75C9E567",
   PRODUCTION_LOGIC_ADDRESS: "0x288F6339FA31bda1A02fA07ef572f241B2f8f579",
   HISTORY_ADDRESS: "0xf97dcCf449941c6FB255e12B72E27c9ceEd165AE",
-  NODE_SYSTEM_ADDRESS: "0x4F9D0BB295F43a3DCEa22BA645F6c51310E808f3",
+  NODE_SYSTEM_ADDRESS: "0x122bf7E0613763E45cadf6045004845BF4e95985",
   EXTEND_STORAGE_ADDRESS: "0x065010AD76A285A0618fd45668c4973fEa363A14",
   EXTEND_LOGIC_ADDRESS: "0x353d3526b7627756902bBBb793d4A0Ac99B8Bc16",
   EXTEND_HISTORY_ADDRESS: "0xe58b6777fC1c39D3e5DaaAfF09261F6c528BB5AB",
@@ -90,6 +90,7 @@ const BSC_TESTNET_CONFIG: ChainContractAddresses = {
   ALLOWANCE_QUOTA: "10000000",
   RPC_URL: "https://bsc-testnet.publicnode.com",
   BIND_ADDRESS_URL: "https://www.ihealth.vip/api",
+  // BIND_ADDRESS_URL: "http://192.168.1.176:8090",
 };
 
 // 3. Anvil Fork 配置 (Chain ID: 56, 但 RPC 是本地)
@@ -149,7 +150,8 @@ const ANVIL_LOCAL_CONFIG: ChainContractAddresses = {
     "0x8e10b9ba4c78fe8d6a2ecf3fa6307f5e6c1ceebe",
   ALLOWANCE_QUOTA: import.meta.env.VITE_ALLOWANCE_QUOTA || "10000000",
   RPC_URL: import.meta.env.VITE_RPC_URL || "http://127.0.0.1:8545",
-  BIND_ADDRESS_URL: import.meta.env.VITE_BIND_ADDRESS_URL || "http://127.0.0.1:8090",
+  BIND_ADDRESS_URL:
+    import.meta.env.VITE_BIND_ADDRESS_URL || "http://127.0.0.1:8090",
 };
 
 // ==================== 判断逻辑 ====================
@@ -194,7 +196,7 @@ const isLocalRpcUrl = (rpcUrl?: string): boolean => {
  */
 export const getChainConfig = (
   chainId: number,
-  rpcUrl?: string
+  rpcUrl?: string,
 ): ChainContractAddresses | null => {
   // 1. 测试网：Chain ID 97
   if (chainId === 97) {
@@ -212,12 +214,12 @@ export const getChainConfig = (
   if (chainId === 56) {
     if (isLocalRpcUrl(rpcUrl)) {
       console.log(
-        "🔧 Using Anvil Fork configuration (Chain ID: 56, Local RPC)"
+        "🔧 Using Anvil Fork configuration (Chain ID: 56, Local RPC)",
       );
       return ANVIL_FORK_CONFIG;
     } else {
       console.log(
-        "✅ Using BSC Mainnet configuration (Chain ID: 56, Mainnet RPC)"
+        "✅ Using BSC Mainnet configuration (Chain ID: 56, Mainnet RPC)",
       );
       return BSC_MAINNET_CONFIG;
     }
@@ -226,7 +228,7 @@ export const getChainConfig = (
   // 4. 未知 Chain ID，尝试通过 RPC URL 判断
   if (isLocalRpcUrl(rpcUrl)) {
     console.log(
-      `🔧 Using Anvil configuration (detected by local RPC URL, Chain ID: ${chainId})`
+      `🔧 Using Anvil configuration (detected by local RPC URL, Chain ID: ${chainId})`,
     );
     // 如果是本地 RPC，优先使用 Anvil Local 配置（可能部署了新合约）
     // 如果 Chain ID 是 56，则使用 Fork 配置
@@ -245,7 +247,7 @@ export const getChainConfig = (
  */
 export const getConfigByWalletChain = (
   walletChainId: number,
-  rpcUrl?: string
+  rpcUrl?: string,
 ): ChainContractAddresses | null => {
   return getChainConfig(walletChainId, rpcUrl);
 };
@@ -267,14 +269,75 @@ export {
   ANVIL_LOCAL_CONFIG,
 };
 
+// ==================== 智能推断默认 Chain ID ====================
+
+/**
+ * 根据 RPC URL 智能推断 Chain ID
+ *
+ * 推断规则：
+ * 1. 包含 "testnet" / "test-net" / "data-seed-prebsc" → 97 (BSC Testnet)
+ * 2. 包含 "localhost" / "127.0.0.1" / "0.0.0.0" → 1337 (Local)
+ * 3. 包含 "bsc" / "binance" (但不包含 testnet) → 56 (BSC Mainnet)
+ * 4. 无法判断或未提供 → 97 (默认测试网，更安全)
+ *
+ * 示例：
+ * - "https://bsc-testnet.publicnode.com" → 97
+ * - "https://bsc.publicnode.com" → 56
+ * - "http://127.0.0.1:8545" → 1337
+ * - undefined → 97
+ *
+ * @param rpcUrl RPC URL
+ * @returns 推断的 Chain ID
+ */
+const inferChainIdFromRpcUrl = (rpcUrl?: string): number => {
+  if (!rpcUrl) return 97; // 默认测试网（更安全）
+
+  const url = rpcUrl.toLowerCase();
+
+  // 测试网 RPC
+  if (
+    url.includes("testnet") ||
+    url.includes("test-net") ||
+    url.includes("data-seed-prebsc")
+  ) {
+    return 97;
+  }
+
+  // 本地 RPC
+  if (
+    url.includes("localhost") ||
+    url.includes("127.0.0.1") ||
+    url.includes("0.0.0.0")
+  ) {
+    return 1337;
+  }
+
+  // 主网 RPC（明确包含 bsc 但不包含 testnet）
+  if (url.includes("bsc") || url.includes("binance")) {
+    return 56;
+  }
+
+  // 默认测试网（更安全的选择）
+  return 97;
+};
+
 // ==================== 向后兼容的静态导出 ====================
 
-const CHAIN_ID = Number(import.meta.env.VITE_CHAIN_ID) || 56;
+// 智能获取 Chain ID：优先使用环境变量，否则根据 RPC URL 推断
+const RPC_URL = import.meta.env.VITE_RPC_URL;
+const CHAIN_ID =
+  Number(import.meta.env.VITE_CHAIN_ID) || inferChainIdFromRpcUrl(RPC_URL);
+
+console.log(
+  "📍 Default Chain ID:",
+  CHAIN_ID,
+  RPC_URL ? `(inferred from RPC: ${RPC_URL})` : "(from env)",
+);
 
 // ⚠️ 以下导出的地址是静态的，仅用于向后兼容
 // 新代码应该使用 useChainConfig() Hook 获取动态地址
-// 默认使用 BSC 主网配置（钱包未连接时的默认值）
-const currentConfig = BSC_MAINNET_CONFIG;
+// 根据推断的 Chain ID 选择默认配置
+const currentConfig = getChainConfig(CHAIN_ID, RPC_URL) || BSC_TESTNET_CONFIG;
 
 const StorageAddress = currentConfig.STORAGE_ADDRESS;
 const LogicAddress = currentConfig.LOGIC_ADDRESS;

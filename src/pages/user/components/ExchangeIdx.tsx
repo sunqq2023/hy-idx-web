@@ -163,7 +163,7 @@ const ExchangeIdx = () => {
   const handleExchangeMixToIDX = async () => {
     if (+mixBalance < 100) {
       Toast.show({
-        content: "MIX余额不足",
+        content: "MIX余额不足（至少需要100 MIX）",
         position: "center",
       });
       return;
@@ -174,26 +174,87 @@ const ExchangeIdx = () => {
 
       const exchangeMixCount = Math.floor(+mixBalance / 100);
 
-      console.log("aaa", exchangeMixCount);
-      const hash = await writeContract(config, {
-        address: MiningMachineProductionLogicAddress as `0x${string}`,
-        abi: MiningMachineProductionLogicABI,
-        functionName: "convertMIXtoIDX",
-        args: [exchangeMixCount],
+      if (exchangeMixCount === 0) {
+        Toast.show({
+          content: "兑换数量为0，请检查MIX余额",
+          position: "center",
+        });
+        setIsExchangingIDX(false);
+        return;
+      }
+
+      console.log("兑换参数:", {
+        mixBalance,
+        exchangeMixCount,
+        address: MiningMachineProductionLogicAddress,
       });
 
-      await waitForTransactionReceipt(config, {
-        hash,
-        chainId: CHAIN_ID,
-      });
-      Toast.show({
-        content: "兑换成功",
-        position: "center",
-      });
-      queryMIXBalance();
-      handleQuery();
+      // 先尝试估算Gas，如果失败会显示具体错误
+      try {
+        const hash = await writeContract(config, {
+          address: MiningMachineProductionLogicAddress as `0x${string}`,
+          abi: MiningMachineProductionLogicABI,
+          functionName: "convertMIXtoIDX",
+          args: [exchangeMixCount],
+        });
+
+        await waitForTransactionReceipt(config, {
+          hash,
+          chainId: CHAIN_ID,
+        });
+        Toast.show({
+          content: "兑换成功",
+          position: "center",
+        });
+        queryMIXBalance();
+        handleQuery();
+      } catch (contractError: unknown) {
+        console.error("合约调用错误:", contractError);
+
+        // 解析错误信息
+        let errorMessage = "兑换失败";
+        if (contractError instanceof Error) {
+          const errorMsg = contractError.message || String(contractError);
+
+          // 检查常见的合约错误
+          if (errorMsg.includes("Insufficient MIX") || errorMsg.includes("余额不足")) {
+            errorMessage = "MIX余额不足";
+          } else if (errorMsg.includes("No IDX to release") || errorMsg.includes("IDX数量为0")) {
+            errorMessage = "无法兑换：IDX数量为0，可能是交易对余额不足";
+          } else if (errorMsg.includes("IDX transfer failed") || errorMsg.includes("转账失败")) {
+            errorMessage = "兑换失败：合约IDX余额不足，请联系管理员";
+          } else if (errorMsg.includes("gas") || errorMsg.includes("Gas")) {
+            errorMessage = "Gas估算失败，可能是合约状态不允许兑换";
+          } else if (errorMsg.includes("execution reverted")) {
+            // 提取revert原因
+            const revertMatch = errorMsg.match(/execution reverted: (.+)/);
+            if (revertMatch) {
+              errorMessage = `兑换失败: ${revertMatch[1]}`;
+            } else {
+              errorMessage = "兑换失败：合约执行被回退，请检查余额和权限";
+            }
+          } else {
+            errorMessage = `兑换失败: ${errorMsg}`;
+          }
+        }
+
+        Toast.show({
+          content: errorMessage,
+          position: "center",
+          duration: 5000,
+        });
+        throw contractError; // 重新抛出以便外部catch处理
+      }
     } catch (error) {
-      console.error(error);
+      console.error("兑换过程错误:", error);
+      // 外层catch处理非合约错误（如网络错误等）
+      if (!(error instanceof Error && error.message.includes("execution reverted"))) {
+        Toast.show({
+          content: "兑换失败，请稍后重试",
+          position: "center",
+          duration: 3000,
+        });
+      }
     } finally {
       setIsExchangingIDX(false);
     }

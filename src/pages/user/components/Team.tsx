@@ -184,16 +184,16 @@ export const Team = () => {
       const formattedRecords = (records as unknown as RawWithdrawRecord[]).map(
         (record: RawWithdrawRecord, index: number) => {
           const formattedAmount = formatEther(record.claimAmount);
-          console.log(`提现记录 ${index + 1}:`, {
-            原始值: record.claimAmount.toString(),
-            格式化后: formattedAmount,
+        console.log(`提现记录 ${index + 1}:`, {
+          原始值: record.claimAmount.toString(),
+          格式化后: formattedAmount,
             类型: typeof formattedAmount,
           });
 
-          return {
-            claimType: Number(record.claimType),
-            claimDate: Number(record.claimDate),
-            claimAmount: formattedAmount, // 保持为字符串，避免精度丢失
+        return {
+          claimType: Number(record.claimType),
+          claimDate: Number(record.claimDate),
+          claimAmount: formattedAmount, // 保持为字符串，避免精度丢失
             tokenType: Number(record.tokenType),
           };
         }
@@ -232,18 +232,18 @@ export const Team = () => {
       // 转换数据格式
       const formattedRecords = (records as unknown as RawPowerRecord[]).map(
         (record: RawPowerRecord, index: number) => {
-          // 算力值直接使用原始数值，不需要formatEther转换
+        // 算力值直接使用原始数值，不需要formatEther转换
           const formattedAmount = record.getAmount.toString();
-          console.log(`算力记录 ${index + 1}:`, {
-            原始值: record.getAmount.toString(),
-            格式化后: formattedAmount,
-            获得日期: new Date(Number(record.getDate) * 1000).toLocaleString(),
+        console.log(`算力记录 ${index + 1}:`, {
+          原始值: record.getAmount.toString(),
+          格式化后: formattedAmount,
+          获得日期: new Date(Number(record.getDate) * 1000).toLocaleString(),
             记录类型: Number(record.recordType),
           });
 
-          return {
-            getDate: Number(record.getDate),
-            getAmount: formattedAmount, // 保持为字符串，避免精度丢失
+        return {
+          getDate: Number(record.getDate),
+          getAmount: formattedAmount, // 保持为字符串，避免精度丢失
             recordType: Number(record.recordType),
           };
         }
@@ -384,36 +384,36 @@ export const Team = () => {
       address: string,
       visited: Set<string> = new Set()
     ): Promise<number> => {
-      // 防止循环引用
+    // 防止循环引用
       if (visited.has(address)) return 0;
       visited.add(address);
 
-      try {
-        // 获取直推好友列表
+    try {
+      // 获取直推好友列表
         const friendList = (await readContract(config, {
-          address: MiningMachineSystemStorageExtendAddress as `0x${string}`,
-          abi: MiningMachineSystemStorageExtendABI,
+        address: MiningMachineSystemStorageExtendAddress as `0x${string}`,
+        abi: MiningMachineSystemStorageExtendABI,
           functionName: "getFriendList",
           args: [address],
         })) as string[];
 
         if (!friendList || friendList.length === 0) return 0;
 
-        // 递归计算每个好友的团队人数
+      // 递归计算每个好友的团队人数
         let totalCount = friendList.length; // 直推好友数
-        for (const friend of friendList) {
+      for (const friend of friendList) {
           const subTeamCount = await calculateTotalTeamCount(
             friend,
             new Set(visited)
           );
           totalCount += subTeamCount;
-        }
+      }
 
         return totalCount;
-      } catch (error) {
+    } catch (error) {
         console.error(`计算地址 ${address} 的团队人数失败:`, error);
         return 0;
-      }
+    }
     },
     []
   );
@@ -536,8 +536,8 @@ export const Team = () => {
 
       const hash = await writeContractWithGasFallback(
         {
-          address: MiningMachineSystemLogicExtendAddress as `0x${string}`,
-          abi: MiningMachineSystemLogicExtendABI,
+        address: MiningMachineSystemLogicExtendAddress as `0x${string}`,
+        abi: MiningMachineSystemLogicExtendABI,
           functionName: "claimRewards",
           args: [parseEther(withdrawAmount)],
         },
@@ -728,8 +728,8 @@ export const Team = () => {
 
       const hash = await writeContractWithGasFallback(
         {
-          address: MiningMachineSystemLogicExtendAddress as `0x${string}`,
-          abi: MiningMachineSystemLogicExtendABI,
+        address: MiningMachineSystemLogicExtendAddress as `0x${string}`,
+        abi: MiningMachineSystemLogicExtendABI,
           functionName: "addFriend",
           args: [referrerInput],
         },
@@ -803,8 +803,8 @@ export const Team = () => {
 
       const hash = await writeContractWithGasFallback(
         {
-          address: MiningMachineSystemStorageExtendAddress as `0x${string}`,
-          abi: MiningMachineSystemStorageExtendABI,
+        address: MiningMachineSystemStorageExtendAddress as `0x${string}`,
+        abi: MiningMachineSystemStorageExtendABI,
           functionName: "addStudio",
           args: [markStudioAddress, true],
         },
@@ -866,8 +866,8 @@ export const Team = () => {
       // 调用ExtendLogicAddress的提取空投奖励函数
       const hash = await writeContractWithGasFallback(
         {
-          address: MiningMachineSystemLogicExtendAddress as `0x${string}`,
-          abi: MiningMachineSystemLogicExtendABI,
+        address: MiningMachineSystemLogicExtendAddress as `0x${string}`,
+        abi: MiningMachineSystemLogicExtendABI,
           functionName: "claimActivatedMachineRewards",
           args: [],
         },
@@ -1182,65 +1182,65 @@ export const Team = () => {
             className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center"
             style={{ zIndex: 99999 }}
           >
-            <div className="bg-white rounded-2xl p-6 mx-4 w-full max-w-sm">
+          <div className="bg-white rounded-2xl p-6 mx-4 w-full max-w-sm">
               <div className="text-lg font-bold mb-4 text-center">
                 提现到钱包
               </div>
 
-              <div className="mb-4">
-                <div className="text-sm text-gray-600 mb-2">
+            <div className="mb-4">
+              <div className="text-sm text-gray-600 mb-2">
                   可提现金额:{" "}
                   <span className="font-bold text-[#895EFE]">
                     {performanceCommission} IDX
                   </span>
-                </div>
-                {/* <div className="text-sm text-gray-600 mb-2">
+              </div>
+              {/* <div className="text-sm text-gray-600 mb-2">
                 奖励池余额: <span className="font-bold text-[#895EFE]">{treasuryBalance} IDX</span>
               </div> */}
-              </div>
+            </div>
 
-              <div className="mb-6">
-                <input
-                  type="number"
-                  placeholder="请输入提现金额"
-                  value={withdrawAmount}
-                  onChange={(e) => {
+            <div className="mb-6">
+              <input
+                type="number"
+                placeholder="请输入提现金额"
+                value={withdrawAmount}
+                onChange={(e) => {
                     setWithdrawAmount(e.target.value);
                     setWithdrawError(""); // 输入时清除错误信息
-                  }}
-                  className={`w-full p-4 border rounded-xl text-sm ${
+                }}
+                className={`w-full p-4 border rounded-xl text-sm ${
                     withdrawError ? "border-red-500" : "border-gray-300"
-                  }`}
-                  step="0.000000000000000001"
-                  min="0"
-                  max={performanceCommission}
-                />
-                {withdrawError && (
-                  <div className="text-red-500 text-sm mt-2">
-                    {withdrawError}
-                  </div>
-                )}
-              </div>
-
-              <div className="flex gap-3">
-                <button
-                  onClick={handleCancelWithdraw}
-                  className="flex-1 py-3 bg-gray-200 text-gray-700 rounded-xl text-sm font-medium"
-                >
-                  取消
-                </button>
-                <button
-                  onClick={handleSubmitWithdraw}
-                  disabled={isWithdrawing}
-                  className="flex-1 py-3 bg-[#895EFE] text-white rounded-xl text-sm font-medium disabled:opacity-50"
-                >
-                  {isWithdrawing ? "提现中..." : "确认提现"}
-                </button>
-              </div>
+                }`}
+                step="0.000000000000000001"
+                min="0"
+                max={performanceCommission}
+              />
+              {withdrawError && (
+                <div className="text-red-500 text-sm mt-2">
+                  {withdrawError}
+                </div>
+              )}
             </div>
-          </div>,
-          document.body
-        )}
+
+            <div className="flex gap-3">
+              <button
+                onClick={handleCancelWithdraw}
+                className="flex-1 py-3 bg-gray-200 text-gray-700 rounded-xl text-sm font-medium"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleSubmitWithdraw}
+                disabled={isWithdrawing}
+                className="flex-1 py-3 bg-[#895EFE] text-white rounded-xl text-sm font-medium disabled:opacity-50"
+              >
+                  {isWithdrawing ? "提现中..." : "确认提现"}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
 
       {/* 推荐人填写表单弹窗 */}
       {showReferrerForm &&
@@ -1249,49 +1249,49 @@ export const Team = () => {
             className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center"
             style={{ zIndex: 99999 }}
           >
-            <div className="bg-white rounded-2xl p-6 mx-4 w-full max-w-sm">
+          <div className="bg-white rounded-2xl p-6 mx-4 w-full max-w-sm">
               <div className="text-lg font-bold mb-4 text-center">
                 请输入你的推荐人钱包地址
               </div>
 
-              <div className="mb-6">
-                <input
-                  type="text"
-                  placeholder="输入推荐人钱包地址"
-                  value={referrerInput}
-                  onChange={(e) => {
+            <div className="mb-6">
+              <input
+                type="text"
+                placeholder="输入推荐人钱包地址"
+                value={referrerInput}
+                onChange={(e) => {
                     setReferrerInput(e.target.value);
                     setReferrerError(""); // 输入时清除错误信息
-                  }}
-                  className={`w-full p-4 border rounded-xl text-sm ${
+                }}
+                className={`w-full p-4 border rounded-xl text-sm ${
                     referrerError ? "border-red-500" : "border-gray-300"
-                  }`}
-                />
-                {referrerError && (
-                  <div className="text-red-500 text-sm mt-2">
-                    {referrerError}
-                  </div>
-                )}
-              </div>
-
-              <div className="flex gap-3">
-                <button
-                  onClick={handleCancelReferrer}
-                  className="flex-1 py-3 bg-gray-200 text-gray-700 rounded-xl text-sm font-medium"
-                >
-                  取消
-                </button>
-                <button
-                  onClick={handleSubmitReferrer}
-                  className="flex-1 py-3 bg-[#895EFE] text-white rounded-xl text-sm font-medium"
-                >
-                  提交
-                </button>
-              </div>
+                }`}
+              />
+              {referrerError && (
+                <div className="text-red-500 text-sm mt-2">
+                  {referrerError}
+                </div>
+              )}
             </div>
-          </div>,
-          document.body
-        )}
+
+            <div className="flex gap-3">
+              <button
+                onClick={handleCancelReferrer}
+                className="flex-1 py-3 bg-gray-200 text-gray-700 rounded-xl text-sm font-medium"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleSubmitReferrer}
+                className="flex-1 py-3 bg-[#895EFE] text-white rounded-xl text-sm font-medium"
+              >
+                提交
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
 
       {/* 推荐人确认弹窗 */}
       {showReferrerConfirm &&
@@ -1300,41 +1300,41 @@ export const Team = () => {
             className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center"
             style={{ zIndex: 99999 }}
           >
-            <div className="bg-white rounded-2xl p-6 mx-4 w-full max-w-sm">
+          <div className="bg-white rounded-2xl p-6 mx-4 w-full max-w-sm">
               <div className="text-lg font-bold mb-4 text-center">
                 确认提示:
               </div>
 
-              <div className="text-sm text-gray-600 mb-4 text-center leading-relaxed">
-                推荐人一但填写成功,将不可更改;请确认你刚才填写的地址是否为你的推荐人:
-              </div>
+            <div className="text-sm text-gray-600 mb-4 text-center leading-relaxed">
+              推荐人一但填写成功,将不可更改;请确认你刚才填写的地址是否为你的推荐人:
+            </div>
 
-              <div className="text-center mb-6">
-                <div className="text-lg font-bold text-[#895EFE]">
-                  {formatIntroducerAddress(referrerInput)}
-                </div>
-              </div>
-
-              <div className="flex gap-3">
-                <button
-                  onClick={handleCancelReferrer}
-                  className="flex-1 py-3 bg-gray-200 text-gray-700 rounded-xl text-sm font-medium"
-                >
-                  不是
-                </button>
-                <Button
-                  onClick={handleConfirmReferrer}
-                  loading={isSubmittingReferrer}
-                  disabled={isSubmittingReferrer}
-                  className="flex-1 py-3 bg-[#895EFE] text-white rounded-xl text-sm font-medium disabled:opacity-50"
-                >
-                  {isSubmittingReferrer ? "提交中..." : "是"}
-                </Button>
+            <div className="text-center mb-6">
+              <div className="text-lg font-bold text-[#895EFE]">
+                {formatIntroducerAddress(referrerInput)}
               </div>
             </div>
-          </div>,
-          document.body
-        )}
+
+            <div className="flex gap-3">
+              <button
+                onClick={handleCancelReferrer}
+                className="flex-1 py-3 bg-gray-200 text-gray-700 rounded-xl text-sm font-medium"
+              >
+                不是
+              </button>
+              <Button
+                onClick={handleConfirmReferrer}
+                loading={isSubmittingReferrer}
+                disabled={isSubmittingReferrer}
+                className="flex-1 py-3 bg-[#895EFE] text-white rounded-xl text-sm font-medium disabled:opacity-50"
+              >
+                  {isSubmittingReferrer ? "提交中..." : "是"}
+              </Button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
 
       {/* 标记工作室表单弹窗 */}
       {showMarkStudioForm &&
@@ -1343,51 +1343,51 @@ export const Team = () => {
             className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center"
             style={{ zIndex: 99999 }}
           >
-            <div className="bg-white rounded-2xl p-6 mx-4 w-full max-w-sm">
+          <div className="bg-white rounded-2xl p-6 mx-4 w-full max-w-sm">
               <div className="text-lg font-bold mb-4 text-center">
                 标记工作室
               </div>
 
-              <div className="mb-6">
-                <input
-                  type="text"
-                  placeholder="输入要标记为工作室的地址"
-                  value={markStudioAddress}
-                  onChange={(e) => {
+            <div className="mb-6">
+              <input
+                type="text"
+                placeholder="输入要标记为工作室的地址"
+                value={markStudioAddress}
+                onChange={(e) => {
                     setMarkStudioAddress(e.target.value);
                     setMarkStudioError(""); // 输入时清除错误信息
-                  }}
-                  className={`w-full p-4 border rounded-xl text-sm ${
+                }}
+                className={`w-full p-4 border rounded-xl text-sm ${
                     markStudioError ? "border-red-500" : "border-gray-300"
-                  }`}
-                />
-                {markStudioError && (
-                  <div className="text-red-500 text-sm mt-2">
-                    {markStudioError}
-                  </div>
-                )}
-              </div>
-
-              <div className="flex gap-3">
-                <button
-                  onClick={handleCancelMarkStudio}
-                  className="flex-1 py-3 bg-gray-200 text-gray-700 rounded-xl text-sm font-medium"
-                >
-                  取消
-                </button>
-                <Button
-                  onClick={handleSubmitMarkStudio}
-                  disabled={isMarkingStudio}
-                  loading={isMarkingStudio}
-                  className="flex-1 py-3 bg-[#895EFE] text-white rounded-xl text-sm font-medium disabled:opacity-50"
-                >
-                  {isMarkingStudio ? "标记中..." : "确认标记"}
-                </Button>
-              </div>
+                }`}
+              />
+              {markStudioError && (
+                <div className="text-red-500 text-sm mt-2">
+                  {markStudioError}
+                </div>
+              )}
             </div>
-          </div>,
-          document.body
-        )}
+
+            <div className="flex gap-3">
+              <button
+                onClick={handleCancelMarkStudio}
+                className="flex-1 py-3 bg-gray-200 text-gray-700 rounded-xl text-sm font-medium"
+              >
+                取消
+              </button>
+              <Button
+                onClick={handleSubmitMarkStudio}
+                disabled={isMarkingStudio}
+                loading={isMarkingStudio}
+                className="flex-1 py-3 bg-[#895EFE] text-white rounded-xl text-sm font-medium disabled:opacity-50"
+              >
+                  {isMarkingStudio ? "标记中..." : "确认标记"}
+              </Button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
 
       {/* 算力记录弹窗 */}
       {showPowerRecords &&
@@ -1396,14 +1396,14 @@ export const Team = () => {
             className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center"
             style={{ zIndex: 99999 }}
           >
-            <div className="bg-white rounded-2xl p-6 mx-4 w-full max-w-sm max-h-[80vh] flex flex-col">
-              {/* 标题栏 */}
-              <div className="flex items-center justify-between mb-4">
-                <div className="text-lg font-bold">算力详情</div>
-                <button
-                  onClick={handleClosePowerRecords}
-                  className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600"
-                >
+          <div className="bg-white rounded-2xl p-6 mx-4 w-full max-w-sm max-h-[80vh] flex flex-col">
+            {/* 标题栏 */}
+            <div className="flex items-center justify-between mb-4">
+              <div className="text-lg font-bold">算力详情</div>
+              <button
+                onClick={handleClosePowerRecords}
+                className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600"
+              >
                   <svg
                     className="w-5 h-5"
                     fill="none"
@@ -1416,42 +1416,42 @@ export const Team = () => {
                       strokeWidth={2}
                       d="M6 18L18 6M6 6l12 12"
                     />
-                  </svg>
-                </button>
-              </div>
+                </svg>
+              </button>
+            </div>
 
-              {/* 我的算力总览 */}
-              <div className="bg-gray-50 rounded-xl p-4 mb-4">
-                <div className="text-sm text-gray-600 mb-2">我的算力</div>
-                <div className="text-2xl font-bold text-black">
+            {/* 我的算力总览 */}
+            <div className="bg-gray-50 rounded-xl p-4 mb-4">
+              <div className="text-sm text-gray-600 mb-2">我的算力</div>
+              <div className="text-2xl font-bold text-black">
                   {powerRecords
                     .reduce(
                       (total, record) => total + parseFloat(record.getAmount),
                       0
                     )
                     .toFixed(0)}
-                </div>
               </div>
+            </div>
 
-              {/* 算力记录列表 */}
-              <div className="flex-1 overflow-y-auto">
-                {isLoadingPowerRecords ? (
-                  <div className="text-center py-8 text-gray-500">
-                    加载中...
-                  </div>
-                ) : powerRecords.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
-                    暂无算力记录
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {powerRecords.map((record, index) => (
+            {/* 算力记录列表 */}
+            <div className="flex-1 overflow-y-auto">
+              {isLoadingPowerRecords ? (
+                <div className="text-center py-8 text-gray-500">
+                  加载中...
+                </div>
+              ) : powerRecords.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  暂无算力记录
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {powerRecords.map((record, index) => (
                       <div
                         key={index}
                         className="bg-white border border-gray-200 rounded-xl p-4 flex items-center"
                       >
-                        {/* 左侧图标 */}
-                        <div className="w-10 h-10 bg-black rounded-full flex items-center justify-center mr-4">
+                      {/* 左侧图标 */}
+                      <div className="w-10 h-10 bg-black rounded-full flex items-center justify-center mr-4">
                           <svg
                             className="w-5 h-5 text-white"
                             fill="none"
@@ -1464,44 +1464,44 @@ export const Team = () => {
                               strokeWidth={2}
                               d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"
                             />
-                          </svg>
-                        </div>
+                        </svg>
+                      </div>
 
-                        {/* 中间信息 */}
-                        <div className="flex-1">
-                          <div className="text-black text-[14px] font-medium mb-1">
-                            获得算力
-                          </div>
-                          <div className="text-gray-500 text-[12px]">
-                            {formatPowerTime(record.getDate)}
-                          </div>
+                      {/* 中间信息 */}
+                      <div className="flex-1">
+                        <div className="text-black text-[14px] font-medium mb-1">
+                          获得算力
                         </div>
-
-                        {/* 右侧数量 */}
-                        <div className="text-right">
-                          <div className="text-[#895EFE] text-[16px] font-bold">
-                            +{formatPowerAmount(record.getAmount)}
-                          </div>
+                        <div className="text-gray-500 text-[12px]">
+                          {formatPowerTime(record.getDate)}
                         </div>
                       </div>
-                    ))}
-                  </div>
-                )}
-              </div>
 
-              {/* 关闭按钮 */}
-              <div className="mt-4">
-                <button
-                  onClick={handleClosePowerRecords}
-                  className="w-full py-3 bg-gray-200 text-gray-700 rounded-xl text-sm font-medium"
-                >
-                  关闭
-                </button>
-              </div>
+                      {/* 右侧数量 */}
+                      <div className="text-right">
+                        <div className="text-[#895EFE] text-[16px] font-bold">
+                          +{formatPowerAmount(record.getAmount)}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-          </div>,
-          document.body
-        )}
+
+            {/* 关闭按钮 */}
+            <div className="mt-4">
+              <button
+                onClick={handleClosePowerRecords}
+                className="w-full py-3 bg-gray-200 text-gray-700 rounded-xl text-sm font-medium"
+              >
+                关闭
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 };

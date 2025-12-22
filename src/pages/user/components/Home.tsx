@@ -29,6 +29,7 @@ import {
   USDT_CONTRACTS_ADDRESS,
   MiningMachineSystemStorageExtendABI,
   MiningMachineSystemLogicExtendABI,
+  MiningMachineNodeSystemABI,
 } from "@/constants";
 import { useChainConfig } from "@/hooks/useChainConfig";
 import EmptyComp from "@/components/EmptyComp";
@@ -76,6 +77,42 @@ export const Home = ({
   const [showBindModal, setShowBindModal] = useState(false);
   const [pendingPhone, setPendingPhone] = useState<string>("");
   const [isBinding, setIsBinding] = useState(false);
+  const [lastBindingTxHash, setLastBindingTxHash] = useState<string>("");
+
+  // 获取本地存储的绑定状态 key
+  const getBindingStatusKey = useCallback((address: string) => {
+    return `wallet_binding_${address.toLowerCase()}`;
+  }, []);
+
+  // 获取本地存储的绑定状态
+  const getLocalBindingStatus = useCallback(
+    (address: string): "bound" | "rejected" | null => {
+      if (!address) return null;
+      try {
+        const key = getBindingStatusKey(address);
+        const status = localStorage.getItem(key);
+        return status as "bound" | "rejected" | null;
+      } catch (error) {
+        console.error("获取本地绑定状态失败:", error);
+        return null;
+      }
+    },
+    [getBindingStatusKey],
+  );
+
+  // 保存绑定状态到本地存储
+  const saveLocalBindingStatus = useCallback(
+    (address: string, status: "bound" | "rejected") => {
+      if (!address) return;
+      try {
+        const key = getBindingStatusKey(address);
+        localStorage.setItem(key, status);
+      } catch (error) {
+        console.error("保存本地绑定状态失败:", error);
+      }
+    },
+    [getBindingStatusKey],
+  );
 
   const navigate = useNavigate();
   const location = useLocation(); // 添加路由位置监听
@@ -199,6 +236,14 @@ export const Home = ({
   const checkPendingBinding = useCallback(async () => {
     if (!userAddress) return;
 
+    // 先检查本地存储的绑定状态（只有已绑定才跳过）
+    const localStatus = getLocalBindingStatus(userAddress);
+    if (localStatus === "bound") {
+      console.log("✅ 本地已记录绑定状态，跳过远程查询");
+      return;
+    }
+    // 注意：拒绝状态不保存到本地，每次都会重新查询
+
     // 检查 BIND_ADDRESS_URL 是否配置
     if (!chainConfig.BIND_ADDRESS_URL) {
       console.warn("⚠️ BIND_ADDRESS_URL 未配置，跳过绑定检查");
@@ -206,20 +251,86 @@ export const Home = ({
     }
 
     try {
-      const response = await fetch(
-        `${chainConfig.BIND_ADDRESS_URL}/mix/getPhoneByAddress/${userAddress}`
-      );
+      // 使用相对路径，通过 Vite 代理访问后端（避免 CORS 问题）
+      const response = await fetch(`/mix/getPhoneByAddress/${userAddress}`);
       const result = await response.json();
 
-      if (result.data?.success === false && result.data?.errorCode === "BINDING_PENDING" && result.data?.phone) {
-        setPendingPhone(result.data.phone);
+      if (
+        result.data?.success === false &&
+        result.data?.errorCode === "BINDING_PENDING" &&
+        result.data?.phone
+      ) {
+        const pendingPhoneNumber = result.data.phone;
+
+        // 在显示弹窗前，先检查链上是否已经绑定
+        console.log("🔍 检查链上绑定状态...");
+        try {
+          const onChainPhone = await readContract(config, {
+            address: chainConfig.NODE_SYSTEM_ADDRESS as `0x${string}`,
+            abi: MiningMachineNodeSystemABI,
+            functionName: "getUserPhone",
+            args: [userAddress],
+          });
+
+          if (onChainPhone && onChainPhone === pendingPhoneNumber) {
+            // 链上已绑定，直接调用后端同步
+            console.log("✅ 链上已绑定，直接同步到后端");
+            Toast.show({
+              content: "检测到链上已绑定，正在同步...",
+              position: "center",
+              duration: 2000,
+            });
+
+            // 使用相对路径，通过 Vite 代理访问后端（避免 CORS 问题）
+            const syncResult = await sendSignedRequest<{
+              code: number;
+              message?: string;
+              data?: {
+                success: boolean;
+                message?: string;
+                errorCode?: string;
+              };
+            }>("POST", "/mix/confirmBinding", {
+              phone: pendingPhoneNumber,
+              address: userAddress,
+            });
+
+            if (syncResult.code === 200 && syncResult.data?.success) {
+              console.log("✅ 后端同步成功");
+              saveLocalBindingStatus(userAddress, "bound");
+              Toast.show({
+                content: "绑定同步成功",
+                position: "center",
+                duration: 2000,
+              });
+            } else {
+              console.warn("⚠️ 后端同步失败:", syncResult);
+              // 同步失败仍然显示弹窗，让用户手动确认
+              setPendingPhone(pendingPhoneNumber);
+              setShowBindModal(true);
+            }
+            return;
+          }
+        } catch (onChainError) {
+          console.warn("⚠️ 检查链上状态失败:", onChainError);
+          // 检查失败，继续显示弹窗
+        }
+
+        // 链上未绑定，显示弹窗让用户确认
+        setPendingPhone(pendingPhoneNumber);
         setShowBindModal(true);
       }
     } catch (error) {
       // 静默处理错误，不阻塞 UI
       console.debug("检查待确认绑定失败:", error);
     }
-  }, [userAddress, chainConfig.BIND_ADDRESS_URL]);
+  }, [
+    userAddress,
+    chainConfig.BIND_ADDRESS_URL,
+    chainConfig.NODE_SYSTEM_ADDRESS,
+    getLocalBindingStatus,
+    saveLocalBindingStatus,
+  ]);
 
   // 处理同意绑定
   const handleAgreeBinding = useCallback(async () => {
@@ -241,7 +352,132 @@ export const Home = ({
         position: "center",
       });
 
-      // 调用后端接口确认绑定（接口内部会调用合约）
+      // 第一步：调用合约的 boundUserPhone 函数
+      console.log("📝 调用合约 boundUserPhone:", {
+        phone: pendingPhone,
+        nodeSystemAddress: chainConfig.NODE_SYSTEM_ADDRESS,
+      });
+      console.log("node system address: ", chainConfig.NODE_SYSTEM_ADDRESS);
+
+      // 先检查手机号是否已被绑定
+      const isPhoneBound = await readContract(config, {
+        address: chainConfig.NODE_SYSTEM_ADDRESS as `0x${string}`,
+        abi: MiningMachineNodeSystemABI,
+        functionName: "isPhoneBound",
+        args: [pendingPhone],
+      });
+
+      if (isPhoneBound) {
+        Toast.show({
+          content: "该手机号已被其他地址绑定",
+          position: "center",
+          duration: 3000,
+        });
+        setIsBinding(false);
+        return;
+      }
+
+      // 检查当前地址是否已绑定
+      const isAddressBound = await readContract(config, {
+        address: chainConfig.NODE_SYSTEM_ADDRESS as `0x${string}`,
+        abi: MiningMachineNodeSystemABI,
+        functionName: "isAddressBound",
+        args: [userAddress],
+      });
+
+      if (isAddressBound) {
+        Toast.show({
+          content: "该地址已绑定其他手机号",
+          position: "center",
+          duration: 3000,
+        });
+        setIsBinding(false);
+        return;
+      }
+
+      const hash = await writeContractAsync({
+        address: chainConfig.NODE_SYSTEM_ADDRESS as `0x${string}`,
+        abi: MiningMachineNodeSystemABI,
+        functionName: "boundUserPhone",
+        args: [pendingPhone],
+        gas: 100000n, // 手动设置 Gas limit，避免估算不足
+        gasPrice: 5000000000n, // 5 Gwei，确保快速确认（BSC 推荐 3-5 Gwei）
+      });
+
+      // 保存交易哈希，以便后续手动同步
+      setLastBindingTxHash(hash);
+
+      console.log("⏳ 等待交易确认...", hash);
+
+      // 更新提示信息
+      Toast.show({
+        content: "交易已发送，等待区块确认...",
+        position: "center",
+        duration: 0, // 不自动关闭
+      });
+
+      let receipt;
+      let transactionSuccess = false;
+
+      try {
+        // 等待交易确认（会轮询 RPC 节点检查交易状态）
+        receipt = await waitForTransactionReceipt(config, {
+          hash,
+          chainId: CHAIN_ID,
+          confirmations: 1,
+          timeout: 60_000,
+        });
+
+        transactionSuccess = receipt.status === "success";
+        console.log("✅ 合约调用成功:", receipt);
+      } catch (waitError) {
+        // 超时或其他错误，尝试手动查询
+        console.warn("⚠️ 等待确认失败，尝试手动查询交易状态...", waitError);
+
+        try {
+          // 使用 getTransactionReceipt 手动查询
+          const txReceipt = await readContract(config, {
+            address: chainConfig.NODE_SYSTEM_ADDRESS as `0x${string}`,
+            abi: [
+              {
+                inputs: [],
+                name: "isPhoneBound",
+                outputs: [{ type: "bool" }],
+                stateMutability: "view",
+                type: "function",
+              },
+            ] as const,
+            functionName: "isPhoneBound",
+            args: [pendingPhone],
+          });
+
+          // 如果能查到绑定状态，说明交易成功了
+          if (txReceipt) {
+            console.log("✅ 通过合约状态确认交易已成功");
+            transactionSuccess = true;
+          }
+        } catch (queryError) {
+          console.error("❌ 无法确认交易状态:", queryError);
+          // 即使查询失败，也尝试调用后端（可能交易已成功）
+          transactionSuccess = true; // 乐观假设
+        }
+      }
+
+      // 关闭等待提示
+      Toast.clear();
+
+      // 第二步：即使超时也尝试调用后端接口确认绑定
+      console.log("📡 调用后端接口确认绑定...");
+
+      if (!transactionSuccess) {
+        Toast.show({
+          content: "交易状态未确认，但仍尝试同步到后端...",
+          position: "center",
+          duration: 2000,
+        });
+      }
+
+      // 使用相对路径，通过 Vite 代理访问后端（避免 CORS 问题）
       const result = await sendSignedRequest<{
         code: number;
         message?: string;
@@ -250,20 +486,17 @@ export const Home = ({
           message?: string;
           errorCode?: string;
         };
-      }>(
-        "POST",
-        `${chainConfig.BIND_ADDRESS_URL}/mix/confirmBinding`,
-        {
-          phone: pendingPhone,
-          address: userAddress,
-        }
-      );
+      }>("POST", "/mix/confirmBinding", {
+        phone: pendingPhone,
+        address: userAddress,
+      });
       // 检查 result.code 和 result.data.success
       if (result.code !== 200 || !result.data?.success) {
         const errorMsg =
           (result.data && (result.data.message || result.data.errorCode)) ||
           result.message ||
-          "绑定失败";
+          "后端确认绑定失败";
+        console.warn("⚠️ 后端确认失败:", errorMsg);
         Toast.show({
           content: errorMsg,
           position: "center",
@@ -273,7 +506,12 @@ export const Home = ({
         throw new Error(errorMsg);
       }
 
-      console.log("绑定成功:", result);
+      console.log("✅ 绑定成功:", result);
+
+      // 保存绑定状态到本地存储
+      if (userAddress) {
+        saveLocalBindingStatus(userAddress, "bound");
+      }
 
       Toast.show({
         content: "绑定成功",
@@ -283,27 +521,152 @@ export const Home = ({
       setShowBindModal(false);
       setPendingPhone("");
     } catch (error) {
-      console.error("绑定失败:", error);
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      Toast.show({
-        content: `绑定失败: ${errorMessage}`,
-        position: "center",
-        duration: 3000,
-      });
+      console.error("❌ 绑定失败:", error);
+
+      // 清除所有 Toast
+      Toast.clear();
+
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+
+      // 特殊处理超时错误
+      if (errorMessage.includes("Timed out while waiting")) {
+        const bscScanUrl = `https://bscscan.com/tx/${lastBindingTxHash}`;
+        Toast.show({
+          content: (
+            <div>
+              <div>交易确认超时，但交易可能已成功</div>
+              <div style={{ marginTop: "8px", fontSize: "12px" }}>
+                交易哈希: {lastBindingTxHash.slice(0, 10)}...
+              </div>
+              <div style={{ marginTop: "4px", fontSize: "12px" }}>
+                请在区块链浏览器查看交易状态
+              </div>
+            </div>
+          ),
+          position: "center",
+          duration: 8000,
+        });
+        console.log("🔗 查看交易:", bscScanUrl);
+      } else if (
+        errorMessage.includes("User rejected") ||
+        errorMessage.includes("User denied")
+      ) {
+        Toast.show({
+          content: "用户取消了交易",
+          position: "center",
+          duration: 2000,
+        });
+      } else if (
+        errorMessage.includes("0x5e983351") ||
+        errorMessage.includes("PhoneAlreadyBound")
+      ) {
+        Toast.show({
+          content: "该手机号已被其他地址绑定",
+          position: "center",
+          duration: 3000,
+        });
+      } else if (
+        errorMessage.includes("0xf6831fd5") ||
+        errorMessage.includes("AddressAlreadyBound")
+      ) {
+        Toast.show({
+          content: "该地址已绑定其他手机号",
+          position: "center",
+          duration: 3000,
+        });
+      } else {
+        Toast.show({
+          content: `绑定失败: ${errorMessage}`,
+          position: "center",
+          duration: 3000,
+        });
+      }
     } finally {
       setIsBinding(false);
     }
-  }, [userAddress, pendingPhone, chainConfig.BIND_ADDRESS_URL]);
+  }, [
+    userAddress,
+    pendingPhone,
+    chainConfig.BIND_ADDRESS_URL,
+    chainConfig.NODE_SYSTEM_ADDRESS,
+    saveLocalBindingStatus,
+    writeContractAsync,
+  ]);
 
   // 处理拒绝绑定
-  const handleRejectBinding = useCallback(() => {
-    Toast.show({
-      content: "已拒绝绑定",
-      position: "center",
-    });
-    setShowBindModal(false);
-    setPendingPhone("");
-  }, []);
+  const handleRejectBinding = useCallback(async () => {
+    if (!userAddress || !pendingPhone) return;
+
+    // 检查 BIND_ADDRESS_URL 是否配置
+    if (!chainConfig.BIND_ADDRESS_URL) {
+      Toast.show({
+        content: "绑定服务未配置",
+        position: "center",
+      });
+      setShowBindModal(false);
+      setPendingPhone("");
+      return;
+    }
+
+    try {
+      Toast.show({
+        content: "正在拒绝绑定...",
+        position: "center",
+      });
+
+      // 使用相对路径，通过 Vite 代理访问后端（避免 CORS 问题）
+      const result = await sendSignedRequest<{
+        code: number;
+        message?: string;
+        data?: {
+          success: boolean;
+          message?: string;
+          errorCode?: string;
+        };
+      }>("POST", "/mix/rejectBinding", {
+        phone: pendingPhone,
+        address: userAddress,
+      });
+
+      // 检查 result.code 和 result.data.success
+      if (result.code !== 200 || !result.data?.success) {
+        const errorMsg =
+          (result.data && (result.data.message || result.data.errorCode)) ||
+          result.message ||
+          "拒绝绑定失败";
+        Toast.show({
+          content: errorMsg,
+          position: "center",
+          duration: 3000,
+        });
+        throw new Error(errorMsg);
+      }
+
+      console.log("拒绝绑定成功:", result);
+
+      Toast.show({
+        content: "已拒绝绑定",
+        position: "center",
+      });
+
+      // 注意：不保存拒绝状态到本地存储，下次仍会检查新的绑定请求
+      setShowBindModal(false);
+      setPendingPhone("");
+    } catch (error) {
+      console.error("拒绝绑定失败:", error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      Toast.show({
+        content: `拒绝绑定失败: ${errorMessage}`,
+        position: "center",
+        duration: 3000,
+      });
+      // 即使 API 调用失败，也关闭弹窗
+      setShowBindModal(false);
+      setPendingPhone("");
+    }
+  }, [userAddress, pendingPhone, chainConfig.BIND_ADDRESS_URL]);
 
   // 检查空投权限
   useEffect(() => {
@@ -357,19 +720,19 @@ export const Home = ({
       setIdxBalance(
         result[0].result && typeof result[0].result === "bigint"
           ? formatEther(result[0].result)
-          : "0"
+          : "0",
       );
       setUsdtBalance(
         result[1].result && typeof result[1].result === "bigint"
           ? formatEther(result[1].result)
-          : "0"
+          : "0",
       );
       setMixBalance(
         Number(
           result[2].result && typeof result[2].result === "bigint"
             ? formatEther(result[2].result)
-            : "0"
-        )
+            : "0",
+        ),
       );
     } catch (error) {
       console.error(error);
@@ -434,7 +797,7 @@ export const Home = ({
         return newItems;
       });
     },
-    [allStatus, machineList, fuelList]
+    [allStatus, machineList, fuelList],
   );
 
   const handleQuery = useCallback(async () => {
@@ -480,7 +843,7 @@ export const Home = ({
       });
 
       const childListResult = result.filter(
-        (e) => e.mtype === 2 && e.isActivatedStakedLP
+        (e) => e.mtype === 2 && e.isActivatedStakedLP,
       );
 
       // 获取子矿机生命剩余
@@ -549,10 +912,10 @@ export const Home = ({
 
       // 关键：根据最新的isProducing状态更新列表
       const activeMachines = result3.filter(
-        (e) => e.isProducing && e.isActivatedStakedLP
+        (e) => e.isProducing && e.isActivatedStakedLP,
       );
       const inactiveMachines = result3.filter(
-        (e) => !e.isProducing && e.isActivatedStakedLP && !e.destroyed
+        (e) => !e.isProducing && e.isActivatedStakedLP && !e.destroyed,
       );
 
       setStartedList(activeMachines);
@@ -644,7 +1007,7 @@ export const Home = ({
           />
         </div>
       );
-    }
+    },
   );
 
   // 动态计算高度
