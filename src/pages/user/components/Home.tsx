@@ -84,41 +84,6 @@ export const Home = ({
   const [isBinding, setIsBinding] = useState(false);
   const [lastBindingTxHash, setLastBindingTxHash] = useState<string>("");
 
-  // 获取本地存储的绑定状态 key
-  const getBindingStatusKey = useCallback((address: string) => {
-    return `wallet_binding_${address.toLowerCase()}`;
-  }, []);
-
-  // 获取本地存储的绑定状态
-  const getLocalBindingStatus = useCallback(
-    (address: string): "bound" | "rejected" | null => {
-      if (!address) return null;
-      try {
-        const key = getBindingStatusKey(address);
-        const status = localStorage.getItem(key);
-        return status as "bound" | "rejected" | null;
-      } catch (error) {
-        console.error("获取本地绑定状态失败:", error);
-        return null;
-      }
-    },
-    [getBindingStatusKey],
-  );
-
-  // 保存绑定状态到本地存储
-  const saveLocalBindingStatus = useCallback(
-    (address: string, status: "bound" | "rejected") => {
-      if (!address) return;
-      try {
-        const key = getBindingStatusKey(address);
-        localStorage.setItem(key, status);
-      } catch (error) {
-        console.error("保存本地绑定状态失败:", error);
-      }
-    },
-    [getBindingStatusKey],
-  );
-
   const navigate = useNavigate();
   const location = useLocation(); // 添加路由位置监听
 
@@ -241,14 +206,6 @@ export const Home = ({
   const checkPendingBinding = useCallback(async () => {
     if (!userAddress) return;
 
-    // 先检查本地存储的绑定状态（只有已绑定才跳过）
-    const localStatus = getLocalBindingStatus(userAddress);
-    if (localStatus === "bound") {
-      console.log("✅ 本地已记录绑定状态，跳过远程查询");
-      return;
-    }
-    // 注意：拒绝状态不保存到本地，每次都会重新查询
-
     // 检查 BIND_ADDRESS_URL 是否配置
     if (!chainConfig.BIND_ADDRESS_URL) {
       console.warn("⚠️ BIND_ADDRESS_URL 未配置，跳过绑定检查");
@@ -304,7 +261,6 @@ export const Home = ({
 
             if (syncResult.code === 200 && syncResult.data?.success) {
               console.log("✅ 后端同步成功");
-              saveLocalBindingStatus(userAddress, "bound");
               Toast.show({
                 content: "绑定同步成功",
                 position: "center",
@@ -335,8 +291,6 @@ export const Home = ({
     userAddress,
     chainConfig.BIND_ADDRESS_URL,
     chainConfig.NODE_SYSTEM_ADDRESS,
-    getLocalBindingStatus,
-    saveLocalBindingStatus,
   ]);
 
   // 处理同意绑定
@@ -515,11 +469,6 @@ export const Home = ({
 
       console.log("✅ 绑定成功:", result);
 
-      // 保存绑定状态到本地存储
-      if (userAddress) {
-        saveLocalBindingStatus(userAddress, "bound");
-      }
-
       Toast.show({
         content: "绑定成功",
         position: "center",
@@ -597,7 +546,6 @@ export const Home = ({
     pendingPhone,
     chainConfig.BIND_ADDRESS_URL,
     chainConfig.NODE_SYSTEM_ADDRESS,
-    saveLocalBindingStatus,
     writeContractAsync,
   ]);
 
