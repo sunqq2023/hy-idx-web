@@ -141,14 +141,30 @@ export async function sendSignedRequest<T = unknown>(
       const urlObj = new URL(url);
       // 只使用 pathname，不包含查询参数
       urlPath = urlObj.pathname;
+
+      // 特殊处理：如果 URL 包含 /api 前缀，需要移除
+      // 例如：https://www.ihealth.vip/api/mix/confirmBinding
+      // pathname: /api/mix/confirmBinding
+      // 签名应该使用: /mix/confirmBinding
+      if (urlPath.startsWith("/api/")) {
+        urlPath = urlPath.substring(4); // 移除 "/api"
+      }
+
       console.log("🔍 URL 解析:", {
         原始URL: url,
-        提取的路径: urlPath,
+        完整路径: urlObj.pathname,
+        签名路径: urlPath,
       });
     } catch (error) {
       // 如果 URL 解析失败，尝试提取路径部分
       const match = url.match(/^https?:\/\/[^/]+(\/[^?#]*)/);
       urlPath = match ? match[1] : url;
+
+      // 同样处理 /api 前缀
+      if (urlPath.startsWith("/api/")) {
+        urlPath = urlPath.substring(4);
+      }
+
       console.warn("⚠️ URL parsing failed, extracted path:", urlPath, error);
     }
   } else {
