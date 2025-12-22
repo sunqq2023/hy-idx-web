@@ -120,7 +120,7 @@ export function signRequest(
 /**
  * 发送带签名的请求
  * @param method HTTP 方法
- * @param url 完整 URL
+ * @param url 完整 URL（必须包含域名，如 https://www.ihealth.vip/api/mix/confirmBinding）
  * @param body 请求体对象
  * @param apiKey 可选的 API Key，如果不提供则从环境变量读取
  * @returns 响应数据
@@ -133,8 +133,7 @@ export async function sendSignedRequest<T = unknown>(
 ): Promise<T> {
   const bodyString = body ? JSON.stringify(body) : undefined;
 
-  // 关键修复：只使用 pathname 进行签名，不包含域名和查询参数
-  // 这与 node-forge 测试脚本的实现一致
+  // 提取 pathname 用于签名（不包含域名和查询参数）
   let urlPath: string;
 
   if (url.startsWith("http://") || url.startsWith("https://")) {

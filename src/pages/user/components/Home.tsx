@@ -251,8 +251,10 @@ export const Home = ({
     }
 
     try {
-      // 使用相对路径，通过 Vite 代理访问后端（避免 CORS 问题）
-      const response = await fetch(`/mix/getPhoneByAddress/${userAddress}`);
+      // 使用配置的 BIND_ADDRESS_URL（外部 API，不是 idmix.app 的接口）
+      const response = await fetch(
+        `${chainConfig.BIND_ADDRESS_URL}/mix/getPhoneByAddress/${userAddress}`,
+      );
       const result = await response.json();
 
       if (
@@ -281,7 +283,7 @@ export const Home = ({
               duration: 2000,
             });
 
-            // 使用相对路径，通过 Vite 代理访问后端（避免 CORS 问题）
+            // 使用配置的 BIND_ADDRESS_URL（外部 API）
             const syncResult = await sendSignedRequest<{
               code: number;
               message?: string;
@@ -290,7 +292,7 @@ export const Home = ({
                 message?: string;
                 errorCode?: string;
               };
-            }>("POST", "/mix/confirmBinding", {
+            }>("POST", `${chainConfig.BIND_ADDRESS_URL}/mix/confirmBinding`, {
               phone: pendingPhoneNumber,
               address: userAddress,
             });
@@ -477,7 +479,7 @@ export const Home = ({
         });
       }
 
-      // 使用相对路径，通过 Vite 代理访问后端（避免 CORS 问题）
+      // 使用配置的 BIND_ADDRESS_URL（外部 API）
       const result = await sendSignedRequest<{
         code: number;
         message?: string;
@@ -486,7 +488,7 @@ export const Home = ({
           message?: string;
           errorCode?: string;
         };
-      }>("POST", "/mix/confirmBinding", {
+      }>("POST", `${chainConfig.BIND_ADDRESS_URL}/mix/confirmBinding`, {
         phone: pendingPhone,
         address: userAddress,
       });
@@ -615,7 +617,7 @@ export const Home = ({
         position: "center",
       });
 
-      // 使用相对路径，通过 Vite 代理访问后端（避免 CORS 问题）
+      // 使用配置的 BIND_ADDRESS_URL（外部 API）
       const result = await sendSignedRequest<{
         code: number;
         message?: string;
@@ -624,7 +626,7 @@ export const Home = ({
           message?: string;
           errorCode?: string;
         };
-      }>("POST", "/mix/rejectBinding", {
+      }>("POST", `${chainConfig.BIND_ADDRESS_URL}/mix/rejectBinding`, {
         phone: pendingPhone,
         address: userAddress,
       });
