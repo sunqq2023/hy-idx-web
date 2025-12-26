@@ -167,7 +167,11 @@ const MyOrders = () => {
   }, []);
 
   const { isLoading: isPaymentCheckLoading, isAllowanceSufficient } =
-    usePaymentCheck(parseEther(String(needToPayIdx)));
+    usePaymentCheck({
+      paymentAmount: parseEther(String(needToPayIdx)),
+      tokenAddress: IDX_CONTRACTS_ADDRESS,
+      spenderAddress: MiningMachineSystemLogicAddress,
+    });
 
   const handlePay = async () => {
     if (isPaymentCheckLoading) return;

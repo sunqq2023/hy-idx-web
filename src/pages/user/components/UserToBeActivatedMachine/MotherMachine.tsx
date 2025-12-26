@@ -344,9 +344,13 @@ const MotherMachine = () => {
   };
 
   const { isLoading: isPaymentCheckLoading, isAllowanceSufficient } =
-    usePaymentCheck(
-      parseEther(String(Math.ceil(+needToPayIdxAmount * fuelList.length))),
-    );
+    usePaymentCheck({
+      paymentAmount: parseEther(
+        String(Math.ceil(+needToPayIdxAmount * fuelList.length)),
+      ),
+      tokenAddress: IDX_CONTRACTS_ADDRESS,
+      spenderAddress: MiningMachineSystemLogicAddress,
+    });
 
   const handlePay = async () => {
     try {

@@ -104,9 +104,13 @@ const UserPayForBuyMachine = () => {
     isLoading: isPaymentCheckLoading,
     isBalanceSufficient,
     isAllowanceSufficient,
-  } = usePaymentCheck(
-    parseEther(String(Math.ceil(pageData.price * +usdtToIdxRate))),
-  );
+  } = usePaymentCheck({
+    paymentAmount: parseEther(
+      String(Math.ceil(pageData.price * +usdtToIdxRate)),
+    ),
+    tokenAddress: IDX_CONTRACTS_ADDRESS,
+    spenderAddress: MiningMachineSystemLogicAddress,
+  });
 
   // 动态计算高度
   useEffect(() => {

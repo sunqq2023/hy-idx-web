@@ -6,7 +6,10 @@
  * 1. 地址会自动转换为小写进行比较
  * 2. 添加新地址时请确保格式正确（0x开头的以太坊地址）
  * 3. 可以添加注释说明为什么该地址被列入黑名单
+ * 4. 合约地址从 constants/index.ts 中的 BSC_MAINNET_CONFIG 获取
  */
+
+import { BSC_MAINNET_CONFIG } from "./index";
 
 export const BOUND_BLACKLIST_ADDRESSES = [
   // 平台钱包地址
@@ -21,41 +24,19 @@ export const BOUND_BLACKLIST_ADDRESSES = [
   // IDX_USDT Pair(PancakeSwap)
   "0xcc9a8c340d9c57e31b411dfdcc41e571f23b9bb8",
 
-  // IDX 合约地址
-  "0xc98f60b3f98e8bf860436746db637e13b0e17458",
-
-  // USDT 合约地址
-  "0x55d398326f99059ff775485246999027b3197955",
-
-  // 历史记录合约地址
-  "0x367f5fae08dc307b3ac8a9a7aa26ac3005c6b51f",
-
-  // 扩展的历史合约地址
-  "0x6e426afed0cf32d6e00b29c791199441658e4f73",
-
-  // 节点合成合约地址
-  "0xf080f93067f52843231b13ff5024d41767898bc8",
-
-  // 生产合约地址
-  "0x90531429c182707190de682ed345e3577d44c3d6",
-
-  // 逻辑合约地址
-  "0x895e8b68d93b2cd5ff4f2bf22ccb3697235c7afd",
-
-  // 扩展的逻辑合约地址
-  "0xfa5ea849e045520996725d13c3160d1d5420078e",
-
-  // 数据存储合约地址
-  "0xb256459d072a52e668b8a86a7cbff9c475ec98c2",
-
-  // 扩展的数据存储合约地址
-  "0xdc567714763206341ac1d90c0d2fc58c57739412",
-
-  // 挂售合约
-  "0x8e10b9ba4c78fe8d6a2ecf3fa6307f5e6c1ceebe",
-
-  // Mix Operator
-  "0x1cea1dc56Be6ab13Ad590Ff367c3Af375DA98A7d",
+  // 从配置中获取合约地址（主网）
+  BSC_MAINNET_CONFIG.IDX_TOKEN.toLowerCase(), // IDX 合约地址
+  BSC_MAINNET_CONFIG.USDT_TOKEN.toLowerCase(), // USDT 合约地址
+  BSC_MAINNET_CONFIG.HISTORY_ADDRESS.toLowerCase(), // 历史记录合约地址
+  BSC_MAINNET_CONFIG.EXTEND_HISTORY_ADDRESS.toLowerCase(), // 扩展的历史合约地址
+  BSC_MAINNET_CONFIG.NODE_SYSTEM_ADDRESS.toLowerCase(), // 节点合成合约地址
+  BSC_MAINNET_CONFIG.PRODUCTION_LOGIC_ADDRESS.toLowerCase(), // 生产合约地址
+  BSC_MAINNET_CONFIG.LOGIC_ADDRESS.toLowerCase(), // 逻辑合约地址
+  BSC_MAINNET_CONFIG.EXTEND_LOGIC_ADDRESS.toLowerCase(), // 扩展的逻辑合约地址
+  BSC_MAINNET_CONFIG.STORAGE_ADDRESS.toLowerCase(), // 数据存储合约地址
+  BSC_MAINNET_CONFIG.EXTEND_STORAGE_ADDRESS.toLowerCase(), // 扩展的数据存储合约地址
+  BSC_MAINNET_CONFIG.SELLUSER_MANAGER_ADDRESS.toLowerCase(), // 挂售合约
+  BSC_MAINNET_CONFIG.MIX_OPERATOR_ADDRESS.toLowerCase(), // Mix Operator
 ];
 
 /**

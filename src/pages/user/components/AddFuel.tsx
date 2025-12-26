@@ -163,9 +163,46 @@ const AddFuel = () => {
     isLoading: isPaymentCheckLoading,
     isAllowanceSufficient,
     isBalanceSufficient,
-  } = usePaymentCheck(
-    parseEther(String(Math.ceil(idxPrice * monthCount * pageData.length))),
-  );
+    balance: idxBalanceBigInt,
+    allowance: idxAllowance,
+  } = usePaymentCheck({
+    paymentAmount: parseEther(
+      String(Math.ceil(idxPrice * monthCount * pageData.length)),
+    ),
+    tokenAddress: IDX_CONTRACTS_ADDRESS,
+    spenderAddress: MiningMachineSystemLogicAddress,
+  });
+
+  // 添加调试日志
+  useEffect(() => {
+    if (!isPaymentCheckLoading) {
+      console.log("=== 支付检查结果 ===");
+      console.log("IDX余额 (BigInt):", idxBalanceBigInt);
+      console.log("IDX余额 (格式化):", formatEther(idxBalanceBigInt));
+      console.log("IDX授权额度 (BigInt):", idxAllowance);
+      console.log("IDX授权额度 (格式化):", formatEther(idxAllowance));
+      console.log(
+        "需要支付:",
+        formatEther(
+          parseEther(
+            String(Math.ceil(idxPrice * monthCount * pageData.length)),
+          ),
+        ),
+        "IDX",
+      );
+      console.log("余额是否充足:", isBalanceSufficient);
+      console.log("授权是否充足:", isAllowanceSufficient);
+    }
+  }, [
+    isPaymentCheckLoading,
+    idxBalanceBigInt,
+    idxAllowance,
+    isBalanceSufficient,
+    isAllowanceSufficient,
+    idxPrice,
+    monthCount,
+    pageData.length,
+  ]);
 
   const handlePay = async () => {
     try {

@@ -1,46 +1,52 @@
-import { useAccount, useBalance, useReadContract } from 'wagmi'
-import { useMemo } from 'react'
-import { erc20Abi } from 'viem'
-import {
-  IDX_CONTRACTS_ADDRESS,
-  MiningMachineSystemLogicAddress
-} from '@/constants'
+import { useAccount, useBalance, useReadContract } from "wagmi";
+import { useMemo } from "react";
+import { erc20Abi } from "viem";
 
 type PaymentCheckResult = {
-  isLoading: boolean
-  isBalanceSufficient: boolean
-  isAllowanceSufficient: boolean
-  balance: bigint
-  allowance: bigint
-  balanceShortfall: bigint
-  allowanceShortfall: bigint
-  error?: Error | null // 修改这里，允许 null
+  isLoading: boolean;
+  isBalanceSufficient: boolean;
+  isAllowanceSufficient: boolean;
+  balance: bigint;
+  allowance: bigint;
+  balanceShortfall: bigint;
+  allowanceShortfall: bigint;
+  error?: Error | null;
+};
+
+interface PaymentCheckOptions {
+  paymentAmount: bigint;
+  tokenAddress: `0x${string}`;
+  spenderAddress: `0x${string}`;
 }
 
-export function usePaymentCheck(paymentAmount: bigint): PaymentCheckResult {
-  const { address } = useAccount()
+export function usePaymentCheck({
+  paymentAmount,
+  tokenAddress,
+  spenderAddress,
+}: PaymentCheckOptions): PaymentCheckResult {
+  const { address } = useAccount();
 
   // 查询余额
   const {
     data: balanceData,
     isLoading: balanceLoading,
-    error: balanceError
+    error: balanceError,
   } = useBalance({
     address,
-    token: IDX_CONTRACTS_ADDRESS
-  })
+    token: tokenAddress,
+  });
 
   // 查询授权
   const {
     data: allowanceData,
     isLoading: allowanceLoading,
-    error: allowanceError
+    error: allowanceError,
   } = useReadContract({
-    address: IDX_CONTRACTS_ADDRESS,
+    address: tokenAddress,
     abi: erc20Abi,
-    functionName: 'allowance',
-    args: [address as `0x${string}`, MiningMachineSystemLogicAddress]
-  })
+    functionName: "allowance",
+    args: [address as `0x${string}`, spenderAddress],
+  });
 
   // 计算结果
   return useMemo(() => {
@@ -49,17 +55,17 @@ export function usePaymentCheck(paymentAmount: bigint): PaymentCheckResult {
       return {
         isLoading: true,
         isBalanceSufficient: false,
-        isAllowanceSufficient: false, // 修正拼写错误 isAllowance -> isAllowance
+        isAllowanceSufficient: false,
         balance: 0n,
         allowance: 0n,
         balanceShortfall: paymentAmount,
         allowanceShortfall: paymentAmount,
-        error: undefined
-      }
+        error: undefined,
+      };
     }
 
     // 错误状态
-    const error = balanceError || allowanceError
+    const error = balanceError || allowanceError;
     if (error) {
       return {
         isLoading: false,
@@ -69,13 +75,13 @@ export function usePaymentCheck(paymentAmount: bigint): PaymentCheckResult {
         allowance: 0n,
         balanceShortfall: paymentAmount,
         allowanceShortfall: paymentAmount,
-        error: error instanceof Error ? error : new Error(String(error)) // 确保是 Error 类型
-      }
+        error: error instanceof Error ? error : new Error(String(error)),
+      };
     }
 
     // 正常状态
-    const balance = balanceData?.value ?? 0n
-    const allowance = allowanceData ?? 0n
+    const balance = balanceData?.value ?? 0n;
+    const allowance = allowanceData ?? 0n;
 
     return {
       isLoading: false,
@@ -86,8 +92,8 @@ export function usePaymentCheck(paymentAmount: bigint): PaymentCheckResult {
       balanceShortfall: balance >= paymentAmount ? 0n : paymentAmount - balance,
       allowanceShortfall:
         allowance >= paymentAmount ? 0n : paymentAmount - allowance,
-      error: undefined
-    }
+      error: undefined,
+    };
   }, [
     balanceData,
     allowanceData,
@@ -96,6 +102,6 @@ export function usePaymentCheck(paymentAmount: bigint): PaymentCheckResult {
     allowanceLoading,
     address,
     balanceError,
-    allowanceError
-  ])
+    allowanceError,
+  ]);
 }

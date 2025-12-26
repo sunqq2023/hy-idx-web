@@ -6,7 +6,11 @@ import CustomConnectButton from "@/components/ConnectButton";
 import { useMimirList } from "@/hooks/useMimirList";
 import { readContract } from "@wagmi/core";
 import config from "@/proviers/config";
-import { MiningMachineSystemStorageABI } from "@/constants";
+import {
+  MiningMachineSystemStorageABI,
+  BSC_TESTNET_CONFIG,
+  BSC_MAINNET_CONFIG,
+} from "@/constants";
 import { useChainConfig } from "@/hooks/useChainConfig";
 import orderStore from "@/stores/orderStore";
 
@@ -35,13 +39,11 @@ const Home = () => {
       STORAGE_ADDRESS: chainConfig.STORAGE_ADDRESS,
       isConnected,
       address,
-      expectedTestnetAddress: "0xEd935db4871D140799C07b86330c6b1B52A7bC1F",
-      expectedMainnetAddress: "0xB256459d072A52e668b8a86a7cbFf9C475Ec98c2",
+      expectedTestnetAddress: BSC_TESTNET_CONFIG.STORAGE_ADDRESS,
+      expectedMainnetAddress: BSC_MAINNET_CONFIG.STORAGE_ADDRESS,
       isUsingCorrectAddress:
-        chainConfig.STORAGE_ADDRESS ===
-          "0xEd935db4871D140799C07b86330c6b1B52A7bC1F" ||
-        chainConfig.STORAGE_ADDRESS ===
-          "0xB256459d072A52e668b8a86a7cbFf9C475Ec98c2",
+        chainConfig.STORAGE_ADDRESS === BSC_TESTNET_CONFIG.STORAGE_ADDRESS ||
+        chainConfig.STORAGE_ADDRESS === BSC_MAINNET_CONFIG.STORAGE_ADDRESS,
     });
   }, [chainConfig.STORAGE_ADDRESS, isConnected, address]);
 
