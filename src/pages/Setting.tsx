@@ -20,10 +20,10 @@ import {
 } from "@wagmi/core";
 import config from "@/proviers/config";
 import { parseEther, erc20Abi, formatEther, getAddress, parseGwei } from "viem";
-import UpgradeContracts from "@/components/UpgradeContracts";
 
 const Setting = () => {
-  const { address: currentWalletAddress } = useAccount();
+  const { address: currentWalletAddress, chainId: walletChainId } =
+    useAccount();
   const chainConfig = useChainConfig();
 
   // 使用动态地址（添加类型断言）
@@ -147,13 +147,18 @@ const Setting = () => {
   // MIX 操作相关状态
   const [addMixForOperatorAmount, setAddMixForOperatorAmount] = useState(""); // 给操作员添加 MIX 数量
   const [subMixForOperatorAmount, setSubMixForOperatorAmount] = useState(""); // 从操作员减少 MIX 数量
+  const [transferMixFromAddress, setTransferMixFromAddress] = useState(""); // 转移 MIX 源地址
   const [transferMixToAddress, setTransferMixToAddress] = useState(""); // 转移 MIX 目标地址
   const [transferMixAmount, setTransferMixAmount] = useState(""); // 转移 MIX 数量
+  const [useCurrentAccount, setUseCurrentAccount] = useState(false); // 是否从当前账户转移
   const [useOperatorAddress, setUseOperatorAddress] = useState(false); // 是否给 MixOperator 充值
   const [isAddingMixForOperator, setIsAddingMixForOperator] = useState(false); // 添加 MIX 中状态
   const [isSubtractingMixForOperator, setIsSubtractingMixForOperator] =
     useState(false); // 减少 MIX 中状态
   const [isTransferringMix, setIsTransferringMix] = useState(false); // 转移 MIX 中状态
+  const [operatorMixBalance, setOperatorMixBalance] = useState("0"); // 操作员 MIX 余额
+  const [isLoadingOperatorBalance, setIsLoadingOperatorBalance] =
+    useState(false); // 加载操作员余额状态
 
   const handleModifyAdmin = async () => {
     const isValid = validateAddressFnMap?.["EVM"]?.(adminAddress);
@@ -176,12 +181,12 @@ const Setting = () => {
         gas: 400000n, // 管理员操作：统一提高到 400000
         maxFeePerGas: parseGwei("10"),
         maxPriorityFeePerGas: parseGwei("2"),
-        chainId: CHAIN_ID,
+        chainId: walletChainId,
       });
 
       await waitForTransactionReceipt(config, {
         hash,
-        chainId: CHAIN_ID,
+        chainId: walletChainId,
       });
       Toast.show({
         content: "修改成功!",
@@ -220,12 +225,12 @@ const Setting = () => {
         gas: 400000n, // 管理员操作：统一提高到 400000
         maxFeePerGas: parseGwei("10"),
         maxPriorityFeePerGas: parseGwei("2"),
-        chainId: CHAIN_ID,
+        chainId: walletChainId,
       });
 
       await waitForTransactionReceipt(config, {
         hash,
-        chainId: CHAIN_ID,
+        chainId: walletChainId,
       });
       Toast.show({
         content: "修改成功!",
@@ -269,12 +274,12 @@ const Setting = () => {
         gas: 600000n, // 复杂操作：修改多个参数，提高到 600000
         maxFeePerGas: parseGwei("10"),
         maxPriorityFeePerGas: parseGwei("2"),
-        chainId: CHAIN_ID,
+        chainId: walletChainId,
       });
 
       await waitForTransactionReceipt(config, {
         hash,
-        chainId: CHAIN_ID,
+        chainId: walletChainId,
       });
       Toast.show({
         content: "修改成功!",
@@ -369,12 +374,12 @@ const Setting = () => {
         gas: 400000n, // 管理员操作：统一提高到 400000
         maxFeePerGas: parseGwei("10"),
         maxPriorityFeePerGas: parseGwei("2"),
-        chainId: CHAIN_ID,
+        chainId: walletChainId,
       });
 
       await waitForTransactionReceipt(config, {
         hash,
-        chainId: CHAIN_ID,
+        chainId: walletChainId,
       });
       Toast.show({
         content: "设置成功!",
@@ -414,12 +419,12 @@ const Setting = () => {
         gas: 400000n, // 管理员操作：统一提高到 400000
         maxFeePerGas: parseGwei("10"),
         maxPriorityFeePerGas: parseGwei("2"),
-        chainId: CHAIN_ID,
+        chainId: walletChainId,
       });
 
       await waitForTransactionReceipt(config, {
         hash,
-        chainId: CHAIN_ID,
+        chainId: walletChainId,
       });
       Toast.show({
         content: "设置成功!",
@@ -440,6 +445,30 @@ const Setting = () => {
   };
 
   // ===== MIX 操作函数 =====
+
+  // 查询操作员 MIX 余额
+  const fetchOperatorMixBalance = async () => {
+    try {
+      setIsLoadingOperatorBalance(true);
+      const balance = await readContract(config, {
+        address: MiningMachineNodeSystemAddress as `0x${string}`,
+        abi: MiningMachineNodeSystemABI,
+        functionName: "getUserMixBalance",
+        args: [chainConfig.MIX_OPERATOR_ADDRESS as `0x${string}`],
+      });
+
+      const formattedBalance = formatEther(balance);
+      setOperatorMixBalance(formattedBalance);
+    } catch (error) {
+      console.error("获取操作员余额失败:", error);
+      Toast.show({
+        content: "获取操作员余额失败",
+        position: "center",
+      });
+    } finally {
+      setIsLoadingOperatorBalance(false);
+    }
+  };
 
   // 给操作员添加 MIX
   const handleAddMixForOperator = async () => {
@@ -462,18 +491,20 @@ const Setting = () => {
         gas: 400000n, // 管理员操作：统一提高到 400000
         maxFeePerGas: parseGwei("10"),
         maxPriorityFeePerGas: parseGwei("2"),
-        chainId: CHAIN_ID,
+        chainId: walletChainId,
       });
 
       await waitForTransactionReceipt(config, {
         hash,
-        chainId: CHAIN_ID,
+        chainId: walletChainId,
       });
       Toast.show({
         content: "成功添加 MIX",
         position: "center",
       });
       setAddMixForOperatorAmount("");
+      // 刷新操作员余额
+      fetchOperatorMixBalance();
     } catch (error) {
       Toast.show({
         content: "添加 MIX 失败",
@@ -506,18 +537,20 @@ const Setting = () => {
         gas: 400000n, // 管理员操作：统一提高到 400000
         maxFeePerGas: parseGwei("10"),
         maxPriorityFeePerGas: parseGwei("2"),
-        chainId: CHAIN_ID,
+        chainId: walletChainId,
       });
 
       await waitForTransactionReceipt(config, {
         hash,
-        chainId: CHAIN_ID,
+        chainId: walletChainId,
       });
       Toast.show({
         content: "成功减少 MIX",
         position: "center",
       });
       setSubMixForOperatorAmount("");
+      // 刷新操作员余额
+      fetchOperatorMixBalance();
     } catch (error) {
       Toast.show({
         content: "减少 MIX 失败",
@@ -529,8 +562,20 @@ const Setting = () => {
     }
   };
 
-  // 转移 MIX（使用 transferMix 函数，自动从当前账户转出）
+  // 转移 MIX（使用 transferMixBetweenUsers 函数，在用户之间转移）
   const handleTransferMix = async () => {
+    // 验证 from 地址
+    const isFromValid = validateAddressFnMap?.["EVM"]?.(transferMixFromAddress);
+    if (!isFromValid) {
+      Toast.show({
+        content: "请输入合法的源地址",
+        position: "center",
+        duration: 2000,
+      });
+      return;
+    }
+
+    // 验证 to 地址
     const isToValid = validateAddressFnMap?.["EVM"]?.(transferMixToAddress);
     if (!isToValid) {
       Toast.show({
@@ -541,6 +586,7 @@ const Setting = () => {
       return;
     }
 
+    // 验证数量
     if (!transferMixAmount || +transferMixAmount <= 0) {
       Toast.show({
         content: "请输入有效的 MIX 数量",
@@ -555,24 +601,30 @@ const Setting = () => {
       const hash = await writeContractAsync({
         address: MiningMachineNodeSystemAddress as `0x${string}`,
         abi: MiningMachineNodeSystemABI,
-        functionName: "transferMix",
-        args: [getAddress(transferMixToAddress), parseEther(transferMixAmount)],
-        gas: 400000n, // 简单操作：只涉及两个参数
+        functionName: "transferMixBetweenUsers",
+        args: [
+          getAddress(transferMixFromAddress),
+          getAddress(transferMixToAddress),
+          parseEther(transferMixAmount),
+        ],
+        gas: 400000n, // 管理员操作：统一提高到 400000
         maxFeePerGas: parseGwei("10"),
         maxPriorityFeePerGas: parseGwei("2"),
-        chainId: CHAIN_ID,
+        chainId: walletChainId,
       });
 
       await waitForTransactionReceipt(config, {
         hash,
-        chainId: CHAIN_ID,
+        chainId: walletChainId,
       });
       Toast.show({
         content: "成功转移 MIX",
         position: "center",
       });
+      setTransferMixFromAddress("");
       setTransferMixToAddress("");
       setTransferMixAmount("");
+      setUseCurrentAccount(false);
       setUseOperatorAddress(false);
     } catch (error) {
       Toast.show({
@@ -588,6 +640,7 @@ const Setting = () => {
   useEffect(() => {
     queryActiveAndGasFee();
     fetchRewardPoolBalance();
+    fetchOperatorMixBalance();
     queryPowerLimits();
   }, []);
 
@@ -624,12 +677,12 @@ const Setting = () => {
         gas: 600000n, // 复杂操作：修改多个矿机参数，提高到 600000
         maxFeePerGas: parseGwei("10"),
         maxPriorityFeePerGas: parseGwei("2"),
-        chainId: CHAIN_ID,
+        chainId: walletChainId,
       });
 
       await waitForTransactionReceipt(config, {
         hash,
-        chainId: CHAIN_ID,
+        chainId: walletChainId,
       });
       Toast.show({
         content: "修改成功!",
@@ -682,12 +735,12 @@ const Setting = () => {
         gas: 400000n, // 管理员操作：统一提高到 400000
         maxFeePerGas: parseGwei("10"),
         maxPriorityFeePerGas: parseGwei("2"),
-        chainId: CHAIN_ID,
+        chainId: walletChainId,
       });
 
       await waitForTransactionReceipt(config, {
         hash,
-        chainId: CHAIN_ID,
+        chainId: walletChainId,
       });
       Toast.show({
         content: "修改成功!",
@@ -795,12 +848,12 @@ const Setting = () => {
         gas: 600000n, // 复杂操作：设置多个锁定释放参数，提高到 600000
         maxFeePerGas: parseGwei("10"),
         maxPriorityFeePerGas: parseGwei("2"),
-        chainId: CHAIN_ID,
+        chainId: walletChainId,
       });
 
       await waitForTransactionReceipt(config, {
         hash,
-        chainId: CHAIN_ID,
+        chainId: walletChainId,
       });
       Toast.show({
         content: "修改成功!",
@@ -839,12 +892,12 @@ const Setting = () => {
         gas: 400000n, // 管理员操作：统一提高到 400000
         maxFeePerGas: parseGwei("10"),
         maxPriorityFeePerGas: parseGwei("2"),
-        chainId: CHAIN_ID,
+        chainId: walletChainId,
       });
 
       await waitForTransactionReceipt(config, {
         hash,
-        chainId: CHAIN_ID,
+        chainId: walletChainId,
       });
 
       Toast.show({
@@ -892,12 +945,12 @@ const Setting = () => {
         gas: 400000n, // 管理员操作：统一提高到 400000
         maxFeePerGas: parseGwei("10"),
         maxPriorityFeePerGas: parseGwei("2"),
-        chainId: CHAIN_ID,
+        chainId: walletChainId,
       });
 
       await waitForTransactionReceipt(config, {
         hash,
-        chainId: CHAIN_ID,
+        chainId: walletChainId,
       });
       Toast.show({
         content: "提取成功!",
@@ -943,12 +996,12 @@ const Setting = () => {
         gas: 400000n, // 管理员操作：统一提高到 400000
         maxFeePerGas: parseGwei("10"),
         maxPriorityFeePerGas: parseGwei("2"),
-        chainId: CHAIN_ID,
+        chainId: walletChainId,
       });
 
       await waitForTransactionReceipt(config, {
         hash,
-        chainId: CHAIN_ID,
+        chainId: walletChainId,
       });
       Toast.show({
         content: "修改成功!",
@@ -987,12 +1040,12 @@ const Setting = () => {
         gas: 400000n, // 管理员操作：统一提高到 400000
         maxFeePerGas: parseGwei("10"),
         maxPriorityFeePerGas: parseGwei("2"),
-        chainId: CHAIN_ID,
+        chainId: walletChainId,
       });
 
       await waitForTransactionReceipt(config, {
         hash,
-        chainId: CHAIN_ID,
+        chainId: walletChainId,
       });
       Toast.show({
         content: "修改成功!",
@@ -1051,12 +1104,12 @@ const Setting = () => {
         gas: 400000n, // 管理员操作：统一提高到 400000
         maxFeePerGas: parseGwei("10"),
         maxPriorityFeePerGas: parseGwei("2"),
-        chainId: CHAIN_ID,
+        chainId: walletChainId,
       });
 
       await waitForTransactionReceipt(config, {
         hash,
-        chainId: CHAIN_ID,
+        chainId: walletChainId,
       });
       Toast.show({
         content: "子矿机铸造成功!",
@@ -1099,12 +1152,12 @@ const Setting = () => {
         gas: 400000n, // 管理员操作：统一提高到 400000
         maxFeePerGas: parseGwei("10"),
         maxPriorityFeePerGas: parseGwei("2"),
-        chainId: CHAIN_ID,
+        chainId: walletChainId,
       });
 
       await waitForTransactionReceipt(config, {
         hash,
-        chainId: CHAIN_ID,
+        chainId: walletChainId,
       });
       Toast.show({
         content: `已${sellUserStatus ? "开启" : "关闭"}该账号挂售权限`,
@@ -1145,12 +1198,12 @@ const Setting = () => {
         gas: 400000n, // 管理员操作：统一提高到 400000
         maxFeePerGas: parseGwei("10"),
         maxPriorityFeePerGas: parseGwei("2"),
-        chainId: CHAIN_ID,
+        chainId: walletChainId,
       });
 
       await waitForTransactionReceipt(config, {
         hash,
-        chainId: CHAIN_ID,
+        chainId: walletChainId,
       });
       Toast.show({
         content: "授权空投IDX成功",
@@ -1190,12 +1243,12 @@ const Setting = () => {
         gas: 400000n, // 管理员操作：统一提高到 400000
         maxFeePerGas: parseGwei("10"),
         maxPriorityFeePerGas: parseGwei("2"),
-        chainId: CHAIN_ID,
+        chainId: walletChainId,
       });
 
       await waitForTransactionReceipt(config, {
         hash,
-        chainId: CHAIN_ID,
+        chainId: walletChainId,
       });
       Toast.show({
         content: "授权铸造子矿机成功",
@@ -1235,12 +1288,12 @@ const Setting = () => {
         gas: 400000n, // 管理员操作：统一提高到 400000
         maxFeePerGas: parseGwei("10"),
         maxPriorityFeePerGas: parseGwei("2"),
-        chainId: CHAIN_ID,
+        chainId: walletChainId,
       });
 
       await waitForTransactionReceipt(config, {
         hash,
-        chainId: CHAIN_ID,
+        chainId: walletChainId,
       });
       Toast.show({
         content: "授权标记工作室成功",
@@ -1281,12 +1334,12 @@ const Setting = () => {
         gas: 400000n, // 管理员操作：统一提高到 400000
         maxFeePerGas: parseGwei("10"),
         maxPriorityFeePerGas: parseGwei("2"),
-        chainId: CHAIN_ID,
+        chainId: walletChainId,
       });
 
       await waitForTransactionReceipt(config, {
         hash,
-        chainId: CHAIN_ID,
+        chainId: walletChainId,
       });
 
       Toast.show({
@@ -1330,12 +1383,12 @@ const Setting = () => {
         gas: 400000n, // 管理员操作：统一提高到 400000
         maxFeePerGas: parseGwei("10"),
         maxPriorityFeePerGas: parseGwei("2"),
-        chainId: CHAIN_ID,
+        chainId: walletChainId,
       });
 
       await waitForTransactionReceipt(config, {
         hash,
-        chainId: CHAIN_ID,
+        chainId: walletChainId,
       });
 
       Toast.show({
@@ -2111,6 +2164,21 @@ const Setting = () => {
           {/* MIX 操作管理 */}
           <div className="bg-white p-3 rounded-2xl mt-2 flex flex-col gap-1">
             <h2 className="mb-2 font-bold">给操作员添加 MIX</h2>
+
+            {/* 显示操作员余额 */}
+            <div className="mb-2 p-2 bg-[#f3f3f3] rounded-xl">
+              <div className="text-[12px] text-gray-600 mb-1">
+                操作员当前余额:
+              </div>
+              <div className="text-[14px] font-bold text-[#895EFE]">
+                {isLoadingOperatorBalance ? (
+                  <div className="animate-pulse">加载中...</div>
+                ) : (
+                  `${operatorMixBalance} MIX`
+                )}
+              </div>
+            </div>
+
             <Input
               placeholder="输入 MIX 数量"
               style={{
@@ -2158,8 +2226,25 @@ const Setting = () => {
           </div>
 
           <div className="bg-white p-3 rounded-2xl mt-2 flex flex-col gap-1">
-            <div className="mb-2 flex items-center justify-between">
-              <h2 className="font-bold">转移 MIX</h2>
+            <h2 className="mb-2 font-bold">转移 MIX</h2>
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <Checkbox
+                checked={useCurrentAccount}
+                onChange={(checked) => {
+                  setUseCurrentAccount(checked);
+                  if (checked && currentWalletAddress) {
+                    setTransferMixFromAddress(currentWalletAddress);
+                  } else if (!checked) {
+                    setTransferMixFromAddress("");
+                  }
+                }}
+                style={{
+                  "--icon-size": "18px",
+                  "--font-size": "13px",
+                }}
+              >
+                从当前账户转移
+              </Checkbox>
               <Checkbox
                 checked={useOperatorAddress}
                 onChange={(checked) => {
@@ -2178,9 +2263,16 @@ const Setting = () => {
                 给MixOperator充值
               </Checkbox>
             </div>
-            <div className="text-[12px] text-gray-500 mb-2">
-              从当前连接的钱包地址转出 MIX
-            </div>
+            <Input
+              placeholder="输入源地址（从哪个地址转出）"
+              style={{
+                "--font-size": "13px",
+              }}
+              className="!bg-[#f3f3f3] rounded-3xl px-4 py-2 !flex !items-center !justify-center mb-2"
+              value={transferMixFromAddress}
+              onChange={(val) => setTransferMixFromAddress(val)}
+              disabled={useCurrentAccount}
+            />
             <Input
               placeholder="输入接收地址（转到哪个地址）"
               style={{
@@ -2211,17 +2303,6 @@ const Setting = () => {
             >
               转移 MIX
             </Button>
-          </div>
-
-          {/* 一键升级合约 */}
-          <div
-            style={{
-              marginTop: "40px",
-              borderTop: "2px solid #e0e0e0",
-              paddingTop: "20px",
-            }}
-          >
-            <UpgradeContracts />
           </div>
         </div>
       )}
