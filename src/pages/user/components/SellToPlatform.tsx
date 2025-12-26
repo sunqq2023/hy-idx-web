@@ -1,105 +1,114 @@
-import { arrowSvg, userMachineSvg } from '@/assets'
-import AdaptiveNumber, { NumberType } from '@/components/AdaptiveNumber'
-import { Button, Input, Toast } from 'antd-mobile'
-import React, { useCallback, useEffect, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { arrowSvg, userMachineSvg } from "@/assets";
+import AdaptiveNumber, { NumberType } from "@/components/AdaptiveNumber";
+import { Button, Input, Toast } from "antd-mobile";
+import React, { useCallback, useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   readContract,
   writeContract,
-  waitForTransactionReceipt
-} from '@wagmi/core'
-import config from '@/proviers/config'
+  waitForTransactionReceipt,
+} from "@wagmi/core";
+import config from "@/proviers/config";
 import {
-  CHAIN_ID,
   MiningMachineSystemLogicABI,
-  MiningMachineSystemLogicAddress,
   MiningMachineSystemStorageABI,
-  MiningMachineSystemStorageAddress
-} from '@/constants'
-import { formatEther } from 'viem'
-import { shortenAddress } from '@/utils/helper'
+} from "@/constants";
+import { useChainConfig } from "@/hooks/useChainConfig";
+import { useChainId } from "wagmi";
+import { formatEther } from "viem";
+import { shortenAddress } from "@/utils/helper";
 
 const SellToPlatform = () => {
-  const navigate = useNavigate()
-  const location = useLocation()
-  const [isSelling, setIsSelling] = useState(false)
+  const navigate = useNavigate();
+  const location = useLocation();
+  const chainConfig = useChainConfig();
+  const chainId = useChainId();
+  const [isSelling, setIsSelling] = useState(false);
 
-  const [usdtToIdxRate, setUsdtToIdxRate] = useState(0)
+  const MiningMachineSystemLogicAddress =
+    chainConfig.LOGIC_ADDRESS as `0x${string}`;
+  const MiningMachineSystemStorageAddress =
+    chainConfig.STORAGE_ADDRESS as `0x${string}`;
+
+  const [usdtToIdxRate, setUsdtToIdxRate] = useState(0);
 
   const getUsdtToIdxRate = async () => {
     try {
       const data = await readContract(config, {
         address: MiningMachineSystemLogicAddress,
         abi: MiningMachineSystemLogicABI,
-        functionName: 'getIDXAmount',
-        args: [1]
-      })
+        functionName: "getIDXAmount",
+        args: [1],
+      });
 
-      const rate = data ? formatEther(data) : '0'
-      setUsdtToIdxRate(+rate)
+      const rate = data ? formatEther(data) : "0";
+      setUsdtToIdxRate(+rate);
     } catch (error) {
-      console.error(error)
+      console.error(error);
     }
-  }
+  };
 
   useEffect(() => {
-    getUsdtToIdxRate()
-  }, [])
+    getUsdtToIdxRate();
+  }, []);
 
   const handlBack = () => {
-    navigate('/user')
-  }
+    navigate("/user");
+  };
 
-  const pageData = location.state
-  const [priceInUsd, setPriceInUsd] = useState(0)
+  const pageData = location.state;
+  const [priceInUsd, setPriceInUsd] = useState(0);
 
   const handleQueryProducedHours = useCallback(async () => {
     try {
       const res = await readContract(config, {
         address: MiningMachineSystemStorageAddress,
         abi: MiningMachineSystemStorageABI,
-        functionName: 'getMachineLifecycle',
-        args: [pageData.machineId]
-      })
-      setPriceInUsd(16 * (1 - Number(res.producedHours) / 360))
+        functionName: "getMachineLifecycle",
+        args: [pageData.machineId],
+      });
+      setPriceInUsd(16 * (1 - Number(res.producedHours) / 360));
     } catch (error) {
-      console.error(error)
+      console.error(error);
     }
-  }, [pageData.machineId])
+  }, [pageData.machineId]);
 
   useEffect(() => {
-    handleQueryProducedHours()
-  }, [handleQueryProducedHours])
+    handleQueryProducedHours();
+  }, [handleQueryProducedHours]);
 
   const handleSellToPlatform = async () => {
     try {
-      setIsSelling(true)
+      setIsSelling(true);
       const hash = await writeContract(config, {
         address: MiningMachineSystemStorageAddress,
         abi: MiningMachineSystemStorageABI,
-        functionName: 'sellToPlatform',
-        args: [pageData.machineId]
-      })
+        functionName: "sellToPlatform",
+        args: [pageData.machineId],
+        gas: 250000n, // 固定 gas limit
+        maxFeePerGas: parseGwei("10"),
+        maxPriorityFeePerGas: parseGwei("2"),
+      });
 
       await waitForTransactionReceipt(config, {
         hash,
-        chainId: CHAIN_ID
-      })
+        chainId,
+      });
       Toast.show({
-        content: '卖出成功',
-        position: 'center'
-      })
-      navigate('/user')
+        content: "卖出成功",
+        position: "center",
+      });
+      navigate("/user");
     } catch (error) {
       Toast.show({
-        content: '卖出失败，请稍后再试',
-        position: 'center'
-      })
-      console.error(error)
+        content: "卖出失败，请稍后再试",
+        position: "center",
+      });
+      console.error(error);
     } finally {
-      setIsSelling(false)
+      setIsSelling(false);
     }
-  }
+  };
 
   return (
     <div className="px-[21px]">
@@ -167,11 +176,11 @@ const SellToPlatform = () => {
 
         <Button
           style={{
-            '--background-color': 'black',
-            '--text-color': 'white',
-            width: '100%',
-            marginTop: '20px',
-            fontSize: '14px'
+            "--background-color": "black",
+            "--text-color": "white",
+            width: "100%",
+            marginTop: "20px",
+            fontSize: "14px",
           }}
           shape="rounded"
           onClick={handleSellToPlatform}
@@ -181,7 +190,7 @@ const SellToPlatform = () => {
         </Button>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default SellToPlatform
+export default SellToPlatform;

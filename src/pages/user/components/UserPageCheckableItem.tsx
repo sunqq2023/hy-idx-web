@@ -1,73 +1,81 @@
-import { Checkbox, ProgressBar } from 'antd-mobile'
-import classNames from 'classnames'
-import styles from './Home.module.css'
-import { selectedSvg, userMachineSvg, startedSvg, noOpenSvg } from '@/assets'
-import { SHA256 } from 'crypto-js'
-import { MachineInfo } from '@/constants/types'
-import AdaptiveNumber, { NumberType } from '@/components/AdaptiveNumber'
-import { formatEther } from 'viem'
+import { Checkbox, ProgressBar } from "antd-mobile";
+import classNames from "classnames";
+import styles from "./Home.module.css";
+import { selectedSvg, userMachineSvg, startedSvg, noOpenSvg } from "@/assets";
+import { SHA256 } from "crypto-js";
+import { MachineInfo } from "@/constants/types";
+import AdaptiveNumber, { NumberType } from "@/components/AdaptiveNumber";
+import { formatEther } from "viem";
 
 const getPercent = (fuelRemainingMinutes: number) => {
-  const minutesInDay = 24 * 60
-  return (fuelRemainingMinutes / minutesInDay / 360) * 100
-}
+  const minutesInDay = 24 * 60;
+  return (fuelRemainingMinutes / minutesInDay / 360) * 100;
+};
 
 const getRemainingLife = (producedMix) => {
-  return (360 * (1440 - getFormattedMix(producedMix))) / 1440
-}
+  return (360 * (1440 - getFormattedMix(producedMix))) / 1440;
+};
 
 const getRemainingFuel = (fuelRemainingMinutes: number) => {
-  const minutesInDay = 24 * 60
-  const RemainingFuelToDay = fuelRemainingMinutes / minutesInDay
-  return parseFloat(RemainingFuelToDay.toFixed(2))
-}
+  const minutesInDay = 24 * 60;
+  const RemainingFuelToDay = fuelRemainingMinutes / minutesInDay;
+  return parseFloat(RemainingFuelToDay.toFixed(2));
+};
 const generateCode = (num: number) => {
-  const input = num + ''
-  const hashHex = SHA256(input).toString()
+  const input = num + "";
+  const hashHex = SHA256(input).toString();
   // 提取前4位字母和后4位十六进制
   const letterPart =
     hashHex
       .match(/[a-zA-Z]/g)
       ?.slice(0, 4)
-      .join('') || 'ABCD'
-  const hexPart = hashHex.slice(10, 14)
+      .join("") || "ABCD";
+  const hexPart = hashHex.slice(10, 14);
 
-  return (letterPart + hexPart).toUpperCase()
-}
+  return (letterPart + hexPart).toUpperCase();
+};
 
 const getFormattedMix = (producedMix) => {
   if (producedMix !== undefined && producedMix > 0) {
-    const val = formatEther(BigInt(producedMix))
-    return +val
+    const val = formatEther(BigInt(producedMix));
+    return +val;
   }
-  return 0
-}
+  return 0;
+};
 
 const UserPageCheckableItem = ({
   item,
   onLeftClick,
-  onRightClick
+  onRightClick,
+  disabled = false,
 }: {
-  item: MachineInfo
-  onLeftClick: (e: MachineInfo) => void
-  onRightClick: (e: MachineInfo) => void
+  item: MachineInfo;
+  onLeftClick: (e: MachineInfo) => void;
+  onRightClick: (e: MachineInfo) => void;
+  disabled?: boolean;
 }) => {
   const getFormattedMix = () => {
     if (item.producedMix !== undefined && item.producedMix > 0) {
-      const val = formatEther(BigInt(item.producedMix))
-      return +val
+      const val = formatEther(BigInt(item.producedMix));
+      return +val;
     }
-    return 0
-  }
+    return 0;
+  };
 
   return (
     <div
       key={item.id}
       className="bg-white rounded-2xl p-2 flex justify-between  text-[.68rem]"
+      style={{ opacity: disabled ? 0.5 : 1 }}
     >
-      <div className="flex relative" onClick={() => onLeftClick(item)}>
+      <div
+        className="flex relative"
+        onClick={() => !disabled && onLeftClick(item)}
+        style={{ cursor: disabled ? "not-allowed" : "pointer" }}
+      >
         <Checkbox
           checked={item.checked}
+          disabled={disabled}
           icon={(checked) =>
             checked ? (
               <img src={selectedSvg} alt="" />
@@ -87,8 +95,8 @@ const UserPageCheckableItem = ({
         <div className="flex justify-between mb-2">
           <div
             className={classNames(
-              styles['machine-name'],
-              'flex rounded-3xl pr-3 text-[.5rem] items-center'
+              styles["machine-name"],
+              "flex rounded-3xl pr-3 text-[.5rem] items-center",
             )}
           >
             <div className="font-bold">#{generateCode(item.id)}</div>
@@ -113,7 +121,7 @@ const UserPageCheckableItem = ({
             percent={getPercent(item.fuelRemainingMinutes)}
             className="flex-1"
             style={{
-              '--fill-color': '#615371'
+              "--fill-color": "#615371",
             }}
           />
           <div>{getRemainingFuel(item.fuelRemainingMinutes)}天</div>
@@ -142,6 +150,6 @@ const UserPageCheckableItem = ({
         </div>
       </div>
     </div>
-  )
-}
-export default UserPageCheckableItem
+  );
+};
+export default UserPageCheckableItem;

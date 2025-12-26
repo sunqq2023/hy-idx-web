@@ -1,21 +1,20 @@
-import { Swiper, SwiperRef, Tabs } from 'antd-mobile'
-import { useCallback, useEffect, useRef, useState } from 'react'
-import styles from './SwiperTabs.module.css'
-import classNames from 'classnames'
-import orderStore from '@/stores/orderStore'
-import { useAccount } from 'wagmi'
-import { readContract, multicall } from '@wagmi/core'
-import config from '@/proviers/config'
+import { Swiper, SwiperRef, Tabs } from "antd-mobile";
+import { useCallback, useEffect, useRef, useState } from "react";
+import styles from "./SwiperTabs.module.css";
+import classNames from "classnames";
+import orderStore from "@/stores/orderStore";
+import { useAccount } from "wagmi";
+import { readContract, multicall } from "@wagmi/core";
+import config from "@/proviers/config";
 import {
   MiningMachineHistoryABI,
-  MiningMachineHistoryAddress,
   MiningMachineSystemLogicABI,
-  MiningMachineSystemLogicAddress
-} from '@/constants'
+} from "@/constants";
+import { useChainConfig } from "@/hooks/useChainConfig";
 
 interface ITab {
-  title: string
-  children: JSX.Element
+  title: string;
+  children: JSX.Element;
 }
 
 const SwiperTabs = ({
@@ -23,61 +22,67 @@ const SwiperTabs = ({
   customClassName,
   getTabKey,
   defaultKey,
-  titleFontSize
+  titleFontSize,
 }: {
-  tabs: ITab[]
-  customClassName?: string
-  getTabKey?: (val: number) => void
-  defaultKey?: number
-  titleFontSize?: string
+  tabs: ITab[];
+  customClassName?: string;
+  getTabKey?: (val: number) => void;
+  defaultKey?: number;
+  titleFontSize?: string;
 }) => {
-  const ref = useRef<SwiperRef>(null)
-  const [tabKey, setTabKey] = useState('1')
-  const [defaultIndex, setDefaultIndex] = useState(1)
+  const ref = useRef<SwiperRef>(null);
+  const [tabKey, setTabKey] = useState("1");
+  const [defaultIndex, setDefaultIndex] = useState(1);
+  const chainConfig = useChainConfig();
 
-  const { address: userAddress } = useAccount()
-  const awaitingPaymentItemsLength = orderStore.getUnPaidLength()
+  const MiningMachineHistoryAddress =
+    chainConfig.HISTORY_ADDRESS as `0x${string}`;
+  const MiningMachineSystemLogicAddress =
+    chainConfig.LOGIC_ADDRESS as `0x${string}`;
+
+  const { address: userAddress } = useAccount();
+  const awaitingPaymentItemsLength = orderStore.getUnPaidLength();
 
   useEffect(() => {
     if (getTabKey) {
-      getTabKey(+tabKey)
+      getTabKey(+tabKey);
     }
-  }, [tabKey, getTabKey])
+  }, [tabKey, getTabKey]);
 
   useEffect(() => {
     if (defaultKey !== undefined) {
-      setDefaultIndex(defaultKey)
-      handleTabChange(`${defaultKey}`)
+      setDefaultIndex(defaultKey);
+      handleTabChange(`${defaultKey}`);
     }
-  }, [defaultKey])
+  }, [defaultKey]);
 
   const handleTabChange = (key: string) => {
-    setTabKey(key)
-    ref?.current?.swipeTo(Number(key))
-  }
+    setTabKey(key);
+    ref?.current?.swipeTo(Number(key));
+  };
 
   const handleQueryAllListedOrders = useCallback(async () => {
     try {
       const buyerOrderIds = await readContract(config, {
         address: MiningMachineHistoryAddress,
         abi: MiningMachineHistoryABI,
-        functionName: 'getBuyerOrderIds',
-        args: [userAddress, 0, 100]
-      })
+        functionName: "getBuyerOrderIds",
+        args: [userAddress, 0, 100],
+      });
 
-      const bignumToNumber = (buyerOrderIds as bigint[]).map((e) => Number(e))
+      const bignumToNumber = (buyerOrderIds as bigint[]).map((e) => Number(e));
 
       const contracts = bignumToNumber.map((id) => {
         return {
           address: MiningMachineHistoryAddress,
           abi: MiningMachineHistoryABI,
-          functionName: 'allOrders',
-          args: [id]
-        }
-      })
+          functionName: "allOrders",
+          args: [id],
+        };
+      });
       const data2 = await multicall(config, {
-        contracts
-      })
+        contracts,
+      });
       const itemList = data2.map((item) => {
         return {
           orderId: Number(item.result[0]),
@@ -85,79 +90,79 @@ const SwiperTabs = ({
           buyer: item.result[2],
           createTime: String(item.result[3]),
           status: item.result[4],
-          orderType: item.result[5]
-        }
-      })
+          orderType: item.result[5],
+        };
+      });
 
       const priceAndMachineIdsContracts = bignumToNumber.map((id) => {
         return {
           address: MiningMachineSystemLogicAddress,
           abi: MiningMachineSystemLogicABI,
-          functionName: 'internalOrders',
-          args: [id]
-        }
-      })
+          functionName: "internalOrders",
+          args: [id],
+        };
+      });
 
       const data3 = await multicall(config, {
-        contracts: priceAndMachineIdsContracts
-      })
+        contracts: priceAndMachineIdsContracts,
+      });
 
       const resultList = itemList.map((item, index) => {
         return {
           ...item,
-          price: Number(data3[index].result[2])
-        }
-      })
+          price: Number(data3[index].result[2]),
+        };
+      });
 
       const machineIdsContracts = bignumToNumber.map((id) => {
         return {
           address: MiningMachineSystemLogicAddress,
           abi: MiningMachineSystemLogicABI,
-          functionName: 'getInternalOrderMachineIds',
-          args: [id]
-        }
-      })
+          functionName: "getInternalOrderMachineIds",
+          args: [id],
+        };
+      });
 
       const data4 = await multicall(config, {
-        contracts: machineIdsContracts
-      })
+        contracts: machineIdsContracts,
+      });
 
       const resultListWithMachineIds = resultList.map((item, index) => {
         const formatIdToNumber = data4[index].result.map((id: bigint) =>
-          Number(id)
-        )
+          Number(id),
+        );
         return {
           ...item,
-          machineIds: formatIdToNumber
-        }
-      })
+          machineIds: formatIdToNumber,
+        };
+      });
 
-      console.log('buyer list', resultListWithMachineIds)
+      console.log("buyer list", resultListWithMachineIds);
 
       // seller orderids
 
       const sellerOrderIds = await readContract(config, {
         address: MiningMachineHistoryAddress,
         abi: MiningMachineHistoryABI,
-        functionName: 'getSellerOrderIds',
-        args: [userAddress, 0, 100]
-      })
+        functionName: "getSellerOrderIds",
+        args: [userAddress, 0, 100],
+      });
 
       const sellerBignumToNumber = (sellerOrderIds as bigint[]).map((e) =>
-        Number(e)
-      )
+        Number(e),
+      );
 
       const sellercontracts = sellerBignumToNumber.map((id) => {
         return {
           address: MiningMachineHistoryAddress,
           abi: MiningMachineHistoryABI,
-          functionName: 'allOrders',
-          args: [id]
-        }
-      })
+          functionName: "allOrders",
+          args: [id],
+        };
+      });
       const sellerdata2 = await multicall(config, {
-        contracts: sellercontracts
-      })
+        contracts: sellercontracts,
+      });
       const selleritemList = sellerdata2.map((item) => {
         return {
           orderId: Number(item.result[0]),
@@ -165,96 +170,96 @@ const SwiperTabs = ({
           buyer: item.result[2],
           createTime: String(item.result[3]),
           status: item.result[4],
-          orderType: 2
-        }
-      })
+          orderType: 2,
+        };
+      });
 
       const sellerpriceAndMachineIdsContracts = sellerBignumToNumber.map(
         (id) => {
           return {
             address: MiningMachineSystemLogicAddress,
             abi: MiningMachineSystemLogicABI,
-            functionName: 'internalOrders',
-            args: [id]
-          }
-        }
-      )
+            functionName: "internalOrders",
+            args: [id],
+          };
+        },
+      );
 
       const sellerdata3 = await multicall(config, {
-        contracts: sellerpriceAndMachineIdsContracts
-      })
+        contracts: sellerpriceAndMachineIdsContracts,
+      });
 
       const sellerresultList = selleritemList.map((item, index) => {
         return {
           ...item,
-          price: Number(sellerdata3[index].result[2])
-        }
-      })
+          price: Number(sellerdata3[index].result[2]),
+        };
+      });
 
       const sellermachineIdsContracts = sellerBignumToNumber.map((id) => {
         return {
           address: MiningMachineSystemLogicAddress,
           abi: MiningMachineSystemLogicABI,
-          functionName: 'getInternalOrderMachineIds',
-          args: [id]
-        }
-      })
+          functionName: "getInternalOrderMachineIds",
+          args: [id],
+        };
+      });
 
       const sellerdata4 = await multicall(config, {
-        contracts: sellermachineIdsContracts
-      })
+        contracts: sellermachineIdsContracts,
+      });
 
       const sellerresultListWithMachineIds = sellerresultList.map(
         (item, index) => {
           const formatIdToNumber = sellerdata4[index].result.map((id: bigint) =>
-            Number(id)
-          )
+            Number(id),
+          );
           return {
             ...item,
-            machineIds: formatIdToNumber
-          }
-        }
-      )
+            machineIds: formatIdToNumber,
+          };
+        },
+      );
 
-      console.log('seller list', sellerresultListWithMachineIds)
+      console.log("seller list", sellerresultListWithMachineIds);
 
       let list = [
         ...resultListWithMachineIds,
-        ...sellerresultListWithMachineIds
-      ]
+        ...sellerresultListWithMachineIds,
+      ];
 
       const sellList = orderStore.getallListedOrders().map((e) => ({
         ...e,
-        orderType: 3
-      }))
+        orderType: 3,
+      }));
 
       list = list
         .filter(
           (item) =>
             item.machineIds.length !== 0 &&
-            (item.seller === userAddress || item.buyer === userAddress)
+            (item.seller === userAddress || item.buyer === userAddress),
         )
         .concat(sellList)
-        .sort((a, b) => a.status - b.status)
+        .sort((a, b) => a.status - b.status);
 
       // 用户交易历史
       const unPaidLength = list.filter(
         (item) =>
           item.status === 0 &&
           (item.seller === userAddress || item.buyer === userAddress) &&
-          !item.listedAt
-      ).length
-      orderStore.updateData(list, unPaidLength)
+          !item.listedAt,
+      ).length;
+      orderStore.updateData(list, unPaidLength);
 
       // 用户交易历史中未处理订单数量
     } catch (error) {
-      console.error(error)
+      console.error(error);
     }
-  }, [userAddress])
+  }, [userAddress]);
 
   useEffect(() => {
-    handleQueryAllListedOrders()
-  }, [handleQueryAllListedOrders])
+    handleQueryAllListedOrders();
+  }, [handleQueryAllListedOrders]);
 
   return (
     <div className="h-full relative">
@@ -264,16 +269,16 @@ const SwiperTabs = ({
         stretch={false}
         className={classNames(
           customClassName,
-          [styles['adm-tabs']],
+          [styles["adm-tabs"]],
           ` ml-[15px] mr-[120px]
             h-[48px] !shrink-0  [&_.adm-tabs-tab-wrapper]:flex-none [&_.adm-tabs-tab-wrapper]:px-0 [&_.adm-tabs-tab-wrapper]:mr-1
             [&_.adm-tabs-tab.adm-tabs-tab-active]:font-medium [&_.adm-tabs-tab.adm-tabs-tab-active]:opacity-100 
             [&_.adm-tabs-tab]:pb-[11px] [&_.adm-tabs-tab]:pt-[14px] [&_.adm-tabs-tab]:text-[15px] 
             [&_.adm-tabs-tab]:opacity-40 [&_.adm-tabs-tab]:transition-transform
-          `
+          `,
         )}
         style={{
-          '--title-font-size': `${titleFontSize ? titleFontSize : '1.06rem'}`
+          "--title-font-size": `${titleFontSize ? titleFontSize : "1.06rem"}`,
         }}
       >
         {tabs.map((tab, index) => (
@@ -304,7 +309,7 @@ const SwiperTabs = ({
         ))}
       </Swiper>
     </div>
-  )
-}
+  );
+};
 
-export default SwiperTabs
+export default SwiperTabs;

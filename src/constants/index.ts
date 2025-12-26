@@ -3,9 +3,9 @@
  * 根据不同的链ID和RPC URL返回对应的合约地址
  *
  * 支持四种配置：
- * 1. 主网 (BSC Mainnet) - Chain ID: 56, RPC: 主网节点
+ * 1. 主网 (BSC Mainnet) - Chain ID: 56
  * 2. 测试网 (BSC Testnet) - Chain ID: 97
- * 3. Anvil Fork - Chain ID: 56, RPC: 本地 (127.0.0.1 或 localhost)
+ * 3. Anvil Fork (BSC) - Chain ID: 1056 (自定义 Fork Chain ID)
  * 4. Anvil Local - Chain ID: 31337 或 1337
  */
 
@@ -46,6 +46,9 @@ export interface ChainContractAddresses {
   // Other Contracts
   SELLUSER_MANAGER_ADDRESS: string;
 
+  // Mix Operator
+  MIX_OPERATOR_ADDRESS: string;
+
   // App Configuration
   ALLOWANCE_QUOTA: string;
   RPC_URL?: string;
@@ -54,7 +57,7 @@ export interface ChainContractAddresses {
 
 // ==================== 四种配置 ====================
 
-// 1. BSC 主网配置 (Chain ID: 56, 主网 RPC)
+// 1. BSC 主网配置 (Chain ID: 56, 升级 LogicExtend 和 NodeSystem 之后要更换地址)
 const BSC_MAINNET_CONFIG: ChainContractAddresses = {
   IDX_TOKEN: "0xc98F60B3F98E8Bf860436746db637e13B0e17458",
   USDT_TOKEN: "0x55d398326f99059fF775485246999027B3197955",
@@ -67,10 +70,10 @@ const BSC_MAINNET_CONFIG: ChainContractAddresses = {
   EXTEND_LOGIC_ADDRESS: "0xFA5eA849E045520996725d13C3160D1D5420078e",
   EXTEND_HISTORY_ADDRESS: "0x6e426AFED0cF32d6E00b29c791199441658E4f73",
   SELLUSER_MANAGER_ADDRESS: "0x8e10b9ba4c78fe8d6a2ecf3fa6307f5e6c1ceebe",
+  MIX_OPERATOR_ADDRESS: "0x1cea1dc56Be6ab13Ad590Ff367c3Af375DA98A7d",
   ALLOWANCE_QUOTA: "10000000",
-  RPC_URL: "https://bsc-dataseed1.binance.org",
-  // 主网合约未升级，绑定服务暂不可用
-  BIND_ADDRESS_URL: "",
+  RPC_URL: "https://bsc.publicnode.com",
+  BIND_ADDRESS_URL: "https://www.ihealth.vip/app",
 };
 
 // 2. BSC 测试网配置 (Chain ID: 97)
@@ -87,14 +90,16 @@ const BSC_TESTNET_CONFIG: ChainContractAddresses = {
   EXTEND_LOGIC_ADDRESS: "0x353d3526b7627756902bBBb793d4A0Ac99B8Bc16",
   EXTEND_HISTORY_ADDRESS: "0xe58b6777fC1c39D3e5DaaAfF09261F6c528BB5AB",
   SELLUSER_MANAGER_ADDRESS: "0x09012C1a6955fD76603453011F058f8567d1cbA3",
+  MIX_OPERATOR_ADDRESS: "0x1cea1dc56Be6ab13Ad590Ff367c3Af375DA98A7d",
   ALLOWANCE_QUOTA: "10000000",
   RPC_URL: "https://bsc-testnet.publicnode.com",
   BIND_ADDRESS_URL: "https://www.ihealth.vip/api",
   // BIND_ADDRESS_URL: "http://192.168.1.176:8090",
 };
 
-// 3. Anvil Fork 配置 (Chain ID: 56, 但 RPC 是本地)
+// 3. Anvil Fork 配置 (Chain ID: 1056)
 // 使用主网合约地址，因为 fork 的是主网
+// 使用 Chain ID 1056 避免与 BSC 主网 (56) 冲突
 const ANVIL_FORK_CONFIG: ChainContractAddresses = {
   IDX_TOKEN: "0xc98F60B3F98E8Bf860436746db637e13B0e17458",
   USDT_TOKEN: "0x55d398326f99059fF775485246999027B3197955",
@@ -102,14 +107,16 @@ const ANVIL_FORK_CONFIG: ChainContractAddresses = {
   LOGIC_ADDRESS: "0x895e8B68D93b2cD5fF4F2bf22cCb3697235C7AfD",
   PRODUCTION_LOGIC_ADDRESS: "0x90531429c182707190de682Ed345e3577D44C3d6",
   HISTORY_ADDRESS: "0x367f5FaE08dC307B3Ac8A9A7AA26AC3005C6B51f",
-  NODE_SYSTEM_ADDRESS: "0xf080f93067F52843231B13fF5024D41767898Bc8",
+  NODE_SYSTEM_ADDRESS: "0xfa55404684a8a38d92Babf184cc36Ad3411997b2",
   EXTEND_STORAGE_ADDRESS: "0xdc567714763206341aC1d90C0d2fc58c57739412",
-  EXTEND_LOGIC_ADDRESS: "0xFA5eA849E045520996725d13C3160D1D5420078e",
+  EXTEND_LOGIC_ADDRESS: "0xcCBad8bEF9b295a258D05bC805c33AF288742a37",
   EXTEND_HISTORY_ADDRESS: "0x6e426AFED0cF32d6E00b29c791199441658E4f73",
   SELLUSER_MANAGER_ADDRESS: "0x8e10b9ba4c78fe8d6a2ecf3fa6307f5e6c1ceebe",
+  MIX_OPERATOR_ADDRESS: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
   ALLOWANCE_QUOTA: "10000000",
-  RPC_URL: "http://127.0.0.1:8545",
-  BIND_ADDRESS_URL: "http://127.0.0.1:8090",
+  RPC_URL: import.meta.env.VITE_RPC_URL || "http://127.0.0.1:8545",
+  BIND_ADDRESS_URL: "https://www.ihealth.vip/api",
+  // BIND_ADDRESS_URL: "http://192.168.1.176:8090",
 };
 
 // 4. Anvil Local 配置 (Chain ID: 31337 或 1337)
@@ -148,10 +155,13 @@ const ANVIL_LOCAL_CONFIG: ChainContractAddresses = {
   SELLUSER_MANAGER_ADDRESS:
     import.meta.env.VITE_SELLUSER_MANAGER_ADDRESS ||
     "0x8e10b9ba4c78fe8d6a2ecf3fa6307f5e6c1ceebe",
+  MIX_OPERATOR_ADDRESS:
+    import.meta.env.VITE_MIX_OPERATOR_ADDRESS ||
+    "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
   ALLOWANCE_QUOTA: import.meta.env.VITE_ALLOWANCE_QUOTA || "10000000",
   RPC_URL: import.meta.env.VITE_RPC_URL || "http://127.0.0.1:8545",
-  BIND_ADDRESS_URL:
-    import.meta.env.VITE_BIND_ADDRESS_URL || "http://127.0.0.1:8090",
+  BIND_ADDRESS_URL: "https://www.ihealth.vip/api",
+  // BIND_ADDRESS_URL: "http://192.168.1.176:8090",
 };
 
 // ==================== 判断逻辑 ====================
@@ -184,14 +194,13 @@ const isLocalRpcUrl = (rpcUrl?: string): boolean => {
  * 判断逻辑：
  * 1. 首先判断 Chain ID
  *    - 97: 测试网
+ *    - 1056: Anvil Fork
  *    - 31337 或 1337: Anvil Local
- *    - 56: 需要进一步判断 RPC URL
- * 2. 如果 Chain ID 是 56，判断 RPC URL
- *    - 本地地址 (127.0.0.1/localhost): Anvil Fork
- *    - 其他: 主网
+ *    - 56: 主网
+ * 2. 如果 Chain ID 未知，尝试通过 RPC URL 判断
  *
  * @param chainId 链ID
- * @param rpcUrl 可选的 RPC URL（用于区分主网和 Anvil Fork）
+ * @param rpcUrl 可选的 RPC URL（用于未知 Chain ID 的判断）
  * @returns 合约地址配置
  */
 export const getChainConfig = (
@@ -204,35 +213,33 @@ export const getChainConfig = (
     return BSC_TESTNET_CONFIG;
   }
 
-  // 2. Anvil Local：Chain ID 31337 或 1337
+  // 2. Anvil Fork：Chain ID 1056
+  if (chainId === 1056) {
+    console.log("🔧 Using Anvil Fork configuration (Chain ID: 1056)");
+    return ANVIL_FORK_CONFIG;
+  }
+
+  // 3. Anvil Local：Chain ID 31337 或 1337
   if (chainId === 31337 || chainId === 1337) {
     console.log(`🔧 Using Anvil Local configuration (Chain ID: ${chainId})`);
     return ANVIL_LOCAL_CONFIG;
   }
 
-  // 3. Chain ID 56：需要判断是主网还是 Anvil Fork
+  // 4. Chain ID 56：只支持主网
   if (chainId === 56) {
-    if (isLocalRpcUrl(rpcUrl)) {
-      console.log(
-        "🔧 Using Anvil Fork configuration (Chain ID: 56, Local RPC)",
-      );
-      return ANVIL_FORK_CONFIG;
-    } else {
-      console.log(
-        "✅ Using BSC Mainnet configuration (Chain ID: 56, Mainnet RPC)",
-      );
-      return BSC_MAINNET_CONFIG;
-    }
+    console.log("✅ Using BSC Mainnet configuration (Chain ID: 56)");
+    return BSC_MAINNET_CONFIG;
   }
 
-  // 4. 未知 Chain ID，尝试通过 RPC URL 判断
+  // 5. 未知 Chain ID，尝试通过 RPC URL 判断
   if (isLocalRpcUrl(rpcUrl)) {
     console.log(
       `🔧 Using Anvil configuration (detected by local RPC URL, Chain ID: ${chainId})`,
     );
     // 如果是本地 RPC，优先使用 Anvil Local 配置（可能部署了新合约）
-    // 如果 Chain ID 是 56，则使用 Fork 配置
-    return chainId === 56 ? ANVIL_FORK_CONFIG : ANVIL_LOCAL_CONFIG;
+    // 如果 Chain ID 是 1056，则使用 Fork 配置
+    if (chainId === 1056) return ANVIL_FORK_CONFIG;
+    return ANVIL_LOCAL_CONFIG;
   }
 
   console.warn(`⚠️ Unknown Chain ID: ${chainId}, no configuration found`);

@@ -177,3 +177,43 @@ export function remove0x(str: string) {
     return str;
   }
 }
+
+/**
+ * 根据链 ID 获取区块浏览器 URL
+ * @param chainId 链 ID
+ * @param txHash 交易哈希（可选）
+ * @param address 地址（可选）
+ * @returns 区块浏览器 URL
+ */
+export function getExplorerUrl(
+  chainId: number,
+  txHash?: string,
+  address?: string,
+): string {
+  const explorers: Record<number, string> = {
+    56: "https://bscscan.com", // BSC 主网
+    97: "https://testnet.bscscan.com", // BSC 测试网
+    1056: "https://bscscan.com", // Anvil Fork (BSC) - 使用 BSC 浏览器查看原始数据
+    1: "https://etherscan.io", // Ethereum 主网
+    11155111: "https://sepolia.etherscan.io", // Sepolia 测试网
+    137: "https://polygonscan.com", // Polygon
+    42161: "https://arbiscan.io", // Arbitrum
+    10: "https://optimistic.etherscan.io", // Optimism
+    8453: "https://basescan.org", // Base
+    43114: "https://snowtrace.io", // Avalanche
+    81457: "https://blastscan.io", // Blast
+    534352: "https://scrollscan.com", // Scroll
+    59144: "https://lineascan.build", // Linea
+    1337: "http://localhost:8545", // Anvil Local
+    31337: "http://localhost:8545", // Anvil Local
+  };
+
+  const baseUrl = explorers[chainId] || explorers[56]; // 默认使用 BSC 主网
+
+  if (txHash) {
+    return `${baseUrl}/tx/${txHash}`;
+  } else if (address) {
+    return `${baseUrl}/address/${address}`;
+  }
+  return baseUrl;
+}

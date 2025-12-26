@@ -1,50 +1,452 @@
-# React + TypeScript + Vite
+# 数字经济 Web 应用
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+基于 React + TypeScript + Vite 构建的 Web3 DApp，支持多链部署和本地开发测试。
 
-Currently, two official plugins are available:
+## 📋 目录
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- [快速开始](#快速开始)
+- [开发环境](#开发环境)
+- [多链支持](#多链支持)
+- [项目结构](#项目结构)
+- [常用命令](#常用命令)
+- [环境配置](#环境配置)
+- [部署](#部署)
+- [文档](#文档)
 
-## Expanding the ESLint configuration
+---
 
-If you are developing a production application, we recommend updating the configuration to enable type aware lint rules:
+## 🚀 快速开始
 
-- Configure the top-level `parserOptions` property like this:
+### 安装依赖
 
-```js
-export default tseslint.config({
-  languageOptions: {
-    // other options...
-    parserOptions: {
-      project: ['./tsconfig.node.json', './tsconfig.app.json'],
-      tsconfigRootDir: import.meta.dirname,
-    },
-  },
-})
+```bash
+npm install
 ```
 
-- Replace `tseslint.configs.recommended` to `tseslint.configs.recommendedTypeChecked` or `tseslint.configs.strictTypeChecked`
-- Optionally add `...tseslint.configs.stylisticTypeChecked`
-- Install [eslint-plugin-react](https://github.com/jsx-eslint/eslint-plugin-react) and update the config:
+### 启动开发服务器
 
-```js
-// eslint.config.js
-import react from 'eslint-plugin-react'
+```bash
+# 主网 + 测试网模式（默认）
+npm run dev
 
-export default tseslint.config({
-  // Set the react version
-  settings: { react: { version: '18.3' } },
-  plugins: {
-    // Add the react plugin
-    react,
-  },
-  rules: {
-    // other rules...
-    // Enable its recommended rules
-    ...react.configs.recommended.rules,
-    ...react.configs['jsx-runtime'].rules,
-  },
-})
+# 访问 http://localhost:3001
 ```
+
+---
+
+## 💻 开发环境
+
+### 系统要求
+
+- Node.js >= 18
+- npm >= 9
+
+### 技术栈
+
+- **框架**: React 18 + TypeScript
+- **构建工具**: Vite 6
+- **Web3**: Wagmi + RainbowKit + Ethers.js
+- **UI 组件**: Ant Design Mobile
+- **状态管理**: MobX
+- **样式**: Tailwind CSS 4
+- **路由**: React Router 6
+
+---
+
+## 🌐 多链支持
+
+本项目支持三种运行模式，通过不同的启动命令来切换：
+
+### 1️⃣ 主网 + 测试网模式（默认）
+
+```bash
+npm run dev
+```
+
+**特点：**
+
+- ✅ 同时支持 BSC 主网 (Chain ID 56) 和 BSC 测试网 (Chain ID 97)
+- ✅ 用户通过钱包切换网络
+- ✅ 无需任何配置
+- ✅ 适合日常开发
+
+**使用场景：**
+
+- 日常开发和调试
+- 测试已部署的合约
+- 与真实网络交互
+
+---
+
+### 2️⃣ Anvil Fork 模式
+
+```bash
+# 终端 1: 启动 Anvil Fork (在 hy-contract 目录)
+cd ../hy-contract
+npm run start-fork
+
+# 终端 2: 启动前端
+npm run dev:fork
+```
+
+**特点：**
+
+- ✅ Fork 自 BSC 主网，拥有主网的所有数据
+- ✅ 本地执行，不消耗真实 gas
+- ✅ Chain ID: 1056
+- ✅ 可以测试主网数据交互
+
+**使用场景：**
+
+- 测试主网数据交互
+- 测试合约升级脚本
+- 安全测试新功能
+
+**钱包配置：**
+
+```
+网络名称: Anvil Fork (BSC)
+RPC URL: http://127.0.0.1:8545
+Chain ID: 1056
+货币符号: BNB
+```
+
+**测试账户：**
+
+```
+地址: 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+私钥: 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
+余额: 10000 BNB
+⚠️ 仅用于测试，永远不要在主网使用！
+```
+
+---
+
+### 3️⃣ Anvil Local 模式
+
+```bash
+# 终端 1: 启动 Anvil Local (在 hy-contract 目录)
+cd ../hy-contract
+npm run start-anvil
+
+# 终端 2: 部署合约
+forge script script/deployContracts.s.sol \
+  --rpc-url http://127.0.0.1:8545 \
+  --broadcast -vvv
+
+# 终端 3: 更新 .env.local 中的合约地址，然后启动前端
+npm run dev:local
+```
+
+**特点：**
+
+- ✅ 完全独立的本地链
+- ✅ 需要部署所有合约
+- ✅ Chain ID: 31337
+- ✅ 完全可控的测试环境
+
+**使用场景：**
+
+- 测试新合约
+- 测试合约部署流程
+- 完全隔离的测试环境
+
+**钱包配置：**
+
+```
+网络名称: Anvil Local
+RPC URL: http://127.0.0.1:8545
+Chain ID: 31337
+货币符号: ETH
+```
+
+---
+
+## 📁 项目结构
+
+```
+hy-web/
+├── src/
+│   ├── assets/           # 图片存储
+│   ├── components/       # 系统组件（顶部导航栏、标签页切换栏、底部弹窗）
+│   ├── constants/        # 常量和合约配置
+│   │   └── index.ts      # 系统合约地址、合约 ABI、链配置
+│   ├── hooks/            # 自定义 Hooks
+│   │   ├── 批量签名交易
+│   │   ├── 获取用户授权情况
+│   │   └── 检测用户钱包地址变化
+│   ├── layout/           # 页面布局
+│   ├── pages/            # 页面组件
+│   │   ├── user/         # 用户相关页面
+│   │   │   ├── addFuel/              # 添加燃料页面
+│   │   │   ├── ClaimMix/             # 领取 MIX 页面
+│   │   │   ├── ExchangeIdx/          # 兑换 IDX 页面
+│   │   │   ├── MachineDetail/        # 矿机详情页面
+│   │   │   ├── MachineTx/            # 矿机交易页面
+│   │   │   ├── MyOrders/             # 我的订单页面
+│   │   │   ├── MyPublishMachineTx/   # 我发布的矿机历史记录页面
+│   │   │   ├── UserTransferMachine/  # 转让子矿机页面
+│   │   │   ├── SellToPlatform/       # 卖给平台页面
+│   │   │   ├── SyntheticMachine/     # 合成矿机页面
+│   │   │   └── UserTxHistory/        # 用户所有历史交易记录页面
+│   │   ├── SalePersonPage.tsx        # 销售员页面
+│   │   ├── SalepersonTxHistory.tsx   # 销售员历史记录页面
+│   │   ├── MakeMHistory.tsx          # 铸造母矿机历史记录页面
+│   │   ├── MakeMotherMiningMachine.tsx # 铸造母矿机页面
+│   │   └── TransferMachine.tsx       # 转让母矿机页面
+│   ├── proviers/         # Web3 Provider 配置
+│   │   ├── Wagmi 配置
+│   │   ├── RainbowKit 配置
+│   │   └── React Query 配置
+│   ├── router/           # 页面路由
+│   ├── stores/           # MobX 全局数据存储
+│   ├── utils/            # 工具函数
+│   │   ├── 格式化地址
+│   │   ├── 时间戳转换
+│   │   └── 其他常用方法
+│   └── App.tsx           # 应用入口
+├── public/               # 静态资源
+├── docs/                 # 文档
+│   ├── MULTI_CHAIN_GUIDE.md           # 完整的多链配置指南
+│   └── [合约文档...]
+├── .env                  # 基础配置
+├── .env.fork             # Fork 模式配置
+├── .env.local            # Local 模式配置
+├── package.json          # 项目配置
+├── vite.config.ts        # Vite 构建配置
+├── tailwind.config.js    # Tailwind 配置
+├── tsconfig.json         # TypeScript 配置
+├── QUICK_START.md        # 快速开始指南
+├── MIGRATION_CHECKLIST.md # 迁移检查清单
+└── README.md             # 本文件
+```
+
+### 主要页面说明
+
+#### 销售员相关
+
+- **SalePersonPage.tsx** - 销售员页面
+- **SalepersonTxHistory.tsx** - 销售员历史记录页面
+
+#### 母矿机相关
+
+- **MakeMotherMiningMachine.tsx** - 铸造母矿机页面
+- **MakeMHistory.tsx** - 铸造母矿机历史记录页面
+- **TransferMachine.tsx** - 转让母矿机页面
+
+#### 用户功能
+
+- **addFuel** - 添加燃料页面
+- **ClaimMix** - 领取 MIX 页面
+- **ExchangeIdx** - 兑换 IDX 页面
+- **MachineDetail** - 矿机详情页面
+- **MachineTx** - 矿机交易页面
+- **MyOrders** - 我的订单页面
+- **MyPublishMachineTx** - 我发布的矿机历史记录页面
+- **UserTransferMachine** - 转让子矿机页面
+- **SellToPlatform** - 卖给平台页面
+- **SyntheticMachine** - 合成矿机页面
+- **UserTxHistory** - 用户所有历史交易记录页面（包括转让子矿机、挂售、购买母矿机）
+
+---
+
+## 🛠️ 常用命令
+
+### 开发
+
+```bash
+# 主网 + 测试网模式（默认）
+npm run dev
+
+# Anvil Fork 模式
+npm run dev:fork
+
+# Anvil Local 模式
+npm run dev:local
+```
+
+### 构建
+
+```bash
+# 生产构建
+npm run build
+```
+
+### 预览
+
+```bash
+# 预览生产构建
+npm run preview
+```
+
+### 代码检查
+
+```bash
+# ESLint 检查
+npm run lint
+```
+
+---
+
+## ⚙️ 环境配置
+
+### 配置文件说明
+
+| 文件              | 用途                     | 提交到 git |
+| ----------------- | ------------------------ | ---------- |
+| `.env`            | 基础配置（所有模式共享） | ✅         |
+| `.env.fork`       | Fork 模式配置            | ✅         |
+| `.env.local`      | Local 模式配置           | ✅         |
+| `.env.production` | 生产环境配置             | ✅         |
+
+### 配置文件和启动命令的关系
+
+| 启动命令            | Mode        | 加载的配置文件    | 支持的网络            |
+| ------------------- | ----------- | ----------------- | --------------------- |
+| `npm run dev`       | development | `.env`            | BSC 主网 + BSC 测试网 |
+| `npm run dev:fork`  | fork        | `.env.fork`       | Anvil Fork (1056)     |
+| `npm run dev:local` | local       | `.env.local`      | Anvil Local (31337)   |
+| `npm run build`     | production  | `.env.production` | BSC 主网 + BSC 测试网 |
+
+### 手机访问配置
+
+如果需要在手机上访问开发服务器：
+
+1. **获取电脑 IP**：
+
+   ```bash
+   # macOS/Linux
+   ifconfig | grep "inet " | grep -v 127.0.0.1
+
+   # 示例输出: inet 192.168.1.176
+   ```
+
+2. **修改 `.env.fork`**：
+
+   ```bash
+   VITE_CHAIN_ID=1056
+   VITE_RPC_URL=http://192.168.1.176:8545  # 使用你的 IP
+   ```
+
+3. **重启服务**：
+
+   ```bash
+   # 重启 Anvil
+   cd ../hy-contract
+   npm run stop-fork
+   npm run start-fork
+
+   # 重启前端
+   npm run dev:fork
+   ```
+
+4. **手机访问**：
+   - 浏览器：`http://192.168.1.176:3001`
+   - 钱包 RPC：`http://192.168.1.176:8545`
+
+---
+
+## 🚢 部署
+
+### Cloudflare Pages 部署
+
+#### 方法 1: 连接 Git 仓库（推荐）
+
+1. 登录 Cloudflare Dashboard
+2. 进入 Pages，创建新项目
+3. 连接你的 Git 仓库
+4. 配置构建设置：
+   ```
+   Build command: npm run build
+   Build output directory: dist
+   Root directory: hy-web
+   Node version: 18 或更高
+   ```
+5. 每次推送代码自动部署
+
+#### 方法 2: 使用 Wrangler CLI
+
+```bash
+# 构建
+npm run build
+
+# 部署
+npx wrangler pages deploy dist
+```
+
+#### 验证部署
+
+访问你的 Cloudflare 域名，打开浏览器控制台，应该看到：
+
+```
+🚀 Production mode: Using Mainnet + Testnet only
+```
+
+---
+
+## 📚 文档
+
+### 详细文档
+
+- **[docs/MULTI_CHAIN_GUIDE.md](./docs/MULTI_CHAIN_GUIDE.md)** - 完整的多链配置指南（包含配置、测试和验证）
+
+### 合约文档
+
+- **[docs/MiningMachineHistory 合约接口说明.md](./docs/MiningMachineHistory%20合约接口说明》.md)**
+- **[docs/MiningMachineSystemStorage 合约接口说明.md](./docs/MiningMachineSystemStorage%20合约接口说明》.md)**
+- 更多合约文档请查看 `docs/` 目录
+
+---
+
+## 🔍 故障排除
+
+### 问题 1: 无法连接到 Anvil
+
+**解决方案：**
+
+```bash
+# 检查 Anvil 状态
+cd ../hy-contract
+npm run check-anvil
+
+# 重启 Anvil
+npm run stop-fork && npm run start-fork
+```
+
+### 问题 2: 环境变量不生效
+
+**解决方案：**
+
+1. 确认使用了正确的命令（`dev:fork` 不是 `dev`）
+2. 重启前端服务器（Ctrl+C 然后重新运行）
+3. 硬刷新浏览器（Ctrl+Shift+R）
+
+### 问题 3: 手机无法访问
+
+**解决方案：**
+
+1. 确认手机和电脑在同一个 WiFi
+2. 检查防火墙设置
+3. 确认使用了正确的 IP 地址
+
+---
+
+## 🤝 贡献
+
+欢迎提交 Issue 和 Pull Request！
+
+---
+
+## 📄 许可证
+
+ISC
+
+---
+
+## 📞 联系方式
+
+如有问题，请查看文档或联系开发团队。
+
+---
+
+**Happy Coding!** 🎉

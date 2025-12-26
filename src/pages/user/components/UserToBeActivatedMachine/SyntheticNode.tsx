@@ -1,87 +1,94 @@
-import { bottomPatternSvg, infoSvg, selectedSvg, smNodeSvg } from '@/assets'
-import AdaptiveNumber, { NumberType } from '@/components/AdaptiveNumber'
+import { bottomPatternSvg, infoSvg, selectedSvg, smNodeSvg } from "@/assets";
+import AdaptiveNumber, { NumberType } from "@/components/AdaptiveNumber";
 import {
-  CHAIN_ID,
   MiningMachineNodeSystemABI,
-  MiningMachineNodeSystemAddress,
   MiningMachineProductionLogicABI,
-  MiningMachineProductionLogicAddress,
   MiningMachineSystemStorageABI,
-  MiningMachineSystemStorageAddress
-} from '@/constants'
-import { MachineInfo } from '@/constants/types'
-import { useSequentialContractWrite } from '@/hooks/useSequentialContractWrite'
-import { Button, Checkbox, Divider, Modal, Skeleton, Toast } from 'antd-mobile'
-import { memo, useCallback, useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { FixedSizeList as List } from 'react-window'
-import SyntheticNodeCheckableItem from './SyntheticNodeCheckableItem'
-import './SyntheticNode.module.css'
-import config from '@/proviers/config'
+} from "@/constants";
+import { useChainConfig } from "@/hooks/useChainConfig";
+import { useAccount, useChainId } from "wagmi";
+import { MachineInfo } from "@/constants/types";
+import { useSequentialContractWrite } from "@/hooks/useSequentialContractWrite";
+import { Button, Checkbox, Divider, Modal, Skeleton, Toast } from "antd-mobile";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { FixedSizeList as List } from "react-window";
+import SyntheticNodeCheckableItem from "./SyntheticNodeCheckableItem";
+import "./SyntheticNode.module.css";
+import config from "@/proviers/config";
 import {
   writeContract,
   waitForTransactionReceipt,
   readContract,
-  multicall
-} from '@wagmi/core'
-import { useAccount } from 'wagmi'
-import { formatEther } from 'viem'
-import EmptyComp from '@/components/EmptyComp'
+  multicall,
+} from "@wagmi/core";
+import { formatEther } from "viem";
+import EmptyComp from "@/components/EmptyComp";
 
 const SyntheticNode = () => {
-  const [machineList, setMachineList] = useState([])
-  const [allStatus, setAllStatus] = useState(false)
-  const [mixPointsToBeClaimed, setMixPointsToBeClaimed] = useState(0)
-  const { address: userAddress } = useAccount()
-  const [userNodes, setUserNodes] = useState(0)
+  const [machineList, setMachineList] = useState([]);
+  const chainConfig = useChainConfig();
+  const chainId = useChainId();
+  const [allStatus, setAllStatus] = useState(false);
+  const [mixPointsToBeClaimed, setMixPointsToBeClaimed] = useState(0);
+  const { address: userAddress } = useAccount();
+  const [userNodes, setUserNodes] = useState(0);
   const [SyntheticNodeNeedMachineCount, setSyntheticNodeNeedMachineCount] =
-    useState(0)
+    useState(0);
 
-  const [isLoading, setIsLoading] = useState(false)
-  const [isClaimingMIX, setIsClaimingMIX] = useState(false)
-  const [listHeight, setListHeight] = useState(0)
-  const listContainerRef = useRef<HTMLDivElement>(null)
-  const [wreckageList, setWreckageList] = useState<MachineInfo[]>([])
+  const MiningMachineNodeSystemAddress =
+    chainConfig.NODE_SYSTEM_ADDRESS as `0x${string}`;
+  const MiningMachineSystemStorageAddress =
+    chainConfig.STORAGE_ADDRESS as `0x${string}`;
+
+  const [isLoading, setIsLoading] = useState(false);
+  const [isClaimingMIX, setIsClaimingMIX] = useState(false);
+  const [listHeight, setListHeight] = useState(0);
+  const listContainerRef = useRef<HTMLDivElement>(null);
+  const [wreckageList, setWreckageList] = useState<MachineInfo[]>([]);
 
   useEffect(() => {
     if (allStatus) {
-      setWreckageList(machineList)
+      setWreckageList(machineList);
     }
-  }, [allStatus, machineList])
+  }, [allStatus, machineList]);
 
   useEffect(() => {
     if (machineList.length === wreckageList.length && wreckageList.length > 0) {
-      setAllStatus(true)
+      setAllStatus(true);
     }
-  }, [machineList, wreckageList])
+  }, [machineList, wreckageList]);
 
   const handleCloseModal = () => {
-    Modal.clear()
-  }
+    Modal.clear();
+  };
 
   const handleClaimMix = async () => {
     try {
-      setIsClaimingMIX(true)
+      setIsClaimingMIX(true);
 
       const hash = await writeContract(config, {
         address: MiningMachineNodeSystemAddress as `0x${string}`,
         abi: MiningMachineNodeSystemABI,
-        functionName: 'claimMixReward',
-        args: []
-      })
+        functionName: "claimMixReward",
+        args: [],
+        gas: 300000n, // 固定 gas limit
+        maxFeePerGas: parseGwei("10"),
+        maxPriorityFeePerGas: parseGwei("2"),
+      });
 
       await waitForTransactionReceipt(config, {
         hash,
-        chainId: CHAIN_ID
-      })
+        chainId,
+      });
 
       Modal.show({
         bodyStyle: {
-          background: '#000000',
-          color: '#ffffff',
-          width: '75vw',
-          padding: '15px',
-          borderRadius: '20px'
+          background: "#000000",
+          color: "#ffffff",
+          width: "75vw",
+          padding: "15px",
+          borderRadius: "20px",
         },
         showCloseButton: true,
         closeOnMaskClick: true,
@@ -107,48 +114,48 @@ const SyntheticNode = () => {
               </button>
             </div>
           </div>
-        )
-      })
-      handleQuery()
+        ),
+      });
+      handleQuery();
     } catch (error) {
       Toast.show({
-        content: '提取失败，请稍后再试',
-        position: 'center'
-      })
-      console.error(error)
+        content: "提取失败，请稍后再试",
+        position: "center",
+      });
+      console.error(error);
     } finally {
-      setIsClaimingMIX(false)
+      setIsClaimingMIX(false);
     }
-  }
+  };
 
   const handleQuery = useCallback(async () => {
     try {
-      setIsLoading(true)
+      setIsLoading(true);
       const data = await readContract(config, {
         address: MiningMachineSystemStorageAddress,
         abi: MiningMachineSystemStorageABI,
-        functionName: 'getOwnerToMachineIds',
-        args: [userAddress]
-      })
-      const bignumToNumber = (data as bigint[]).map((e) => Number(e))
+        functionName: "getOwnerToMachineIds",
+        args: [userAddress],
+      });
+      const bignumToNumber = (data as bigint[]).map((e) => Number(e));
 
       const contracts = bignumToNumber.map((e) => {
         return {
           address: MiningMachineSystemStorageAddress,
           abi: MiningMachineSystemStorageABI,
-          functionName: 'getMachineLifecycle',
-          args: [e]
-        }
-      })
+          functionName: "getMachineLifecycle",
+          args: [e],
+        };
+      });
       const data2 = await multicall(config, {
-        contracts
-      })
+        contracts,
+      });
       const result = data2.map((e, i) => {
         return {
           destroyed: e.result.destroyed,
           mtype: e.result.mtype,
           checked: false,
-          id: bignumToNumber[i]
+          id: bignumToNumber[i],
           // activatedAt: Number(e.result.activatedAt),
           // createTime: Number(e.result.createTime),
           // expiredAt: Number(e.result.expiredAt),
@@ -159,172 +166,172 @@ const SyntheticNode = () => {
           // producedChildCount: Number(e.result.producedChildCount),
           // producedHours: Number(e.result.producedHours),
           // fuelRemainingMinutes: Number(e.result.fuelRemainingMinutes)
-        }
-      })
+        };
+      });
 
       const nodesAmount = await readContract(config, {
         address: MiningMachineNodeSystemAddress,
         abi: MiningMachineNodeSystemABI,
-        functionName: 'destroyedMachineCount',
-        args: [userAddress]
-      })
+        functionName: "destroyedMachineCount",
+        args: [userAddress],
+      });
 
-      let list = result.filter((item) => item.destroyed)
-      list = list.slice(0, Number(nodesAmount))
+      let list = result.filter((item) => item.destroyed);
+      list = list.slice(0, Number(nodesAmount));
 
-      setMachineList(list)
-      console.log('filter nodesAmount * list', list, Number(nodesAmount))
+      setMachineList(list);
+      console.log("filter nodesAmount * list", list, Number(nodesAmount));
     } catch (error) {
-      console.log(error)
+      console.log(error);
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }, [userAddress])
+  }, [userAddress]);
 
   useEffect(() => {
-    handleQuery()
-  }, [handleQuery])
+    handleQuery();
+  }, [handleQuery]);
 
   const getSyntheticNodeNeedMachineCount = async () => {
     try {
       const data = await readContract(config, {
         address: MiningMachineNodeSystemAddress,
         abi: MiningMachineNodeSystemABI,
-        functionName: 'nodesAmount',
-        args: []
-      })
-      setSyntheticNodeNeedMachineCount(Number(data))
+        functionName: "nodesAmount",
+        args: [],
+      });
+      setSyntheticNodeNeedMachineCount(Number(data));
     } catch (error) {
-      console.error(error)
+      console.error(error);
     }
-  }
+  };
 
   useEffect(() => {
-    getSyntheticNodeNeedMachineCount()
-  }, [])
+    getSyntheticNodeNeedMachineCount();
+  }, []);
 
   const getUserNodesCount = async () => {
     try {
       const data = await readContract(config, {
         address: MiningMachineNodeSystemAddress,
         abi: MiningMachineNodeSystemABI,
-        functionName: 'getUserNodeCount',
-        args: [userAddress]
-      })
-      setUserNodes(Number(data))
+        functionName: "getUserNodeCount",
+        args: [userAddress],
+      });
+      setUserNodes(Number(data));
     } catch (error) {
-      console.error(error)
+      console.error(error);
     }
-  }
+  };
   useEffect(() => {
-    getUserNodesCount()
-    getUserCurrentAvailableMix()
-  }, [])
+    getUserNodesCount();
+    getUserCurrentAvailableMix();
+  }, []);
 
   const getUserCurrentAvailableMix = async () => {
     try {
       const data = await readContract(config, {
         address: MiningMachineNodeSystemAddress,
         abi: MiningMachineNodeSystemABI,
-        functionName: 'getUserCurrentAvailableMix',
-        args: [userAddress]
-      })
+        functionName: "getUserCurrentAvailableMix",
+        args: [userAddress],
+      });
 
-      setMixPointsToBeClaimed(+(data ? formatEther(data) : '0'))
+      setMixPointsToBeClaimed(+(data ? formatEther(data) : "0"));
     } catch (error) {
-      console.error(error)
+      console.error(error);
     }
-  }
+  };
 
   // 动态计算高度
   useEffect(() => {
-    if (!listContainerRef.current) return
+    if (!listContainerRef.current) return;
 
     const calculateHeight = () => {
-      const windowHeight = window.innerHeight
-      const topSectionHeight = 100
-      const newHeight = windowHeight - topSectionHeight
-      setListHeight(newHeight)
-    }
+      const windowHeight = window.innerHeight;
+      const topSectionHeight = 100;
+      const newHeight = windowHeight - topSectionHeight;
+      setListHeight(newHeight);
+    };
 
     // 初始化计算
-    calculateHeight()
+    calculateHeight();
 
     // 监听窗口变化（如旋转屏幕、键盘弹出等）
-    window.addEventListener('resize', calculateHeight)
-    return () => window.removeEventListener('resize', calculateHeight)
-  }, [])
+    window.addEventListener("resize", calculateHeight);
+    return () => window.removeEventListener("resize", calculateHeight);
+  }, []);
 
   const handleLeftClick = useCallback(
     (item: MachineInfo) => {
       setMachineList((prevItems) => {
         const newItems = prevItems.map((e) => {
-          return e.id === item.id ? { ...e, checked: !e.checked } : e
-        })
+          return e.id === item.id ? { ...e, checked: !e.checked } : e;
+        });
 
-        const isItemChecked = !item.checked
+        const isItemChecked = !item.checked;
         if (isItemChecked) {
           if (!allStatus) {
-            setWreckageList([...wreckageList, item])
+            setWreckageList([...wreckageList, item]);
           } else {
-            setWreckageList(machineList)
+            setWreckageList(machineList);
           }
         } else {
-          const list = wreckageList.filter((e) => e.id !== item.id)
-          setWreckageList(list)
-          setAllStatus(false)
+          const list = wreckageList.filter((e) => e.id !== item.id);
+          setWreckageList(list);
+          setAllStatus(false);
         }
 
-        return newItems
-      })
+        return newItems;
+      });
     },
-    [allStatus, machineList, wreckageList]
-  )
+    [allStatus, machineList, wreckageList],
+  );
 
   const getChekeIcon = (checked: boolean): React.ReactNode =>
     checked ? (
       <img src={selectedSvg} alt="" width={16} height={16} />
     ) : (
       <div className="border border-[#a5a4a4] w-[1rem] h-[1rem] rounded-[50%]" />
-    )
+    );
 
   const toggleSelectAll = () => {
     setMachineList((prevList) => {
       const newList = prevList.map((item) => {
         return {
           ...item,
-          checked: !allStatus
-        }
-      })
+          checked: !allStatus,
+        };
+      });
 
       if (!allStatus) {
-        setWreckageList(newList)
+        setWreckageList(newList);
       } else {
-        setWreckageList([])
+        setWreckageList([]);
       }
 
-      return newList
-    })
-    setAllStatus(!allStatus)
-  }
+      return newList;
+    });
+    setAllStatus(!allStatus);
+  };
 
   const Row = memo(
     ({
       index,
       style,
-      data
+      data,
     }: {
-      data: MachineInfo[]
-      index: number
-      style: React.CSSProperties
+      data: MachineInfo[];
+      index: number;
+      style: React.CSSProperties;
     }) => {
-      const item = data[index]
+      const item = data[index];
 
       return (
         <div
           style={{
             ...style,
-            height: '70px'
+            height: "70px",
           }}
         >
           <SyntheticNodeCheckableItem
@@ -332,41 +339,45 @@ const SyntheticNode = () => {
             onLeftClick={handleLeftClick}
           />
         </div>
-      )
-    }
-  )
+      );
+    },
+  );
 
   const handleSynthetic = async () => {
     if (wreckageList.length < SyntheticNodeNeedMachineCount) {
       Toast.show({
         content: `所选残骸数量不足${SyntheticNodeNeedMachineCount}个，无法执行操作`,
-        position: 'bottom',
-        duration: 2000
-      })
-      return
+        position: "bottom",
+        duration: 2000,
+      });
+      return;
     }
 
     try {
-      setIsClaimingMIX(true)
+      setIsClaimingMIX(true);
 
       const hash = await writeContract(config, {
         address: MiningMachineNodeSystemAddress as `0x${string}`,
         abi: MiningMachineNodeSystemABI,
-        functionName: 'createNode',
-        args: []
-      })
+        functionName: "createNode",
+        args: [],
+        gas: 400000n, // 固定 gas limit（创建节点需要更多 gas）
+        maxFeePerGas: parseGwei("10"),
+        maxPriorityFeePerGas: parseGwei("2"),
+      });
 
       await waitForTransactionReceipt(config, {
-        hash
-      })
+        hash,
+        chainId,
+      });
 
       Modal.show({
         bodyStyle: {
-          background: '#000000',
-          color: '#ffffff',
-          width: '75vw',
-          padding: '15px',
-          borderRadius: '20px'
+          background: "#000000",
+          color: "#ffffff",
+          width: "75vw",
+          padding: "15px",
+          borderRadius: "20px",
         },
         showCloseButton: true,
         closeOnMaskClick: true,
@@ -385,27 +396,27 @@ const SyntheticNode = () => {
               </button>
             </div>
           </div>
-        )
-      })
+        ),
+      });
     } catch (error) {
-      console.error(error)
+      console.error(error);
       Toast.show({
-        content: '合成失败，请稍后再试',
-        position: 'center'
-      })
+        content: "合成失败，请稍后再试",
+        position: "center",
+      });
     } finally {
-      setIsClaimingMIX(false)
+      setIsClaimingMIX(false);
     }
-  }
+  };
 
   const handleInfoClick = () => {
     Modal.show({
       bodyStyle: {
-        color: '#ffffff',
-        width: '80vw',
-        padding: '10px',
-        borderRadius: '20px',
-        height: '220px'
+        color: "#ffffff",
+        width: "80vw",
+        padding: "10px",
+        borderRadius: "20px",
+        height: "220px",
       },
       content: (
         <>
@@ -439,15 +450,15 @@ const SyntheticNode = () => {
         </>
       ),
       closeOnMaskClick: true,
-      showCloseButton: true
-    })
-  }
+      showCloseButton: true,
+    });
+  };
 
   const tempData = new Array(10).fill({
     checked: false,
     id: 111,
-    mtype: 1
-  })
+    mtype: 1,
+  });
 
   return (
     <div className="pt-4  flex flex-col justify-between h-full">
@@ -455,10 +466,10 @@ const SyntheticNode = () => {
         <div
           style={{
             background: `#000 url(${bottomPatternSvg}) no-repeat center`,
-            width: '100%',
-            padding: '21px',
-            gap: '5px',
-            borderRadius: '25px'
+            width: "100%",
+            padding: "21px",
+            gap: "5px",
+            borderRadius: "25px",
           }}
         >
           <div className="text-white flex justify-between">
@@ -503,8 +514,8 @@ const SyntheticNode = () => {
             icon={(isChecked) => getChekeIcon(isChecked)}
             onClick={toggleSelectAll}
             style={{
-              '--font-size': '14px',
-              '--gap': '6px'
+              "--font-size": "14px",
+              "--gap": "6px",
             }}
           >
             全选
@@ -571,7 +582,7 @@ const SyntheticNode = () => {
         </Button>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default SyntheticNode
+export default SyntheticNode;

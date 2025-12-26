@@ -41,35 +41,38 @@ export const prodEvmChains = [
   b3,
 ];
 
-// 根据环境变量决定使用的链
-// 部署到线上时，应该同时支持主网和测试网，让用户通过钱包切换
+// 根据 mode 决定使用的链
 const getActiveChains = () => {
-  const chainId = Number(import.meta.env.VITE_CHAIN_ID);
-  const rpcUrl = import.meta.env.VITE_RPC_URL as string;
+  const mode = import.meta.env.MODE;
 
-  // 检查是否是本地开发环境
-  const isLocalDev =
-    rpcUrl?.includes("127.0.0.1") ||
-    rpcUrl?.includes("localhost") ||
-    chainId === 31337 ||
-    chainId === 1337;
+  // 生产环境：只支持主网和测试网
+  if (mode === "production") {
+    console.log("🚀 Production mode: Using Mainnet + Testnet only");
+    const allChains = [...prodEvmChains];
+    if (!allChains.find((chain) => chain.id === bscTestnet.id)) {
+      allChains.push(bscTestnet);
+    }
+    return allChains;
+  }
 
-  if (isLocalDev) {
-    console.log("🔧 Using Localhost (Anvil Fork) chain");
+  // Fork 模式：只支持 Anvil Fork (Chain ID 1056)
+  if (mode === "fork") {
+    console.log("🔧 Fork mode: Using Anvil Fork (Chain ID 1056)");
     return [localhost];
   }
 
-  // 生产环境：同时支持主网和测试网
-  // 这样用户可以通过钱包切换网络，应用会自动使用对应的合约地址
-  console.log("🚀 Using production chains (Mainnet + Testnet)");
-  // 将 bscTestnet 添加到生产链列表中，确保同时支持主网和测试网
-  const allChains = [...prodEvmChains];
-
-  // 如果 bscTestnet 不在列表中，添加它
-  if (!allChains.find(chain => chain.id === bscTestnet.id)) {
-    allChains.push(bscTestnet);
+  // Local 模式：只支持 Anvil Local (Chain ID 31337)
+  if (mode === "local") {
+    console.log("🔧 Local mode: Using Anvil Local (Chain ID 31337)");
+    return [localhost];
   }
 
+  // 开发模式（默认）：支持主网和测试网
+  console.log("🔧 Development mode: Using Mainnet + Testnet");
+  const allChains = [...prodEvmChains];
+  if (!allChains.find((chain) => chain.id === bscTestnet.id)) {
+    allChains.push(bscTestnet);
+  }
   return allChains;
 };
 

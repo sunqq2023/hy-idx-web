@@ -1,55 +1,16 @@
 import { useState } from "react";
 import { Button, Toast } from "antd-mobile";
-import { useWriteContract } from "wagmi";
+import { useWriteContract, useConfig, useAccount } from "wagmi";
 import { waitForTransactionReceipt } from "@wagmi/core";
-import { getAddress, encodeFunctionData } from "viem";
-import config from "@/proviers/config";
+import { getAddress } from "viem";
 import {
   MiningMachineSystemLogicABI,
-  MiningMachineSystemLogicAddress,
   MiningMachineSystemStorageABI,
-  MiningMachineSystemStorageAddress,
   MiningMachineSystemStorageExtendABI,
-  MiningMachineSystemStorageExtendAddress,
   MiningMachineHistoryExtendABI,
-  MiningMachineHistoryExtendAddress,
-  MiningMachineSystemLogicExtendAddress,
-  MiningMachineNodeSystemAddress,
-  MiningMachineProductionLogicAddress,
+  MiningMachineSystemLogicExtendABI,
 } from "@/constants";
-
-// Multicall3 合约地址（通用地址，大多数链都支持）
-const MULTICALL3_ADDRESS = "0xcA11bde05977b3631167028862bE2a173976CA11";
-
-// Multicall3 ABI（只需要 aggregate3 函数）
-const MULTICALL3_ABI = [
-  {
-    inputs: [
-      {
-        components: [
-          { name: "target", type: "address" },
-          { name: "allowFailure", type: "bool" },
-          { name: "callData", type: "bytes" },
-        ],
-        name: "calls",
-        type: "tuple[]",
-      },
-    ],
-    name: "aggregate3",
-    outputs: [
-      {
-        components: [
-          { name: "success", type: "bool" },
-          { name: "returnData", type: "bytes" },
-        ],
-        name: "returnData",
-        type: "tuple[]",
-      },
-    ],
-    stateMutability: "payable",
-    type: "function",
-  },
-] as const;
+import { useChainConfig } from "@/hooks/useChainConfig";
 
 /**
  * 统一升级合约组件
@@ -61,10 +22,30 @@ const MULTICALL3_ABI = [
  * 2. SystemLogic.setExtendLogic() - 更新 LogicExtend 地址
  * 3. StorageExtend.setAuthorizedCaller() - 授权新的 LogicExtend
  * 4. HistoryExtend.setAuthorizedCaller() - 授权新的 LogicExtend
+ * 5. LogicExtend.setAuthorizedCaller() - 授权 SystemLogic 访问 LogicExtend
  */
 export default function UpgradeContracts() {
   const { writeContractAsync } = useWriteContract();
+  const wagmiConfig = useConfig(); // 使用 useConfig hook
+  const { chain } = useAccount(); // 获取当前链信息
+  const chainConfig = useChainConfig();
   const [isUpgrading, setIsUpgrading] = useState(false);
+
+  // 使用动态地址
+  const MiningMachineSystemStorageAddress =
+    chainConfig.STORAGE_ADDRESS as `0x${string}`;
+  const MiningMachineSystemLogicAddress =
+    chainConfig.LOGIC_ADDRESS as `0x${string}`;
+  const MiningMachineProductionLogicAddress =
+    chainConfig.PRODUCTION_LOGIC_ADDRESS as `0x${string}`;
+  const MiningMachineNodeSystemAddress =
+    chainConfig.NODE_SYSTEM_ADDRESS as `0x${string}`;
+  const MiningMachineSystemStorageExtendAddress =
+    chainConfig.EXTEND_STORAGE_ADDRESS as `0x${string}`;
+  const MiningMachineSystemLogicExtendAddress =
+    chainConfig.EXTEND_LOGIC_ADDRESS as `0x${string}`;
+  const MiningMachineHistoryExtendAddress =
+    chainConfig.EXTEND_HISTORY_ADDRESS as `0x${string}`;
 
   const steps = [
     {
@@ -95,99 +76,200 @@ export default function UpgradeContracts() {
       function: "setAuthorizedCaller",
       reason: "新的 LogicExtend 合约需要权限才能记录历史数据",
     },
+    {
+      name: "授权 LogicExtend",
+      description: "授权 SystemLogic 合约访问 LogicExtend",
+      contract: "MiningMachineSystemLogicExtend",
+      function: "setAuthorizedCaller",
+      reason:
+        "SystemLogic 合约需要权限才能调用 LogicExtend 的奖励函数（如 addRewardForAddressByFuelFee）",
+    },
   ];
 
-  // 使用 Multicall 一次性执行所有步骤
+  // 逐个执行所有步骤（因为需要 sadmin 权限，不能使用 Multicall）
   const handleUpgradeAll = async () => {
+    if (!chain?.id) {
+      Toast.show({
+        content: "请先连接钱包",
+        position: "center",
+        duration: 2000,
+      });
+      return;
+    }
+
     setIsUpgrading(true);
 
     try {
+      console.log("=== 开始执行合约升级授权 ===");
+      console.log("当前链信息:", {
+        chainId: chain.id,
+        chainName: chain.name,
+      });
+
+      // 步骤 1: Storage.setLogicAddress
       Toast.show({
-        content: "正在准备 Multicall 交易...",
+        content: "步骤 1/5: 更新 Storage 中的合约地址...",
+        position: "center",
+        duration: 2000,
+      });
+
+      const hash1 = await writeContractAsync({
+        address: MiningMachineSystemStorageAddress,
+        abi: MiningMachineSystemStorageABI,
+        functionName: "setLogicAddress",
+        args: [
+          getAddress(MiningMachineSystemLogicAddress),
+          getAddress(MiningMachineProductionLogicAddress),
+          getAddress(MiningMachineNodeSystemAddress),
+        ],
+        gas: 250000n, // 优化: 500,000 → 250,000 (实际消耗约 150,000)
+        maxFeePerGas: 10000000000n, // 10 Gwei
+        maxPriorityFeePerGas: 2000000000n, // 2 Gwei
+        chainId: chain.id,
+      });
+
+      console.log("步骤 1 交易哈希:", hash1);
+      await waitForTransactionReceipt(wagmiConfig, {
+        hash: hash1,
+        chainId: chain.id,
+      });
+
+      Toast.show({
+        content: "✅ 步骤 1/5 完成",
         position: "center",
         duration: 1000,
       });
 
-      // 准备 4 个调用的 calldata
-      const calls = [
-        // 1. Storage.setLogicAddress
-        {
-          target: getAddress(MiningMachineSystemStorageAddress),
-          allowFailure: false,
-          callData: encodeFunctionData({
-            abi: MiningMachineSystemStorageABI,
-            functionName: "setLogicAddress",
-            args: [
-              getAddress(MiningMachineSystemLogicAddress),
-              getAddress(MiningMachineProductionLogicAddress),
-              getAddress(MiningMachineNodeSystemAddress),
-            ],
-          }),
-        },
-        // 2. SystemLogic.setExtendLogic
-        {
-          target: getAddress(MiningMachineSystemLogicAddress),
-          allowFailure: false,
-          callData: encodeFunctionData({
-            abi: MiningMachineSystemLogicABI,
-            functionName: "setExtendLogic",
-            args: [getAddress(MiningMachineSystemLogicExtendAddress)],
-          }),
-        },
-        // 3. StorageExtend.setAuthorizedCaller
-        {
-          target: getAddress(MiningMachineSystemStorageExtendAddress),
-          allowFailure: false,
-          callData: encodeFunctionData({
-            abi: MiningMachineSystemStorageExtendABI,
-            functionName: "setAuthorizedCaller",
-            args: [getAddress(MiningMachineSystemLogicExtendAddress), true],
-          }),
-        },
-        // 4. HistoryExtend.setAuthorizedCaller
-        {
-          target: getAddress(MiningMachineHistoryExtendAddress),
-          allowFailure: false,
-          callData: encodeFunctionData({
-            abi: MiningMachineHistoryExtendABI,
-            functionName: "setAuthorizedCaller",
-            args: [getAddress(MiningMachineSystemLogicExtendAddress), true],
-          }),
-        },
-      ];
-
+      // 步骤 2: SystemLogic.setExtendLogic
       Toast.show({
-        content: "请在钱包中确认交易（包含 4 个操作）",
+        content: "步骤 2/5: 更新 SystemLogic 中的 LogicExtend 地址...",
         position: "center",
         duration: 2000,
       });
 
-      // 执行 Multicall
-      const hash = await writeContractAsync({
-        address: MULTICALL3_ADDRESS,
-        abi: MULTICALL3_ABI,
-        functionName: "aggregate3",
-        args: [calls],
+      const hash2 = await writeContractAsync({
+        address: MiningMachineSystemLogicAddress,
+        abi: MiningMachineSystemLogicABI,
+        functionName: "setExtendLogic",
+        args: [getAddress(MiningMachineSystemLogicExtendAddress)],
+        gas: 150000n, // 优化: 300,000 → 150,000 (实际消耗约 80,000)
+        maxFeePerGas: 10000000000n, // 10 Gwei
+        maxPriorityFeePerGas: 2000000000n, // 2 Gwei
+        chainId: chain.id,
+      });
+
+      console.log("步骤 2 交易哈希:", hash2);
+      await waitForTransactionReceipt(wagmiConfig, {
+        hash: hash2,
+        chainId: chain.id,
       });
 
       Toast.show({
-        content: "交易已提交，等待确认...",
+        content: "✅ 步骤 2/5 完成",
+        position: "center",
+        duration: 1000,
+      });
+
+      // 步骤 3: StorageExtend.setAuthorizedCaller
+      Toast.show({
+        content: "步骤 3/5: 授权 LogicExtend 访问 StorageExtend...",
         position: "center",
         duration: 2000,
       });
 
-      // 等待交易确认
-      await waitForTransactionReceipt(config, { hash });
+      const hash3 = await writeContractAsync({
+        address: MiningMachineSystemStorageExtendAddress,
+        abi: MiningMachineSystemStorageExtendABI,
+        functionName: "setAuthorizedCaller",
+        args: [getAddress(MiningMachineSystemLogicExtendAddress), true],
+        gas: 150000n, // 优化: 300,000 → 150,000 (实际消耗约 80,000)
+        maxFeePerGas: 10000000000n, // 10 Gwei
+        maxPriorityFeePerGas: 2000000000n, // 2 Gwei
+        chainId: chain.id,
+      });
+
+      console.log("步骤 3 交易哈希:", hash3);
+      await waitForTransactionReceipt(wagmiConfig, {
+        hash: hash3,
+        chainId: chain.id,
+      });
 
       Toast.show({
-        content: "🎉 所有合约地址更新完成！",
+        content: "✅ 步骤 3/5 完成",
+        position: "center",
+        duration: 1000,
+      });
+
+      // 步骤 4: HistoryExtend.setAuthorizedCaller
+      Toast.show({
+        content: "步骤 4/5: 授权 LogicExtend 访问 HistoryExtend...",
+        position: "center",
+        duration: 2000,
+      });
+
+      const hash4 = await writeContractAsync({
+        address: MiningMachineHistoryExtendAddress,
+        abi: MiningMachineHistoryExtendABI,
+        functionName: "setAuthorizedCaller",
+        args: [getAddress(MiningMachineSystemLogicExtendAddress), true],
+        gas: 150000n, // 优化: 300,000 → 150,000 (实际消耗约 80,000)
+        maxFeePerGas: 10000000000n, // 10 Gwei
+        maxPriorityFeePerGas: 2000000000n, // 2 Gwei
+        chainId: chain.id,
+      });
+
+      console.log("步骤 4 交易哈希:", hash4);
+      await waitForTransactionReceipt(wagmiConfig, {
+        hash: hash4,
+        chainId: chain.id,
+      });
+
+      Toast.show({
+        content: "✅ 步骤 4/5 完成",
+        position: "center",
+        duration: 1000,
+      });
+
+      // 步骤 5: LogicExtend.setAuthorizedCaller (授权 SystemLogic)
+      Toast.show({
+        content: "步骤 5/5: 授权 SystemLogic 访问 LogicExtend...",
+        position: "center",
+        duration: 2000,
+      });
+
+      const hash5 = await writeContractAsync({
+        address: MiningMachineSystemLogicExtendAddress,
+        abi: MiningMachineSystemLogicExtendABI,
+        functionName: "setAuthorizedCaller",
+        args: [getAddress(MiningMachineSystemLogicAddress), true],
+        gas: 150000n, // 优化: 300,000 → 150,000 (实际消耗约 80,000)
+        maxFeePerGas: 10000000000n, // 10 Gwei
+        maxPriorityFeePerGas: 2000000000n, // 2 Gwei
+        chainId: chain.id,
+      });
+
+      console.log("步骤 5 交易哈希:", hash5);
+      await waitForTransactionReceipt(wagmiConfig, {
+        hash: hash5,
+        chainId: chain.id,
+      });
+
+      Toast.show({
+        content: "✅ 步骤 5/5 完成",
+        position: "center",
+        duration: 1000,
+      });
+
+      console.log("=== 所有授权步骤完成 ===");
+      Toast.show({
+        content: "✅ 所有授权步骤完成！",
         position: "center",
         duration: 3000,
       });
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "未知错误";
+      console.error("升级失败:", error);
       Toast.show({
-        content: `❌ 升级失败: ${errorMessage}`,
+        content: `升级失败: ${error instanceof Error ? error.message : String(error)}`,
         position: "center",
         duration: 3000,
       });
@@ -203,8 +285,8 @@ export default function UpgradeContracts() {
         <div className="text-[12px] text-gray-600 mb-2">
           重新部署 NodeSystem 和 LogicExtend 合约后，点击按钮自动完成所有配置
         </div>
-        <div className="text-[13px] font-semibold text-green-600 bg-green-50 p-2 rounded">
-          💳 只需确认 1 次钱包交易（包含 4 个操作）
+        <div className="text-[13px] font-semibold text-orange-600 bg-orange-50 p-2 rounded">
+          💳 需要确认 5 次钱包交易（逐个执行）
         </div>
       </div>
 
@@ -303,8 +385,12 @@ export default function UpgradeContracts() {
             LogicExtend 引用
           </div>
           <div>
-            <strong>3-4. setAuthorizedCaller:</strong>{" "}
-            授权新合约访问扩展存储和历史记录
+            <strong>3-4. setAuthorizedCaller:</strong> 授权新的 LogicExtend
+            访问扩展存储和历史记录
+          </div>
+          <div>
+            <strong>5. setAuthorizedCaller:</strong> 授权 SystemLogic 访问
+            LogicExtend（重要：用于燃料费奖励功能）
           </div>
         </div>
       </div>
@@ -319,26 +405,24 @@ export default function UpgradeContracts() {
         onClick={handleUpgradeAll}
         disabled={isUpgrading}
       >
-        {isUpgrading
-          ? "正在执行 Multicall 交易..."
-          : "🚀 一键升级所有合约地址（Multicall）"}
+        {isUpgrading ? "正在执行升级交易..." : "🚀 一键升级所有合约地址"}
       </Button>
 
       {/* 警告信息 */}
       <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded">
-        <p className="text-xs text-red-700 font-semibold mb-2">⚠️ 重要提示：</p>
-        <p className="text-xs text-red-700 space-y-1">
+        <div className="text-xs text-red-700 font-semibold mb-2">
+          ⚠️ 重要提示：
+        </div>
+        <div className="text-xs text-red-700 space-y-1">
           <div>• 升级前请确保已在 constants/index.ts 中更新新合约地址</div>
           <div>• 升级过程中请勿关闭页面或刷新</div>
-          <div className="font-bold text-green-800 bg-green-100 p-1 rounded">
-            • 💳 使用 Multicall：只需确认 1 次钱包交易，但包含 4 个操作
+          <div className="font-bold text-orange-800 bg-orange-100 p-1 rounded">
+            • 💳 需要确认 5 次钱包交易（逐个执行）
           </div>
-          <div className="font-bold text-orange-800">
-            • ⚡ 虽然只确认 1 次，但实际执行 4 笔交易操作
-          </div>
-          <div>• 如果失败，所有操作都会回滚，可以重新点击按钮</div>
-          <div>• 预计总耗时：约 30 秒（取决于网络速度）</div>
-        </p>
+          <div>• 每个步骤都会等待前一个步骤完成后再执行</div>
+          <div>• 如果某个步骤失败，可以重新点击按钮继续</div>
+          <div>• 预计总耗时：约 1-2 分钟（取决于网络速度）</div>
+        </div>
       </div>
     </div>
   );

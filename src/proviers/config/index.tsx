@@ -1,6 +1,7 @@
 import { getDefaultConfig } from "@rainbow-me/rainbowkit";
 import { trustWallet } from "@rainbow-me/rainbowkit/wallets";
 import { bsc, bscTestnet } from "wagmi/chains";
+import type { Chain } from "wagmi/chains";
 import {
   metaMaskWallet,
   walletConnectWallet,
@@ -43,7 +44,7 @@ if (typeof window !== "undefined" && import.meta.env.DEV) {
 }
 
 // 自定义BSC链配置，使用更稳定的RPC节点
-const customBsc = {
+const customBsc: Chain = {
   ...bsc,
   rpcUrls: {
     default: {
@@ -58,7 +59,7 @@ const customBsc = {
 };
 
 // 自定义BSC测试网配置，使用更快的RPC节点
-const customBscTestnet = {
+const customBscTestnet: Chain = {
   ...bscTestnet,
   rpcUrls: {
     default: {
@@ -71,10 +72,9 @@ const customBscTestnet = {
   },
 };
 
-const localhost = {
+const localhost: Chain = {
   id: 1337,
   name: "local",
-  network: "local",
   contracts: {
     // 添加Multicall3合约地址（替换为你实际部署的地址）
     multicall3: {
@@ -103,10 +103,73 @@ const localhost = {
   testnet: true,
 };
 
+// Anvil Fork (BSC) - Chain ID 1056
+const anvilFork: Chain = {
+  id: 1056,
+  name: "Anvil Fork (BSC)",
+  nativeCurrency: {
+    name: "BNB",
+    symbol: "BNB",
+    decimals: 18,
+  },
+  rpcUrls: {
+    default: {
+      http: [
+        // 优先使用环境变量中的 RPC URL（支持局域网 IP）
+        import.meta.env.VITE_RPC_URL || "http://127.0.0.1:8545",
+      ],
+    },
+    public: {
+      http: [import.meta.env.VITE_RPC_URL || "http://127.0.0.1:8545"],
+    },
+  },
+  blockExplorers: {
+    default: {
+      name: "Anvil Fork Explorer",
+      url: import.meta.env.VITE_RPC_URL || "http://127.0.0.1:8545", // Fork 环境没有区块浏览器，使用 RPC URL
+      apiUrl: import.meta.env.VITE_RPC_URL || "http://127.0.0.1:8545",
+    },
+  },
+  contracts: {
+    multicall3: {
+      address: "0xca11bde05977b3631167028862be2a173976ca11",
+      blockCreated: 15921452,
+    },
+  },
+  testnet: true,
+};
+
+// 根据 mode 决定支持的链
+const getSupportedChains = () => {
+  const mode = import.meta.env.MODE;
+
+  // 生产环境：只支持主网和测试网
+  if (mode === "production") {
+    console.log("🚀 Production mode: Using Mainnet + Testnet only");
+    return [customBsc, customBscTestnet];
+  }
+
+  // Fork 模式：只支持 Anvil Fork
+  if (mode === "fork") {
+    console.log("🔧 Fork mode: Using Anvil Fork (Chain ID 1056)");
+    return [anvilFork];
+  }
+
+  // Local 模式：只支持 Anvil Local
+  if (mode === "local") {
+    console.log("🔧 Local mode: Using Anvil Local (Chain ID 31337)");
+    return [localhost];
+  }
+
+  // 开发模式（默认）：支持主网和测试网
+  console.log("🔧 Development mode: Using Mainnet + Testnet");
+  return [customBsc, customBscTestnet];
+};
+
 const config = getDefaultConfig({
   appName: "My RainbowKit App",
   projectId: "c6c2a2e243f4e96a433941e477c33844", // TODO: 如果无法访问，请创建新的 Project ID
-  chains: [customBsc, customBscTestnet, localhost], // 使用自定义配置
+  chains: getSupportedChains(),
   wallets: [
     {
       groupName: "Popular",

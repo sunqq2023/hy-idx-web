@@ -1,197 +1,208 @@
-import { arrowSvg } from '@/assets'
-import { Button, Divider, TextArea, Toast } from 'antd-mobile'
-import { SHA256 } from 'crypto-js'
-import { useEffect, useRef, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
-import { FixedSizeList as List } from 'react-window'
-import { MachineInfo } from '@/constants/types'
-import { validateAddressFnMap } from '@/utils/validateAddress'
+import { arrowSvg } from "@/assets";
+import { Button, Divider, TextArea, Toast } from "antd-mobile";
+import { SHA256 } from "crypto-js";
+import { useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { FixedSizeList as List } from "react-window";
+import { MachineInfo } from "@/constants/types";
+import { validateAddressFnMap } from "@/utils/validateAddress";
 import {
   waitForTransactionReceipt,
   writeContract,
-  readContract
-} from '@wagmi/core'
-import config from '@/proviers/config'
-import {
-  CHAIN_ID,
-  MiningMachineSystemLogicABI,
-  MiningMachineSystemLogicAddress
-} from '@/constants'
-import LoadingButton from '@/components/LoadingButton'
-import { formatEther } from 'viem'
+  readContract,
+} from "@wagmi/core";
+import config from "@/proviers/config";
+import { MiningMachineSystemLogicABI } from "@/constants";
+import { useChainConfig } from "@/hooks/useChainConfig";
+import { useChainId } from "wagmi";
+import LoadingButton from "@/components/LoadingButton";
+import { formatEther, parseGwei } from "viem";
 
 const generateCode = (num: number) => {
-  const input = num + ''
-  const hashHex = SHA256(input).toString()
+  const input = num + "";
+  const hashHex = SHA256(input).toString();
   // 提取前4位字母和后4位十六进制
   const letterPart =
     hashHex
       .match(/[a-zA-Z]/g)
       ?.slice(0, 4)
-      .join('') || 'ABCD'
-  const hexPart = hashHex.slice(10, 14)
+      .join("") || "ABCD";
+  const hexPart = hashHex.slice(10, 14);
 
-  return (letterPart + hexPart).toUpperCase()
-}
+  return (letterPart + hexPart).toUpperCase();
+};
 
 const UserTransferMachine = () => {
-  const navigate = useNavigate()
-  const location = useLocation()
+  const navigate = useNavigate();
+  const location = useLocation();
+  const chainConfig = useChainConfig();
+  const chainId = useChainId();
 
-  const pageData = location.state
+  const MiningMachineSystemLogicAddress =
+    chainConfig.LOGIC_ADDRESS as `0x${string}`;
+
+  const pageData = location.state;
   // console.log('user transfer machine', pageData)
 
-  const [receiveAddress, setReceiveAddress] = useState('')
+  const [receiveAddress, setReceiveAddress] = useState("");
 
-  const [transferLoading, setTransferLoading] = useState(false)
+  const [transferLoading, setTransferLoading] = useState(false);
 
   const handlBack = () => {
-    navigate('/user/toBeActivatedMachine')
-  }
+    navigate("/user/toBeActivatedMachine");
+  };
 
-  const [listHeight, setListHeight] = useState(0)
-  const listContainerRef = useRef<HTMLDivElement>(null)
+  const [listHeight, setListHeight] = useState(0);
+  const listContainerRef = useRef<HTMLDivElement>(null);
 
-  const [usdtToIdxRate, setUsdtToIdxRate] = useState(0)
+  const [usdtToIdxRate, setUsdtToIdxRate] = useState(0);
 
   // 动态计算高度
   useEffect(() => {
-    if (!listContainerRef.current) return
+    if (!listContainerRef.current) return;
 
     const calculateHeight = () => {
-      const windowHeight = window.innerHeight
-      const topSectionHeight = 540
-      const newHeight = windowHeight - topSectionHeight
-      setListHeight(newHeight)
-    }
+      const windowHeight = window.innerHeight;
+      const topSectionHeight = 540;
+      const newHeight = windowHeight - topSectionHeight;
+      setListHeight(newHeight);
+    };
 
     // 初始化计算
-    calculateHeight()
+    calculateHeight();
 
     // 监听窗口变化（如旋转屏幕、键盘弹出等）
-    window.addEventListener('resize', calculateHeight)
-    return () => window.removeEventListener('resize', calculateHeight)
-  }, [])
+    window.addEventListener("resize", calculateHeight);
+    return () => window.removeEventListener("resize", calculateHeight);
+  }, []);
 
   const handleTransferOut = async () => {
     // 检查矿机数量是否超过30台
     if (pageData && pageData.length > 30) {
       Toast.show({
-        content: '最多只能转让30台矿机',
-        position: 'center',
-        duration: 2000
-      })
-      return
+        content: "最多只能转让30台矿机",
+        position: "center",
+        duration: 2000,
+      });
+      return;
     }
 
-    const isValid = validateAddressFnMap?.['EVM']?.(receiveAddress)
+    const isValid = validateAddressFnMap?.["EVM"]?.(receiveAddress);
 
     if (!isValid) {
       Toast.show({
-        content: '请输入合法的BNB地址',
-        position: 'center',
-        duration: 2000
-      })
-      return
+        content: "请输入合法的BNB地址",
+        position: "center",
+        duration: 2000,
+      });
+      return;
     }
 
     try {
       const ids = pageData.map((e: MachineInfo) => {
-        return e.id
-      })
+        return e.id;
+      });
 
       Toast.show({
-        content: '转让中...',
-        position: 'center',
-        duration: 0
-      })
+        content: "转让中...",
+        position: "center",
+        duration: 0,
+      });
 
-      setTransferLoading(true)
+      setTransferLoading(true);
+
+      // 动态计算 Gas Limit
+      const baseGas = 150000n;
+      const perMachineGas = 50000n;
+      const gasLimit = baseGas + BigInt(ids.length) * perMachineGas;
 
       const res = await writeContract(config, {
         address: MiningMachineSystemLogicAddress,
         abi: MiningMachineSystemLogicABI,
-        functionName: 'createInternalMachineOrder',
-        args: [receiveAddress, ids]
-      })
+        functionName: "createInternalMachineOrder",
+        args: [receiveAddress, ids],
+        gas: gasLimit, // 动态计算 Gas Limit
+        maxFeePerGas: parseGwei("10"),
+        maxPriorityFeePerGas: parseGwei("2"),
+      });
 
       await waitForTransactionReceipt(config, {
         hash: res,
-        chainId: CHAIN_ID
-      })
-      Toast.clear()
-      handlBack()
+        chainId,
+      });
+      Toast.clear();
+      handlBack();
     } catch (error) {
-      console.error(error)
+      console.error(error);
     } finally {
-      setTransferLoading(false)
+      setTransferLoading(false);
     }
-  }
+  };
 
   const handleChangeAddress = (value: string) => {
-    setReceiveAddress(value)
-  }
+    setReceiveAddress(value);
+  };
 
   const getUsdtToIdxRate = async () => {
     try {
       const data = await readContract(config, {
         address: MiningMachineSystemLogicAddress,
         abi: MiningMachineSystemLogicABI,
-        functionName: 'getIDXAmount',
-        args: [1]
-      })
+        functionName: "getIDXAmount",
+        args: [1],
+      });
 
-      const rate = data ? formatEther(data) : '0'
+      const rate = data ? formatEther(data) : "0";
       // console.log('rate', rate)
-      setUsdtToIdxRate(+rate)
+      setUsdtToIdxRate(+rate);
     } catch (error) {
-      console.error(error)
+      console.error(error);
     }
-  }
+  };
 
   useEffect(() => {
-    getUsdtToIdxRate()
-  }, [])
+    getUsdtToIdxRate();
+  }, []);
 
   const paymentToBeReceived = pageData.reduce((acc, cur) => {
-    const totalUSD = 150 * (1 - cur.producedHours / 360) - 30
-    let totalIDX = totalUSD * usdtToIdxRate
+    const totalUSD = 150 * (1 - cur.producedHours / 360) - 30;
+    let totalIDX = totalUSD * usdtToIdxRate;
     if (totalIDX < 0) {
-      totalIDX = 0
+      totalIDX = 0;
     }
-    return acc + totalIDX
-  }, 0)
+    return acc + totalIDX;
+  }, 0);
 
   const Row = ({
     index,
     style,
-    data
+    data,
   }: {
-    data: MachineInfo[]
-    index: number
-    style: React.CSSProperties
+    data: MachineInfo[];
+    index: number;
+    style: React.CSSProperties;
   }) => {
-    const item = data[index]
+    const item = data[index];
 
     const getMachineType = (producedHours: number) => {
-      const result = 150 * (1 - producedHours / 360) - 30
-      return result === 120 ? '新矿机' : '二手矿机'
-    }
+      const result = 150 * (1 - producedHours / 360) - 30;
+      return result === 120 ? "新矿机" : "二手矿机";
+    };
 
     const getMachineProfit = (producedHours: number) => {
-      const totalUSD = 150 * (1 - producedHours / 360) - 30
-      let totalIDX = totalUSD * usdtToIdxRate
+      const totalUSD = 150 * (1 - producedHours / 360) - 30;
+      let totalIDX = totalUSD * usdtToIdxRate;
       if (totalIDX < 0) {
-        totalIDX = 0
+        totalIDX = 0;
       }
-      return totalIDX
-    }
+      return totalIDX;
+    };
 
     return (
       <div
         style={{
           ...style,
-          height: '50px'
+          height: "50px",
         }}
       >
         <div className="flex py-2 text-[12px]">
@@ -203,7 +214,7 @@ const UserTransferMachine = () => {
 
           <div
             className={`${
-              getMachineProfit(item.producedHours) === 0 && 'text-[red]'
+              getMachineProfit(item.producedHours) === 0 && "text-[red]"
             }`}
           >
             {getMachineProfit(item.producedHours)} IDX
@@ -211,8 +222,8 @@ const UserTransferMachine = () => {
         </div>
         <Divider className="!my-[0]" />
       </div>
-    )
-  }
+    );
+  };
 
   return (
     <div>
@@ -241,7 +252,7 @@ const UserTransferMachine = () => {
             placeholder="输入对方的钱包地址"
             onChange={handleChangeAddress}
             style={{
-              '--font-size': '14px'
+              "--font-size": "14px",
             }}
           />
         </div>
@@ -251,7 +262,9 @@ const UserTransferMachine = () => {
             <div className=" font-bold  text-black">待转让详情</div>
             <div className="text-[12px]">
               共计：
-              <span className={`mr-2 text-[18px] font-bold ${pageData.length > 30 ? 'text-red-500' : 'text-black'}`}>
+              <span
+                className={`mr-2 text-[18px] font-bold ${pageData.length > 30 ? "text-red-500" : "text-black"}`}
+              >
                 {pageData.length}
               </span>
               台
@@ -304,12 +317,12 @@ const UserTransferMachine = () => {
 
         <Button
           className={`!rounded-3xl !ml-auto !h-[40px] !w-[100px] ${
-            pageData.length > 30 
-              ? '!bg-gray-300 !text-gray-500 cursor-not-allowed' 
-              : '!bg-black !text-white'
+            pageData.length > 30
+              ? "!bg-gray-300 !text-gray-500 cursor-not-allowed"
+              : "!bg-black !text-white"
           }`}
           style={{
-            fontSize: '15px'
+            fontSize: "15px",
           }}
           onClick={handleTransferOut}
           loading={transferLoading}
@@ -319,8 +332,7 @@ const UserTransferMachine = () => {
         </Button>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default UserTransferMachine
-    
+export default UserTransferMachine;

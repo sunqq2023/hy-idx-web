@@ -20,13 +20,11 @@ import {
   getBalance,
   waitForTransactionReceipt,
 } from "@wagmi/core";
-import { erc20Abi, formatEther, formatUnits } from "viem";
+import { erc20Abi, formatEther, formatUnits, parseGwei } from "viem";
 import AdaptiveNumber, { NumberType } from "@/components/AdaptiveNumber";
 import {
-  CHAIN_ID,
   MiningMachineProductionLogicABI,
   MiningMachineSystemStorageABI,
-  USDT_CONTRACTS_ADDRESS,
   MiningMachineSystemStorageExtendABI,
   MiningMachineSystemLogicExtendABI,
   MiningMachineNodeSystemABI,
@@ -35,6 +33,8 @@ import { useChainConfig } from "@/hooks/useChainConfig";
 import EmptyComp from "@/components/EmptyComp";
 import { BindWalletModal } from "@/components/BindWalletModal";
 import { sendSignedRequest } from "@/utils/rsaSignature";
+import { isAddressBlacklisted } from "@/constants/boundblacklist";
+import { getExplorerUrl } from "@/utils/helper";
 
 // 导入调试工具（仅开发环境）
 if (import.meta.env.DEV) {
@@ -63,6 +63,7 @@ export const Home = ({
   const MiningMachineProductionLogicAddress =
     chainConfig.PRODUCTION_LOGIC_ADDRESS;
   const IDX_CONTRACTS_ADDRESS = chainConfig.IDX_TOKEN;
+  const USDT_CONTRACTS_ADDRESS = chainConfig.USDT_TOKEN;
 
   const [machineList, setMachineList] = useState<MachineInfo[]>([]);
   const [allList, setAllList] = useState<MachineInfo[]>([]);
@@ -84,6 +85,7 @@ export const Home = ({
   const [pendingPhone, setPendingPhone] = useState<string>("");
   const [isBinding, setIsBinding] = useState(false);
   const [lastBindingTxHash, setLastBindingTxHash] = useState<string>("");
+  const [boundPhone, setBoundPhone] = useState<string>(""); // 已绑定的手机号
 
   const navigate = useNavigate();
   const location = useLocation(); // 添加路由位置监听
@@ -227,6 +229,34 @@ export const Home = ({
       ) {
         const pendingPhoneNumber = result.data.phone;
 
+        // 检查地址是否在黑名单中
+        if (isAddressBlacklisted(userAddress)) {
+          console.warn("⚠️ 地址在黑名单中，禁止绑定");
+          Toast.show({
+            content: "此地址不可绑定，已删除绑定申请",
+            position: "center",
+            duration: 3000,
+          });
+
+          // 调用接口删除数据库中的绑定记录
+          try {
+            await sendSignedRequest<{
+              code: number;
+              message?: string;
+              data?: {
+                success: boolean;
+                message?: string;
+              };
+            }>("POST", `${chainConfig.BIND_ADDRESS_URL}/mix/deleteBinding`, {
+              address: userAddress,
+            });
+            console.log("✅ 已删除黑名单地址的绑定记录");
+          } catch (error) {
+            console.error("❌ 删除绑定记录失败:", error);
+          }
+          return;
+        }
+
         // 在显示弹窗前，先检查链上是否已经绑定
         console.log("🔍 检查链上绑定状态...");
         try {
@@ -267,6 +297,8 @@ export const Home = ({
                 position: "center",
                 duration: 2000,
               });
+              // 同步成功后，保存已绑定的手机号
+              setBoundPhone(pendingPhoneNumber);
             } else {
               console.warn("⚠️ 后端同步失败:", syncResult);
               // 同步失败仍然显示弹窗，让用户手动确认
@@ -283,6 +315,9 @@ export const Home = ({
         // 链上未绑定，显示弹窗让用户确认
         setPendingPhone(pendingPhoneNumber);
         setShowBindModal(true);
+      } else if (result.data?.success === true && result.data?.phone) {
+        // 已经绑定成功，保存手机号用于显示
+        setBoundPhone(result.data.phone);
       }
     } catch (error) {
       // 静默处理错误，不阻塞 UI
@@ -297,6 +332,38 @@ export const Home = ({
   // 处理同意绑定
   const handleAgreeBinding = useCallback(async () => {
     if (!userAddress || !pendingPhone) return;
+
+    // 检查地址是否在黑名单中
+    if (isAddressBlacklisted(userAddress)) {
+      console.warn("⚠️ 地址在黑名单中，禁止绑定");
+      Toast.show({
+        content: "此地址不可绑定",
+        position: "center",
+        duration: 3000,
+      });
+
+      // 调用接口删除数据库中的绑定记录
+      try {
+        await sendSignedRequest<{
+          code: number;
+          message?: string;
+          data?: {
+            success: boolean;
+            message?: string;
+          };
+        }>("POST", `${chainConfig.BIND_ADDRESS_URL}/mix/deleteBinding`, {
+          address: userAddress,
+        });
+        console.log("✅ 已删除黑名单地址的绑定记录");
+      } catch (error) {
+        console.error("❌ 删除绑定记录失败:", error);
+      }
+
+      // 关闭弹窗
+      setShowBindModal(false);
+      setPendingPhone("");
+      return;
+    }
 
     // 检查 BIND_ADDRESS_URL 是否配置
     if (!chainConfig.BIND_ADDRESS_URL) {
@@ -363,7 +430,8 @@ export const Home = ({
         functionName: "boundUserPhone",
         args: [pendingPhone],
         gas: 100000n, // 手动设置 Gas limit，避免估算不足
-        gasPrice: 5000000000n, // 5 Gwei，确保快速确认（BSC 推荐 3-5 Gwei）
+        maxFeePerGas: parseGwei("10"), // 10 Gwei，确保快速确认（BSC 推荐 3-5 Gwei）
+        maxPriorityFeePerGas: parseGwei("2"), // 2 Gwei 优先费用
       });
 
       // 保存交易哈希，以便后续手动同步
@@ -477,6 +545,9 @@ export const Home = ({
 
       setShowBindModal(false);
       setPendingPhone("");
+
+      // 绑定成功后，保存已绑定的手机号用于显示
+      setBoundPhone(pendingPhone);
     } catch (error) {
       console.error("❌ 绑定失败:", error);
 
@@ -488,7 +559,7 @@ export const Home = ({
 
       // 特殊处理超时错误
       if (errorMessage.includes("Timed out while waiting")) {
-        const bscScanUrl = `https://bscscan.com/tx/${lastBindingTxHash}`;
+        const explorerUrl = getExplorerUrl(chainId, lastBindingTxHash);
         Toast.show({
           content: (
             <div>
@@ -504,7 +575,7 @@ export const Home = ({
           position: "center",
           duration: 8000,
         });
-        console.log("🔗 查看交易:", bscScanUrl);
+        console.log("🔗 查看交易:", explorerUrl);
       } else if (
         errorMessage.includes("User rejected") ||
         errorMessage.includes("User denied")
@@ -624,6 +695,12 @@ export const Home = ({
     }
   }, [userAddress, pendingPhone, chainConfig.BIND_ADDRESS_URL]);
 
+  // 手机号脱敏显示
+  const maskPhone = (phone: string): string => {
+    if (!phone || phone.length < 11) return phone;
+    return `${phone.slice(0, 3)}****${phone.slice(-4)}`;
+  };
+
   // 检查空投权限
   useEffect(() => {
     checkAirdropPermission();
@@ -707,25 +784,46 @@ export const Home = ({
 
   useEffect(() => {
     if (allStatus) {
-      setFuelList(machineList);
+      // 只选择已激活的子矿机
+      const activatedChildMachines = machineList.filter(
+        (item) => item.mtype === 2 && item.isActivatedStakedLP,
+      );
+      setFuelList(activatedChildMachines);
     }
+  }, [allStatus, machineList]);
 
-    if (machineList.length === fuelList.length && fuelList.length > 0) {
+  useEffect(() => {
+    // 检查是否所有可选矿机都已选中
+    const selectableCount = machineList.filter(
+      (item) => item.mtype === 2 && item.isActivatedStakedLP,
+    ).length;
+
+    if (selectableCount > 0 && fuelList.length === selectableCount) {
       setAllStatus(true);
+    } else if (fuelList.length === 0) {
+      setAllStatus(false);
     }
-  }, [allStatus, machineList, fuelList]);
+  }, [fuelList.length, machineList]);
 
   const toggleSelectAll = () => {
     setMachineList((prevList) => {
       const newList = prevList.map((item) => {
-        return {
-          ...item,
-          checked: !allStatus,
-        };
+        // 只允许选择已激活的子矿机
+        if (item.mtype === 2 && item.isActivatedStakedLP) {
+          return {
+            ...item,
+            checked: !allStatus,
+          };
+        }
+        return item;
       });
 
       if (!allStatus) {
-        setFuelList(newList);
+        // 只添加已激活的子矿机到 fuelList
+        const activatedChildMachines = newList.filter(
+          (item) => item.mtype === 2 && item.isActivatedStakedLP,
+        );
+        setFuelList(activatedChildMachines);
       } else {
         setFuelList([]);
       }
@@ -746,7 +844,10 @@ export const Home = ({
         const isItemChecked = !item.checked;
         if (isItemChecked) {
           if (allStatus) {
-            setFuelList(machineList);
+            const activatedChildMachines = machineList.filter(
+              (m) => m.mtype === 2 && m.isActivatedStakedLP,
+            );
+            setFuelList(activatedChildMachines);
           } else {
             setFuelList([...fuelList, item]);
           }
@@ -966,6 +1067,7 @@ export const Home = ({
             item={item}
             onLeftClick={handleLeftClick}
             onRightClick={handleRightClick}
+            disabled={item.mtype !== 2 || !item.isActivatedStakedLP}
           />
         </div>
       );
@@ -1069,11 +1171,30 @@ export const Home = ({
 
     try {
       setIsAirdropping(true);
+
+      console.log("=== 开始空投IDX ===");
+      console.log("目标地址:", airdropAddress);
+      console.log("空投数量:", airdropAmount);
+      console.log("合约地址:", MiningMachineSystemLogicExtendAddress);
+
+      // airdrop 函数需要执行：
+      // - 检查和设置激活日期（如果需要）
+      // - 增加奖励余额
+      // - 记录历史
+      // 添加 20% 安全余量确保交易成功
+      const baseGas = 200000n;
+      const gasLimit = (baseGas * 120n) / 100n; // 添加 20% 安全余量
+
+      console.log(`使用 Gas Limit: ${gasLimit} (包含 20% 安全余量)`);
+
       const hash = await writeContractAsync({
         address: MiningMachineSystemLogicExtendAddress as `0x${string}`,
         abi: MiningMachineSystemLogicExtendABI,
         functionName: "airdrop",
         args: [airdropAddress, airdropAmount],
+        gas: gasLimit,
+        maxFeePerGas: parseGwei("10"),
+        maxPriorityFeePerGas: parseGwei("2"),
       });
 
       await waitForTransactionReceipt(config, {
@@ -1143,11 +1264,29 @@ export const Home = ({
       console.log("空投数量:", count);
       console.log("合约地址:", MiningMachineSystemLogicExtendAddress);
 
+      // 根据矿机数量动态计算 gas limit
+      // mintChildMachine 需要为每台矿机执行多次存储操作：
+      // - setMachine (存储矿机信息)
+      // - pushOwnerToMachineId (关联到所有者)
+      // - setMachineLifecycle (初始化生命周期)
+      const baseGas = 300000n; // 基础 gas
+      const perMachineGas = 150000n; // 每台矿机额外的 gas
+      const calculatedGas = baseGas + perMachineGas * BigInt(count);
+      // 添加 20% 安全余量
+      const gasLimit = (calculatedGas * 120n) / 100n;
+
+      console.log(
+        `计算的 Gas Limit: ${gasLimit} (${count}台矿机，包含 20% 安全余量)`,
+      );
+
       const hash = await writeContractAsync({
         address: MiningMachineSystemLogicExtendAddress as `0x${string}`,
         abi: MiningMachineSystemLogicExtendABI,
         functionName: "mintChildMachine",
         args: [machineAirdropAddress, BigInt(count)],
+        gas: gasLimit,
+        maxFeePerGas: parseGwei("10"),
+        maxPriorityFeePerGas: parseGwei("2"),
       });
 
       console.log("交易已发送，哈希:", hash);
@@ -1233,8 +1372,13 @@ export const Home = ({
     <div className=" flex flex-col justify-between">
       <div className="px-[21px] ">
         <div className="bg-[#09090a] rounded-2xl text-white px-4 py-2 text-[1rem] relative">
-          <div className="text-[#c6c6c6] text-[12px] font-[400] flex">
-            钱包余额
+          <div className="text-[#c6c6c6] text-[12px] font-[400] flex justify-between items-center">
+            <span>钱包余额</span>
+            {boundPhone && (
+              <span className="text-[10px]">
+                已绑定商城账号: {maskPhone(boundPhone)}
+              </span>
+            )}
           </div>
 
           <div className="flex mt-1 mb-1 items-center gap-1">

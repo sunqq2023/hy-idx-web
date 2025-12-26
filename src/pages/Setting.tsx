@@ -1,20 +1,14 @@
 import {
   MiningMachineNodeSystemABI,
-  MiningMachineNodeSystemAddress,
   MiningMachineProductionLogicABI,
-  MiningMachineProductionLogicAddress,
   MiningMachineSystemLogicABI,
-  MiningMachineSystemLogicAddress,
   MiningMachineSystemStorageABI,
-  MiningMachineSystemStorageAddress,
   SelluserManagerABI,
-  MiningMachineSelluserManagerAddress,
   MiningMachineSystemStorageExtendABI,
-  MiningMachineSystemStorageExtendAddress,
   MiningMachineSystemLogicExtendABI,
-  MiningMachineSystemLogicExtendAddress,
-  IDX_CONTRACTS_ADDRESS,
+  CHAIN_ID,
 } from "@/constants";
+import { useChainConfig } from "@/hooks/useChainConfig";
 import { validateAddressFnMap } from "@/utils/validateAddress";
 import { Button, Input, TextArea, Toast, Dialog, Checkbox } from "antd-mobile";
 import { useEffect, useState } from "react";
@@ -25,11 +19,29 @@ import {
   readContract,
 } from "@wagmi/core";
 import config from "@/proviers/config";
-import { parseEther, erc20Abi, formatEther, getAddress } from "viem";
+import { parseEther, erc20Abi, formatEther, getAddress, parseGwei } from "viem";
 import UpgradeContracts from "@/components/UpgradeContracts";
 
 const Setting = () => {
   const { address: currentWalletAddress } = useAccount();
+  const chainConfig = useChainConfig();
+
+  // 使用动态地址（添加类型断言）
+  const MiningMachineSystemStorageAddress =
+    chainConfig.STORAGE_ADDRESS as `0x${string}`;
+  const MiningMachineSystemLogicAddress =
+    chainConfig.LOGIC_ADDRESS as `0x${string}`;
+  const MiningMachineProductionLogicAddress =
+    chainConfig.PRODUCTION_LOGIC_ADDRESS as `0x${string}`;
+  const MiningMachineNodeSystemAddress =
+    chainConfig.NODE_SYSTEM_ADDRESS as `0x${string}`;
+  const MiningMachineSelluserManagerAddress =
+    chainConfig.SELLUSER_MANAGER_ADDRESS as `0x${string}`;
+  const MiningMachineSystemStorageExtendAddress =
+    chainConfig.EXTEND_STORAGE_ADDRESS as `0x${string}`;
+  const MiningMachineSystemLogicExtendAddress =
+    chainConfig.EXTEND_LOGIC_ADDRESS as `0x${string}`;
+  const IDX_CONTRACTS_ADDRESS = chainConfig.IDX_TOKEN as `0x${string}`;
 
   /* ===== 新增：本地登录态 ===== */
   const [passed, setPassed] = useState(false); // 是否已通过
@@ -135,10 +147,9 @@ const Setting = () => {
   // MIX 操作相关状态
   const [addMixForOperatorAmount, setAddMixForOperatorAmount] = useState(""); // 给操作员添加 MIX 数量
   const [subMixForOperatorAmount, setSubMixForOperatorAmount] = useState(""); // 从操作员减少 MIX 数量
-  const [transferMixFromAddress, setTransferMixFromAddress] = useState(""); // 转移 MIX 源地址
   const [transferMixToAddress, setTransferMixToAddress] = useState(""); // 转移 MIX 目标地址
   const [transferMixAmount, setTransferMixAmount] = useState(""); // 转移 MIX 数量
-  const [useCurrentWallet, setUseCurrentWallet] = useState(false); // 是否使用当前钱包地址作为源地址
+  const [useOperatorAddress, setUseOperatorAddress] = useState(false); // 是否给 MixOperator 充值
   const [isAddingMixForOperator, setIsAddingMixForOperator] = useState(false); // 添加 MIX 中状态
   const [isSubtractingMixForOperator, setIsSubtractingMixForOperator] =
     useState(false); // 减少 MIX 中状态
@@ -162,10 +173,15 @@ const Setting = () => {
         abi: MiningMachineSystemStorageABI,
         functionName: "setSadmin",
         args: [adminAddress],
+        gas: 400000n, // 管理员操作：统一提高到 400000
+        maxFeePerGas: parseGwei("10"),
+        maxPriorityFeePerGas: parseGwei("2"),
+        chainId: CHAIN_ID,
       });
 
       await waitForTransactionReceipt(config, {
         hash,
+        chainId: CHAIN_ID,
       });
       Toast.show({
         content: "修改成功!",
@@ -201,10 +217,15 @@ const Setting = () => {
         abi: MiningMachineSystemStorageABI,
         functionName: "setPlatformWallet",
         args: [mintAddress],
+        gas: 400000n, // 管理员操作：统一提高到 400000
+        maxFeePerGas: parseGwei("10"),
+        maxPriorityFeePerGas: parseGwei("2"),
+        chainId: CHAIN_ID,
       });
 
       await waitForTransactionReceipt(config, {
         hash,
+        chainId: CHAIN_ID,
       });
       Toast.show({
         content: "修改成功!",
@@ -245,10 +266,15 @@ const Setting = () => {
         abi: MiningMachineSystemLogicABI,
         functionName: "setChildMachineTradeConfig",
         args: [PLATFORM_FEE_USD, SELLER_INCOME_USD, activeAndGasFee],
+        gas: 600000n, // 复杂操作：修改多个参数，提高到 600000
+        maxFeePerGas: parseGwei("10"),
+        maxPriorityFeePerGas: parseGwei("2"),
+        chainId: CHAIN_ID,
       });
 
       await waitForTransactionReceipt(config, {
         hash,
+        chainId: CHAIN_ID,
       });
       Toast.show({
         content: "修改成功!",
@@ -340,10 +366,15 @@ const Setting = () => {
         abi: MiningMachineSystemLogicExtendABI,
         functionName: "setPromotionPowerLimit",
         args: [BigInt(promotionPowerLimit)],
+        gas: 400000n, // 管理员操作：统一提高到 400000
+        maxFeePerGas: parseGwei("10"),
+        maxPriorityFeePerGas: parseGwei("2"),
+        chainId: CHAIN_ID,
       });
 
       await waitForTransactionReceipt(config, {
         hash,
+        chainId: CHAIN_ID,
       });
       Toast.show({
         content: "设置成功!",
@@ -380,10 +411,15 @@ const Setting = () => {
         abi: MiningMachineSystemLogicExtendABI,
         functionName: "setActivatedPowerLimit",
         args: [BigInt(activatedPowerLimit)],
+        gas: 400000n, // 管理员操作：统一提高到 400000
+        maxFeePerGas: parseGwei("10"),
+        maxPriorityFeePerGas: parseGwei("2"),
+        chainId: CHAIN_ID,
       });
 
       await waitForTransactionReceipt(config, {
         hash,
+        chainId: CHAIN_ID,
       });
       Toast.show({
         content: "设置成功!",
@@ -423,10 +459,15 @@ const Setting = () => {
         abi: MiningMachineNodeSystemABI,
         functionName: "addMixForOperator",
         args: [parseEther(addMixForOperatorAmount)],
+        gas: 400000n, // 管理员操作：统一提高到 400000
+        maxFeePerGas: parseGwei("10"),
+        maxPriorityFeePerGas: parseGwei("2"),
+        chainId: CHAIN_ID,
       });
 
       await waitForTransactionReceipt(config, {
         hash,
+        chainId: CHAIN_ID,
       });
       Toast.show({
         content: "成功添加 MIX",
@@ -462,10 +503,15 @@ const Setting = () => {
         abi: MiningMachineNodeSystemABI,
         functionName: "subMixForOperator",
         args: [parseEther(subMixForOperatorAmount)],
+        gas: 400000n, // 管理员操作：统一提高到 400000
+        maxFeePerGas: parseGwei("10"),
+        maxPriorityFeePerGas: parseGwei("2"),
+        chainId: CHAIN_ID,
       });
 
       await waitForTransactionReceipt(config, {
         hash,
+        chainId: CHAIN_ID,
       });
       Toast.show({
         content: "成功减少 MIX",
@@ -483,18 +529,8 @@ const Setting = () => {
     }
   };
 
-  // 转移 MIX
+  // 转移 MIX（使用 transferMix 函数，自动从当前账户转出）
   const handleTransferMix = async () => {
-    const isFromValid = validateAddressFnMap?.["EVM"]?.(transferMixFromAddress);
-    if (!isFromValid) {
-      Toast.show({
-        content: "请输入合法的源地址",
-        position: "center",
-        duration: 2000,
-      });
-      return;
-    }
-
     const isToValid = validateAddressFnMap?.["EVM"]?.(transferMixToAddress);
     if (!isToValid) {
       Toast.show({
@@ -519,25 +555,25 @@ const Setting = () => {
       const hash = await writeContractAsync({
         address: MiningMachineNodeSystemAddress as `0x${string}`,
         abi: MiningMachineNodeSystemABI,
-        functionName: "transferMixBetweenUsers",
-        args: [
-          getAddress(transferMixFromAddress),
-          getAddress(transferMixToAddress),
-          parseEther(transferMixAmount),
-        ],
+        functionName: "transferMix",
+        args: [getAddress(transferMixToAddress), parseEther(transferMixAmount)],
+        gas: 400000n, // 简单操作：只涉及两个参数
+        maxFeePerGas: parseGwei("10"),
+        maxPriorityFeePerGas: parseGwei("2"),
+        chainId: CHAIN_ID,
       });
 
       await waitForTransactionReceipt(config, {
         hash,
+        chainId: CHAIN_ID,
       });
       Toast.show({
         content: "成功转移 MIX",
         position: "center",
       });
-      setTransferMixFromAddress("");
       setTransferMixToAddress("");
       setTransferMixAmount("");
-      setUseCurrentWallet(false);
+      setUseOperatorAddress(false);
     } catch (error) {
       Toast.show({
         content: "转移 MIX 失败",
@@ -585,10 +621,15 @@ const Setting = () => {
           +childProductInterval * 60 * 24,
           parseEther(childProductInterval), // 4* 1e18
         ],
+        gas: 600000n, // 复杂操作：修改多个矿机参数，提高到 600000
+        maxFeePerGas: parseGwei("10"),
+        maxPriorityFeePerGas: parseGwei("2"),
+        chainId: CHAIN_ID,
       });
 
       await waitForTransactionReceipt(config, {
         hash,
+        chainId: CHAIN_ID,
       });
       Toast.show({
         content: "修改成功!",
@@ -638,10 +679,15 @@ const Setting = () => {
         abi: MiningMachineSystemStorageABI,
         functionName: addressMap[type],
         args: [getAddress(address)],
+        gas: 400000n, // 管理员操作：统一提高到 400000
+        maxFeePerGas: parseGwei("10"),
+        maxPriorityFeePerGas: parseGwei("2"),
+        chainId: CHAIN_ID,
       });
 
       await waitForTransactionReceipt(config, {
         hash,
+        chainId: CHAIN_ID,
       });
       Toast.show({
         content: "修改成功!",
@@ -746,10 +792,15 @@ const Setting = () => {
           BigInt(releaseDuration) * 24n * 60n * 60n,
           BigInt(releaseIntervalMinutes) * 1440n,
         ],
+        gas: 600000n, // 复杂操作：设置多个锁定释放参数，提高到 600000
+        maxFeePerGas: parseGwei("10"),
+        maxPriorityFeePerGas: parseGwei("2"),
+        chainId: CHAIN_ID,
       });
 
       await waitForTransactionReceipt(config, {
         hash,
+        chainId: CHAIN_ID,
       });
       Toast.show({
         content: "修改成功!",
@@ -785,10 +836,15 @@ const Setting = () => {
         abi: MiningMachineNodeSystemABI,
         functionName: "setNodesAmount",
         args: [BigInt(nodeCount)],
+        gas: 400000n, // 管理员操作：统一提高到 400000
+        maxFeePerGas: parseGwei("10"),
+        maxPriorityFeePerGas: parseGwei("2"),
+        chainId: CHAIN_ID,
       });
 
       await waitForTransactionReceipt(config, {
         hash,
+        chainId: CHAIN_ID,
       });
 
       Toast.show({
@@ -833,10 +889,15 @@ const Setting = () => {
         abi: MiningMachineSystemLogicABI,
         functionName: "withdrawToken",
         args: [withdrawTokenAddress, parseEther(withdrawTokenAmount)],
+        gas: 400000n, // 管理员操作：统一提高到 400000
+        maxFeePerGas: parseGwei("10"),
+        maxPriorityFeePerGas: parseGwei("2"),
+        chainId: CHAIN_ID,
       });
 
       await waitForTransactionReceipt(config, {
         hash,
+        chainId: CHAIN_ID,
       });
       Toast.show({
         content: "提取成功!",
@@ -879,10 +940,15 @@ const Setting = () => {
         abi: MiningMachineProductionLogicABI,
         functionName: "setSwap",
         args: [idxCount, mixCount],
+        gas: 400000n, // 管理员操作：统一提高到 400000
+        maxFeePerGas: parseGwei("10"),
+        maxPriorityFeePerGas: parseGwei("2"),
+        chainId: CHAIN_ID,
       });
 
       await waitForTransactionReceipt(config, {
         hash,
+        chainId: CHAIN_ID,
       });
       Toast.show({
         content: "修改成功!",
@@ -918,10 +984,15 @@ const Setting = () => {
         abi: MiningMachineSystemStorageABI,
         functionName: "setCommissionWallet",
         args: [serviceChargeAddress],
+        gas: 400000n, // 管理员操作：统一提高到 400000
+        maxFeePerGas: parseGwei("10"),
+        maxPriorityFeePerGas: parseGwei("2"),
+        chainId: CHAIN_ID,
       });
 
       await waitForTransactionReceipt(config, {
         hash,
+        chainId: CHAIN_ID,
       });
       Toast.show({
         content: "修改成功!",
@@ -977,10 +1048,15 @@ const Setting = () => {
         abi: MiningMachineProductionLogicABI,
         functionName: "sadminMintChildMachines",
         args: [mintChildMachineAddress, count],
+        gas: 400000n, // 管理员操作：统一提高到 400000
+        maxFeePerGas: parseGwei("10"),
+        maxPriorityFeePerGas: parseGwei("2"),
+        chainId: CHAIN_ID,
       });
 
       await waitForTransactionReceipt(config, {
         hash,
+        chainId: CHAIN_ID,
       });
       Toast.show({
         content: "子矿机铸造成功!",
@@ -1020,10 +1096,15 @@ const Setting = () => {
         abi: SelluserManagerABI,
         functionName: "setSelluser",
         args: [sellUserAddress, sellUserStatus],
+        gas: 400000n, // 管理员操作：统一提高到 400000
+        maxFeePerGas: parseGwei("10"),
+        maxPriorityFeePerGas: parseGwei("2"),
+        chainId: CHAIN_ID,
       });
 
       await waitForTransactionReceipt(config, {
         hash,
+        chainId: CHAIN_ID,
       });
       Toast.show({
         content: `已${sellUserStatus ? "开启" : "关闭"}该账号挂售权限`,
@@ -1061,10 +1142,15 @@ const Setting = () => {
         abi: MiningMachineSystemStorageExtendABI,
         functionName: "addAirdropper",
         args: [airdropperAddress, true],
+        gas: 400000n, // 管理员操作：统一提高到 400000
+        maxFeePerGas: parseGwei("10"),
+        maxPriorityFeePerGas: parseGwei("2"),
+        chainId: CHAIN_ID,
       });
 
       await waitForTransactionReceipt(config, {
         hash,
+        chainId: CHAIN_ID,
       });
       Toast.show({
         content: "授权空投IDX成功",
@@ -1101,10 +1187,15 @@ const Setting = () => {
         abi: MiningMachineSystemStorageExtendABI,
         functionName: "addmachineTransfer",
         args: [machineTransferAddress, true],
+        gas: 400000n, // 管理员操作：统一提高到 400000
+        maxFeePerGas: parseGwei("10"),
+        maxPriorityFeePerGas: parseGwei("2"),
+        chainId: CHAIN_ID,
       });
 
       await waitForTransactionReceipt(config, {
         hash,
+        chainId: CHAIN_ID,
       });
       Toast.show({
         content: "授权铸造子矿机成功",
@@ -1141,10 +1232,15 @@ const Setting = () => {
         abi: MiningMachineSystemStorageExtendABI,
         functionName: "addStudioMarker",
         args: [studioMarkerAddress, true],
+        gas: 400000n, // 管理员操作：统一提高到 400000
+        maxFeePerGas: parseGwei("10"),
+        maxPriorityFeePerGas: parseGwei("2"),
+        chainId: CHAIN_ID,
       });
 
       await waitForTransactionReceipt(config, {
         hash,
+        chainId: CHAIN_ID,
       });
       Toast.show({
         content: "授权标记工作室成功",
@@ -1182,10 +1278,15 @@ const Setting = () => {
         abi: erc20Abi,
         functionName: "transfer",
         args: [MiningMachineSystemLogicExtendAddress, parseEther(addIdxAmount)],
+        gas: 400000n, // 管理员操作：统一提高到 400000
+        maxFeePerGas: parseGwei("10"),
+        maxPriorityFeePerGas: parseGwei("2"),
+        chainId: CHAIN_ID,
       });
 
       await waitForTransactionReceipt(config, {
         hash,
+        chainId: CHAIN_ID,
       });
 
       Toast.show({
@@ -1226,10 +1327,15 @@ const Setting = () => {
         abi: MiningMachineSystemLogicExtendABI,
         functionName: "withdrawIDX",
         args: [parseEther(withdrawIdxAmount)],
+        gas: 400000n, // 管理员操作：统一提高到 400000
+        maxFeePerGas: parseGwei("10"),
+        maxPriorityFeePerGas: parseGwei("2"),
+        chainId: CHAIN_ID,
       });
 
       await waitForTransactionReceipt(config, {
         hash,
+        chainId: CHAIN_ID,
       });
 
       Toast.show({
@@ -2055,13 +2161,13 @@ const Setting = () => {
             <div className="mb-2 flex items-center justify-between">
               <h2 className="font-bold">转移 MIX</h2>
               <Checkbox
-                checked={useCurrentWallet}
+                checked={useOperatorAddress}
                 onChange={(checked) => {
-                  setUseCurrentWallet(checked);
-                  if (checked && currentWalletAddress) {
-                    setTransferMixFromAddress(currentWalletAddress);
+                  setUseOperatorAddress(checked);
+                  if (checked) {
+                    setTransferMixToAddress(chainConfig.MIX_OPERATOR_ADDRESS);
                   } else if (!checked) {
-                    setTransferMixFromAddress("");
+                    setTransferMixToAddress("");
                   }
                 }}
                 style={{
@@ -2069,19 +2175,12 @@ const Setting = () => {
                   "--font-size": "13px",
                 }}
               >
-                使用当前账户
+                给MixOperator充值
               </Checkbox>
             </div>
-            <Input
-              placeholder="输入源地址（从哪个地址转出）"
-              style={{
-                "--font-size": "13px",
-              }}
-              className="!bg-[#f3f3f3] rounded-3xl px-4 py-2 !flex !items-center !justify-center mb-2"
-              value={transferMixFromAddress}
-              onChange={(val) => setTransferMixFromAddress(val)}
-              disabled={useCurrentWallet}
-            />
+            <div className="text-[12px] text-gray-500 mb-2">
+              从当前连接的钱包地址转出 MIX
+            </div>
             <Input
               placeholder="输入接收地址（转到哪个地址）"
               style={{
@@ -2090,6 +2189,7 @@ const Setting = () => {
               className="!bg-[#f3f3f3] rounded-3xl px-4 py-2 !flex !items-center !justify-center mb-2"
               value={transferMixToAddress}
               onChange={(val) => setTransferMixToAddress(val)}
+              disabled={useOperatorAddress}
             />
             <Input
               placeholder="输入 MIX 数量"

@@ -32,10 +32,19 @@ const chainInfo: IWeb3ChainType = {
     },
     rpcUrls: {
       default: {
-        http: ["http://127.0.0.1:8545"],
+        http: [
+          // 优先使用环境变量中的 RPC URL（支持局域网 IP）
+          import.meta.env.VITE_RPC_URL || "http://127.0.0.1:8545",
+        ],
       },
       public: {
-        http: ["http://127.0.0.1:8545"],
+        http: [import.meta.env.VITE_RPC_URL || "http://127.0.0.1:8545"],
+      },
+    },
+    contracts: {
+      multicall3: {
+        address: "0xca11bde05977b3631167028862be2a173976ca11",
+        blockCreated: 15921452,
       },
     },
   },

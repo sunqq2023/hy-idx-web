@@ -1,121 +1,127 @@
-import { arrowSvg, userMachineSvg } from '@/assets'
+import { arrowSvg, userMachineSvg } from "@/assets";
 import {
-  CHAIN_ID,
   MiningMachineProductionLogicABI,
-  MiningMachineProductionLogicAddress,
   MiningMachineSystemLogicABI,
-  MiningMachineSystemLogicAddress
-} from '@/constants'
-import { MachineInfo } from '@/constants/types'
-import { useSequentialContractWrite } from '@/hooks/useSequentialContractWrite'
-import { Button, Toast } from 'antd-mobile'
-import { useEffect, useRef, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
-import { FixedSizeList as List } from 'react-window'
-import dayjs from 'dayjs'
-import { erc20Abi, formatEther } from 'viem'
-import { formatTime, shortenAddress } from '@/utils/helper'
-import { useAccount, useReadContract } from 'wagmi'
-import { writeContract, waitForTransactionReceipt } from '@wagmi/core'
-import config from '@/proviers/config'
-import orderStore from '@/stores/orderStore'
+} from "@/constants";
+import { useChainConfig } from "@/hooks/useChainConfig";
+import { useAccount, useReadContract, useChainId } from "wagmi";
+import { MachineInfo } from "@/constants/types";
+import { useSequentialContractWrite } from "@/hooks/useSequentialContractWrite";
+import { Button, Toast } from "antd-mobile";
+import { useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { FixedSizeList as List } from "react-window";
+import dayjs from "dayjs";
+import { erc20Abi, formatEther } from "viem";
+import { formatTime, shortenAddress } from "@/utils/helper";
+import { writeContract, waitForTransactionReceipt } from "@wagmi/core";
+import config from "@/proviers/config";
+import orderStore from "@/stores/orderStore";
 
 interface IMachineTx {
-  orderId: number
-  machineId: number
-  seller: `0x${string}`
+  orderId: number;
+  machineId: number;
+  seller: `0x${string}`;
+  buyer?: `0x${string}`;
   // 以 IDX 为单位的价格
-  priceInIdx: number
-  listedAt: number
+  priceInIdx: number;
+  listedAt: number;
   // 订单状态（0 = 有效，1 = 已成交，2 = 已取消，3 = 已售给平台）
-  status: number
-  NO: number
+  status: number;
+  NO: number;
 }
 
 const MyPublishMachineTx = () => {
-  const location = useLocation()
+  const location = useLocation();
+  const chainConfig = useChainConfig();
+  const chainId = useChainId();
 
-  const pageData = location.state
+  const MiningMachineSystemLogicAddress =
+    chainConfig.LOGIC_ADDRESS as `0x${string}`;
+
+  const pageData = location.state;
 
   const diffDays =
-    15 - dayjs(new Date().getTime() / 1000).diff(pageData.listedAt, 'day')
+    15 - dayjs(new Date().getTime() / 1000).diff(pageData.listedAt, "day");
 
   // 转换为毫秒（假设原始时间戳是秒级的）
-  const timestampInMilliseconds = pageData.listedAt * 1000
+  const timestampInMilliseconds = pageData.listedAt * 1000;
   // 计算15天后的时间
-  const fifteenDaysLater = dayjs(timestampInMilliseconds).add(15, 'day')
+  const fifteenDaysLater = dayjs(timestampInMilliseconds).add(15, "day");
   // 获取当前时间
-  const now = dayjs()
+  const now = dayjs();
   // 判断是否已过15天
-  const isExpired = now.isAfter(fifteenDaysLater)
+  const isExpired = now.isAfter(fifteenDaysLater);
 
-  const { address: userAddress } = useAccount()
+  const { address: userAddress } = useAccount();
 
   const machineList = orderStore
     .getOrders()
     .filter(
-      (item) =>
-        item.seller === userAddress && item.status === 1 && item.orderType === 3
-    )
+      (item: any) =>
+        item.seller === userAddress &&
+        item.status === 1 &&
+        item.orderType === 3,
+    );
 
-  const navigate = useNavigate()
-  const [listHeight, setListHeight] = useState(0)
-  const listContainerRef = useRef<HTMLDivElement>(null)
+  const navigate = useNavigate();
+  const [listHeight, setListHeight] = useState(0);
+  const listContainerRef = useRef<HTMLDivElement>(null);
 
-  const [isDowning, setIsDowning] = useState(false)
+  const [isDowning, setIsDowning] = useState(false);
 
   const handlBack = () => {
-    navigate('/user')
-  }
+    navigate("/user");
+  };
 
   // 动态计算高度
   useEffect(() => {
-    if (!listContainerRef.current) return
+    if (!listContainerRef.current) return;
 
     const calculateHeight = () => {
-      const windowHeight = window.innerHeight
-      const topSectionHeight = 354
-      const newHeight = windowHeight - topSectionHeight
-      setListHeight(newHeight)
-    }
+      const windowHeight = window.innerHeight;
+      const topSectionHeight = 354;
+      const newHeight = windowHeight - topSectionHeight;
+      setListHeight(newHeight);
+    };
 
     // 初始化计算
-    calculateHeight()
+    calculateHeight();
 
     // 监听窗口变化（如旋转屏幕、键盘弹出等）
-    window.addEventListener('resize', calculateHeight)
-    return () => window.removeEventListener('resize', calculateHeight)
-  }, [])
+    window.addEventListener("resize", calculateHeight);
+    return () => window.removeEventListener("resize", calculateHeight);
+  }, []);
 
   const handleTakenOffShelves = async () => {
-  
+    try {
+      setIsDowning(true);
+      const hash = await writeContract(config, {
+        address: MiningMachineSystemLogicAddress,
+        abi: MiningMachineSystemLogicABI,
+        functionName: "cancelListedChildMachine",
+        args: [pageData.orderId],
+        gas: 200000n, // 固定 gas limit
+        maxFeePerGas: parseGwei("10"),
+        maxPriorityFeePerGas: parseGwei("2"),
+      });
 
-
-  try {
-    setIsDowning(true);
-    const hash = await writeContract(config, {
-      address: MiningMachineSystemLogicAddress,
-      abi: MiningMachineSystemLogicABI,
-      functionName: 'cancelListedChildMachine',
-      args: [pageData.orderId]
-    });
-
-    await waitForTransactionReceipt(config, { hash, chainId: CHAIN_ID });
-    Toast.show({ content: '下架成功', position: 'center' });
-    navigate('/user');
-  } catch (error: any) {
-    console.error('取消订单失败:', error);
-    // 提取合约返回的具体错误信息
-    const errorMsg = error.data?.message || '取消失败，请稍后重试';
-    Toast.show({ content: errorMsg, position: 'center' });
-  } finally {
-    setIsDowning(false);
-  }
-};
+      await waitForTransactionReceipt(config, { hash, chainId });
+      Toast.show({ content: "下架成功", position: "center" });
+      navigate("/user");
+    } catch (error: any) {
+      console.error("取消订单失败:", error);
+      // 提取合约返回的具体错误信息
+      const errorMsg = error.data?.message || "取消失败，请稍后重试";
+      Toast.show({ content: errorMsg, position: "center" });
+    } finally {
+      setIsDowning(false);
+    }
+  };
 
   const handleSellToPlatform = () => {
-    navigate('/user/sellToPlatform', { state: pageData })
-  }
+    navigate("/user/sellToPlatform", { state: pageData });
+  };
 
   return (
     <div className="px-[21px]">
@@ -164,8 +170,8 @@ const MyPublishMachineTx = () => {
               onClick={handleTakenOffShelves}
               className="flex-1 !rounded-3xl !border-2 !border-dashed !border-[#e1e1e1]"
               style={{
-                fontSize: '14px',
-                padding: '5px'
+                fontSize: "14px",
+                padding: "5px",
               }}
             >
               下架
@@ -208,24 +214,24 @@ const MyPublishMachineTx = () => {
         </List>
       </div>
     </div>
-  )
-}
+  );
+};
 
 const Row = ({
   index,
   style,
-  data
+  data,
 }: {
-  data: IMachineTx[]
-  index: number
-  style: React.CSSProperties
+  data: IMachineTx[];
+  index: number;
+  style: React.CSSProperties;
 }) => {
-  const item = data[index]
+  const item = data[index];
   return (
     <div
       style={{
         ...style,
-        height: '110px'
+        height: "110px",
       }}
     >
       <div className="p-[15px] bg-white rounded-3xl flex flex-col gap-1 text-[#777777] relative">
@@ -259,7 +265,7 @@ const Row = ({
         </div>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default MyPublishMachineTx
+export default MyPublishMachineTx;

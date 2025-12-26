@@ -1,94 +1,98 @@
-import { rocketSvg, selectedSvg } from '@/assets'
-import { MachineInfo } from '@/constants/types'
-import { Button, Checkbox, Divider, Skeleton, Toast } from 'antd-mobile'
+import { rocketSvg, selectedSvg } from "@/assets";
+import { MachineInfo } from "@/constants/types";
+import { Button, Checkbox, Divider, Skeleton, Toast } from "antd-mobile";
 import React, {
   memo,
   useCallback,
   useEffect,
   useMemo,
   useRef,
-  useState
-} from 'react'
-import { FixedSizeList as List } from 'react-window'
-import MotherCheckableItem from './MotherCheckableItem'
-import usePopup from '@/components/usePopup'
-import { useAccount, useReadContract, useWriteContract } from 'wagmi'
-import { multicall } from '@wagmi/core'
-import { readContract } from '@wagmi/core'
+  useState,
+} from "react";
+import { FixedSizeList as List } from "react-window";
+import MotherCheckableItem from "./MotherCheckableItem";
+import usePopup from "@/components/usePopup";
+import { useAccount, useReadContract, useWriteContract } from "wagmi";
+import { multicall, readContract } from "@wagmi/core";
 import {
-  ALLOWANCE_QUOTA,
-  IDX_CONTRACTS_ADDRESS,
   MiningMachineProductionLogicABI,
-  MiningMachineProductionLogicAddress,
   MiningMachineSystemLogicABI,
-  MiningMachineSystemLogicAddress,
   MiningMachineSystemStorageABI,
-  MiningMachineSystemStorageAddress
-} from '@/constants'
-import { erc20Abi, formatEther, parseEther, parseGwei } from 'viem'
-import AdaptiveNumber, { NumberType } from '@/components/AdaptiveNumber'
-import config from '@/proviers/config'
-import { useSequentialContractWrite } from '@/hooks/useSequentialContractWrite'
-import { useNavigate } from 'react-router-dom'
-import { usePaymentCheck } from '@/hooks/usePaymentCheck'
-import EmptyComp from '@/components/EmptyComp'
+} from "@/constants";
+import { useChainConfig } from "@/hooks/useChainConfig";
+import { erc20Abi, formatEther, parseEther, parseGwei } from "viem";
+import AdaptiveNumber, { NumberType } from "@/components/AdaptiveNumber";
+import config from "@/proviers/config";
+import { useSequentialContractWrite } from "@/hooks/useSequentialContractWrite";
+import { useNavigate } from "react-router-dom";
+import { usePaymentCheck } from "@/hooks/usePaymentCheck";
+import EmptyComp from "@/components/EmptyComp";
 
 const MotherMachine = () => {
-  const [machineList, setMachineList] = useState<MachineInfo[]>([])
-  const { address: userAddress } = useAccount()
-  const navigate = useNavigate()
-  const { writeContractAsync } = useWriteContract()
+  const [machineList, setMachineList] = useState<MachineInfo[]>([]);
+  const chainConfig = useChainConfig();
+  const { address: userAddress } = useAccount();
+  const navigate = useNavigate();
+  const { writeContractAsync } = useWriteContract();
 
-  const [allStatus, setAllStatus] = useState(false)
+  const MiningMachineSystemLogicAddress =
+    chainConfig.LOGIC_ADDRESS as `0x${string}`;
+  const MiningMachineSystemStorageAddress =
+    chainConfig.STORAGE_ADDRESS as `0x${string}`;
+  const MiningMachineProductionLogicAddress =
+    chainConfig.PRODUCTION_LOGIC_ADDRESS as `0x${string}`;
+  const IDX_CONTRACTS_ADDRESS = chainConfig.IDX_TOKEN as `0x${string}`;
 
-  const [listHeight, setListHeight] = useState(0)
-  const listContainerRef = useRef<HTMLDivElement>(null)
+  const [allStatus, setAllStatus] = useState(false);
 
-  const [isLoading, setIsLoading] = useState(false)
+  const [listHeight, setListHeight] = useState(0);
+  const listContainerRef = useRef<HTMLDivElement>(null);
 
-  const [fuelList, setFuelList] = useState<MachineInfo[]>([])
-  const [needToPayIdxAmount, setneedToPayIdxAmount] = useState('')
-  const [idxBalance, setidxBalance] = useState('')
+  const [isLoading, setIsLoading] = useState(false);
+
+  const [fuelList, setFuelList] = useState<MachineInfo[]>([]);
+  const [needToPayIdxAmount, setneedToPayIdxAmount] = useState("");
+  const [idxBalance, setidxBalance] = useState("");
   const isReadyToActivateListLength = useMemo(() => {
-    return machineList.filter((item) => !item.isActivatedStakedLP).length || 0
-  }, [machineList])
+    return machineList.filter((item) => !item.isActivatedStakedLP).length || 0;
+  }, [machineList]);
 
   useEffect(() => {
     if (
       isReadyToActivateListLength === fuelList.length &&
       isReadyToActivateListLength > 0
     ) {
-      setAllStatus(true)
+      setAllStatus(true);
     } else {
-      setAllStatus(false)
+      setAllStatus(false);
     }
-  }, [isReadyToActivateListLength, fuelList])
+  }, [isReadyToActivateListLength, fuelList]);
 
   // 关键修改：使用批量激活专用方法
-  const { batchActivateMachinesWithLP } = useSequentialContractWrite()
+  const { batchActivateMachinesWithLP } = useSequentialContractWrite();
 
   const handleQuery = useCallback(async () => {
-    setIsLoading(true)
+    setIsLoading(true);
     try {
       const data = await readContract(config, {
         address: MiningMachineSystemStorageAddress,
         abi: MiningMachineSystemStorageABI,
-        functionName: 'getOwnerToMachineIds',
-        args: [userAddress]
-      })
-      const bignumToNumber = (data as bigint[]).map((e) => Number(e))
+        functionName: "getOwnerToMachineIds",
+        args: [userAddress],
+      });
+      const bignumToNumber = (data as bigint[]).map((e) => Number(e));
 
       const contracts = bignumToNumber.map((e) => {
         return {
           address: MiningMachineSystemStorageAddress,
           abi: MiningMachineSystemStorageABI,
-          functionName: 'getMachineLifecycle',
-          args: [e]
-        }
-      })
+          functionName: "getMachineLifecycle",
+          args: [e],
+        };
+      });
       const data2 = await multicall(config, {
-        contracts
-      })
+        contracts,
+      });
       const result = data2.map((e, i) => {
         return {
           activatedAt: Number(e.result.activatedAt),
@@ -104,78 +108,78 @@ const MotherMachine = () => {
           producedChildCount: Number(e.result.producedChildCount),
           producedHours: Number(e.result.producedHours),
           mtype: e.result.mtype,
-          fuelRemainingMinutes: Number(e.result.fuelRemainingMinutes)
-        }
-      })
+          fuelRemainingMinutes: Number(e.result.fuelRemainingMinutes),
+        };
+      });
 
-      const motherList = result.filter((item) => item.mtype === 1)
+      const motherList = result.filter((item) => item.mtype === 1);
 
       // 获取母矿机是否在售卖中 如果是则不能进行 激活
       const canbeActivateContract = motherList.map((item) => {
         return {
           address: MiningMachineSystemStorageAddress,
           abi: MiningMachineSystemStorageABI,
-          functionName: '_isOnSale',
-          args: [item.id]
-        }
-      })
+          functionName: "_isOnSale",
+          args: [item.id],
+        };
+      });
 
       const data3 = await multicall(config, {
-        contracts: canbeActivateContract
-      })
+        contracts: canbeActivateContract,
+      });
 
       const result3 = motherList.map((item, i) => {
         return {
           ...item,
-          isOnSale: data3[i].result as boolean
-        }
-      })
+          isOnSale: data3[i].result as boolean,
+        };
+      });
 
       // 获取母矿机生命剩余
       const remainingContract = result3.map((item) => {
         return {
           address: MiningMachineProductionLogicAddress,
           abi: MiningMachineProductionLogicABI,
-          functionName: 'viewMachineProduction',
-          args: [item.id]
-        }
-      })
+          functionName: "viewMachineProduction",
+          args: [item.id],
+        };
+      });
 
       const data4 = await multicall(config, {
-        contracts: remainingContract
-      })
+        contracts: remainingContract,
+      });
 
       const result4 = result3.map((item, i) => ({
         ...item,
-        unclaimedChildCount: Number(data4[i].result[2])
-      }))
+        unclaimedChildCount: Number(data4[i].result[2]),
+      }));
 
       setMachineList(
         result4
           .sort((a, b) => a.activatedAt - b.activatedAt)
-          .filter((e) => !e.destroyed)
-      )
-      console.log('mother machine list', result4)
+          .filter((e) => !e.destroyed),
+      );
+      console.log("mother machine list", result4);
     } catch (error) {
-      console.log(error)
+      console.log(error);
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }, [userAddress])
+  }, [userAddress]);
 
   useEffect(() => {
-    handleQuery()
-  }, [handleQuery])
+    handleQuery();
+  }, [handleQuery]);
 
   useEffect(() => {
     if (allStatus) {
       setFuelList(
         machineList.filter(
-          (item) => !item.isActivatedStakedLP && !item.isOnSale
-        )
-      )
+          (item) => !item.isActivatedStakedLP && !item.isOnSale,
+        ),
+      );
     }
-  }, [allStatus, machineList])
+  }, [allStatus, machineList]);
 
   const toggleSelectAll = () => {
     setMachineList((prevList) => {
@@ -183,103 +187,103 @@ const MotherMachine = () => {
         if (!item.isActivatedStakedLP) {
           return {
             ...item,
-            checked: !allStatus
-          }
+            checked: !allStatus,
+          };
         }
-        return item
-      })
+        return item;
+      });
 
       if (!allStatus) {
-        setFuelList(newList.filter((item) => !item.isActivatedStakedLP))
+        setFuelList(newList.filter((item) => !item.isActivatedStakedLP));
       } else {
-        setFuelList([])
+        setFuelList([]);
       }
 
-      return newList
-    })
-    setAllStatus(!allStatus)
-  }
+      return newList;
+    });
+    setAllStatus(!allStatus);
+  };
 
   const getChekeIcon = (checked: boolean): React.ReactNode =>
     checked ? (
       <img src={selectedSvg} alt="" width={16} height={16} />
     ) : (
       <div className="border border-[#a5a4a4] w-[1rem] h-[1rem] rounded-[50%]" />
-    )
+    );
 
   // 动态计算高度
   useEffect(() => {
-    if (!listContainerRef.current) return
+    if (!listContainerRef.current) return;
 
     const calculateHeight = () => {
-      const windowHeight = window.innerHeight
-      const topSectionHeight = 230
-      const newHeight = windowHeight - topSectionHeight
-      setListHeight(newHeight)
-    }
+      const windowHeight = window.innerHeight;
+      const topSectionHeight = 230;
+      const newHeight = windowHeight - topSectionHeight;
+      setListHeight(newHeight);
+    };
 
     // 初始化计算
-    calculateHeight()
+    calculateHeight();
 
     // 监听窗口变化（如旋转屏幕、键盘弹出等）
-    window.addEventListener('resize', calculateHeight)
-    return () => window.removeEventListener('resize', calculateHeight)
-  }, [])
+    window.addEventListener("resize", calculateHeight);
+    return () => window.removeEventListener("resize", calculateHeight);
+  }, []);
 
   const handleLeftClick = useCallback(
     (item: MachineInfo) => {
       setMachineList((prevItems) => {
         const newItems = prevItems.map((e) => {
           if (!e.isActivatedStakedLP) {
-            return e.id === item.id ? { ...e, checked: !e.checked } : e
+            return e.id === item.id ? { ...e, checked: !e.checked } : e;
           }
           // 已经激活的机器不可以再次激活 也不可选中
-          return e
-        })
+          return e;
+        });
 
-        const clickItem = newItems.find((e) => e.id === item.id)
+        const clickItem = newItems.find((e) => e.id === item.id);
 
         if (!clickItem!.isActivatedStakedLP) {
-          const isItemChecked = !item.checked
+          const isItemChecked = !item.checked;
           if (isItemChecked) {
             if (!allStatus) {
-              setFuelList([...fuelList, item])
+              setFuelList([...fuelList, item]);
             } else {
-              setFuelList(machineList)
+              setFuelList(machineList);
             }
           } else {
-            const list = fuelList.filter((e) => e.id !== item.id)
-            setFuelList(list)
-            setAllStatus(false)
+            const list = fuelList.filter((e) => e.id !== item.id);
+            setFuelList(list);
+            setAllStatus(false);
           }
         }
 
-        return newItems
-      })
+        return newItems;
+      });
     },
-    [allStatus, machineList, fuelList]
-  )
+    [allStatus, machineList, fuelList],
+  );
 
   const handleRightClick = (item: MachineInfo) => {
-    navigate('/user/machineDetail', { state: item })
-  }
+    navigate("/user/machineDetail", { state: item });
+  };
 
   const Row = memo(
     ({
       index,
       style,
-      data
+      data,
     }: {
-      data: MachineInfo[]
-      index: number
-      style: React.CSSProperties
+      data: MachineInfo[];
+      index: number;
+      style: React.CSSProperties;
     }) => {
-      const item = data[index]
+      const item = data[index];
       return (
         <div
           style={{
             ...style,
-            height: '70px'
+            height: "70px",
           }}
         >
           <MotherCheckableItem
@@ -288,162 +292,150 @@ const MotherMachine = () => {
             onRightClick={handleRightClick}
           />
         </div>
-      )
-    }
-  )
+      );
+    },
+  );
 
   const {
     data: idxPrice,
     isLoading: idxPriceLoading,
-    error: idxPriceError
+    error: idxPriceError,
   } = useReadContract({
     address: MiningMachineSystemLogicAddress,
     abi: MiningMachineSystemLogicABI,
-    functionName: 'getIDXAmount',
-    args: [30]
-  })
+    functionName: "getIDXAmount",
+    args: [30],
+  });
 
   const {
     data: idxData,
     isLoading: idxBalanceLoading,
-    error: idxBalanceError
+    error: idxBalanceError,
   } = useReadContract({
     address: IDX_CONTRACTS_ADDRESS,
     abi: erc20Abi,
-    functionName: 'balanceOf',
-    args: [userAddress!]
-  })
+    functionName: "balanceOf",
+    args: [userAddress!],
+  });
 
   useEffect(() => {
     if (!idxBalanceLoading) {
-      setidxBalance(idxData ? formatEther(idxData) : '0')
+      setidxBalance(idxData ? formatEther(idxData) : "0");
     }
-  }, [idxBalanceLoading, idxData])
+  }, [idxBalanceLoading, idxData]);
 
   useEffect(() => {
     if (!idxPriceLoading) {
-      setneedToPayIdxAmount(idxPrice ? formatEther(idxPrice) : '0')
+      setneedToPayIdxAmount(idxPrice ? formatEther(idxPrice) : "0");
     }
-  }, [idxPriceLoading, idxPrice])
+  }, [idxPriceLoading, idxPrice]);
 
-  const [isPaying, setIsPaying] = useState(false)
+  const [isPaying, setIsPaying] = useState(false);
   const handleActivate = async () => {
     if (fuelList.length === 0) {
       Toast.show({
-        content: '请选择要激活的矿机',
-        position: 'center',
-        duration: 2000
-      })
-      return
+        content: "请选择要激活的矿机",
+        position: "center",
+        duration: 2000,
+      });
+      return;
     }
-    setOpen(true)
-  }
+    setOpen(true);
+  };
 
   const { isLoading: isPaymentCheckLoading, isAllowanceSufficient } =
     usePaymentCheck(
-      parseEther(String(Math.ceil(+needToPayIdxAmount * fuelList.length)))
-    )
+      parseEther(String(Math.ceil(+needToPayIdxAmount * fuelList.length))),
+    );
 
   const handlePay = async () => {
     try {
-      if (isPaymentCheckLoading) return
+      if (isPaymentCheckLoading) return;
 
-      setIsPaying(true)
+      setIsPaying(true);
       // 1. 检查并处理智能授权
       if (!isAllowanceSufficient) {
         // 计算实际需要的金额
-        const actualAmount = parseEther(String(Math.ceil(+needToPayIdxAmount * fuelList.length)))
-        const smartAllowance = actualAmount * 30n  // 调整为30倍授权
-        
-        console.log('实际需要金额:', formatEther(actualAmount), 'IDX')
-        console.log('期望智能授权额度:', formatEther(smartAllowance), 'IDX')
-        
+        const actualAmount = parseEther(
+          String(Math.ceil(+needToPayIdxAmount * fuelList.length)),
+        );
+        const smartAllowance = actualAmount * 30n; // 调整为30倍授权
+
+        console.log("实际需要金额:", formatEther(actualAmount), "IDX");
+        console.log("期望智能授权额度:", formatEther(smartAllowance), "IDX");
+
         // 先查询当前allowance值
-        console.log('查询当前allowance值...')
-        const currentAllowance = await readContract(config, {
+        console.log("查询当前allowance值...");
+        const currentAllowance = (await readContract(config, {
           address: IDX_CONTRACTS_ADDRESS,
           abi: erc20Abi,
-          functionName: 'allowance',
-          args: [userAddress!, MiningMachineSystemLogicAddress]
-        }) as bigint
-        
-        console.log('当前allowance值:', formatEther(currentAllowance), 'IDX')
-        
+          functionName: "allowance",
+          args: [userAddress!, MiningMachineSystemLogicAddress],
+        })) as bigint;
+
+        console.log("当前allowance值:", formatEther(currentAllowance), "IDX");
+
         // 检查当前allowance是否已经足够（超过2倍实际需要）
         if (currentAllowance >= smartAllowance) {
-          console.log('当前allowance已足够，无需重新授权')
+          console.log("当前allowance已足够，无需重新授权");
         } else {
-          console.log('当前allowance不足，执行智能授权')
-          
-          // 尝试自动Gas估算，失败时使用回退方案
-          try {
-            console.log('尝试自动Gas估算...')
-            await writeContractAsync({
-              address: IDX_CONTRACTS_ADDRESS,
-              abi: erc20Abi,
-              functionName: 'approve',
-              args: [MiningMachineSystemLogicAddress, smartAllowance]
-            })
-          } catch (error) {
-            // 如果是Gas估算失败，使用回退方案
-            if (error.message.includes('gasLimit') || error.message.includes('null')) {
-              console.warn('Gas估算失败，使用回退方案:', error.message)
-              await writeContractAsync({
-                address: IDX_CONTRACTS_ADDRESS,
-                abi: erc20Abi,
-                functionName: 'approve',
-                args: [MiningMachineSystemLogicAddress, smartAllowance],
-                gas: 120000n, // 保守的Gas限制
-                maxFeePerGas: parseGwei('25'), // 稍高的费用确保交易成功
-                maxPriorityFeePerGas: parseGwei('3') // 适中的优先费用
-              })
-            } else {
-              throw error // 其他错误正常抛出
-            }
-          }
+          console.log("当前allowance不足，执行智能授权");
+
+          // 使用显式 gas 配置
+          console.log("执行 IDX 授权...");
+          await writeContractAsync({
+            address: IDX_CONTRACTS_ADDRESS,
+            abi: erc20Abi,
+            functionName: "approve",
+            args: [MiningMachineSystemLogicAddress, smartAllowance],
+            gas: 350000n, // 授权操作
+            maxFeePerGas: parseGwei("10"),
+            maxPriorityFeePerGas: parseGwei("2"),
+          });
+          console.log("IDX智能授权交易已发送");
         }
       }
 
       // 2. 转换矿机ID为bigint数组（匹配合约uint256[]类型）
-      const machineIds = fuelList.map(item => BigInt(item.id))
+      const machineIds = fuelList.map((item) => BigInt(item.id));
 
       // 3. 调用批量激活接口（关键修改）
       const result = await batchActivateMachinesWithLP(
         MiningMachineSystemLogicAddress as `0x${string}`,
-        machineIds
-      )
+        machineIds,
+      );
 
       // 4. 处理激活结果
       if (result.success) {
         Toast.show({
-          content: '激活成功!',
-          position: 'center'
-        })
-        handleQuery() // 刷新矿机列表
-        setFuelList([]) // 清空选中列表
-        setAllStatus(false)
+          content: "激活成功!",
+          position: "center",
+        });
+        handleQuery(); // 刷新矿机列表
+        setFuelList([]); // 清空选中列表
+        setAllStatus(false);
       } else {
         Toast.show({
-          content: `激活失败: ${result.error instanceof Error ? result.error.message : '未知错误'}`,
-          position: 'center'
-        })
+          content: `激活失败: ${result.error instanceof Error ? result.error.message : "未知错误"}`,
+          position: "center",
+        });
       }
     } catch (error) {
-      console.error('激活过程异常:', error)
+      console.error("激活过程异常:", error);
       Toast.show({
-        content: '激活失败，请重试',
-        position: 'center'
-      })
+        content: "激活失败，请重试",
+        position: "center",
+      });
     } finally {
-      setOpen(false)
-      setIsPaying(false)
+      setOpen(false);
+      setIsPaying(false);
     }
-  }
+  };
 
   const { setOpen, component } = usePopup({
-    title: '',
-    contentClassName: '',
-    closeButtonClassName: '',
+    title: "",
+    contentClassName: "",
+    closeButtonClassName: "",
     content: (
       <div className="w-full">
         <div className="text-[#6433EC] font-bold text-[15px] pt-2 pb-4">
@@ -484,12 +476,12 @@ const MotherMachine = () => {
           disabled={+idxBalance < +needToPayIdxAmount * fuelList.length}
         >
           {+idxBalance > +needToPayIdxAmount * fuelList.length
-            ? '支付费用'
-            : '余额不足'}
+            ? "支付费用"
+            : "余额不足"}
         </Button>
       </div>
-    )
-  })
+    ),
+  });
 
   return (
     <div className="pt-4 flex flex-col justify-between h-full">
@@ -502,8 +494,8 @@ const MotherMachine = () => {
             icon={(isChecked) => getChekeIcon(isChecked)}
             onClick={toggleSelectAll}
             style={{
-              '--font-size': '14px',
-              '--gap': '6px'
+              "--font-size": "14px",
+              "--gap": "6px",
             }}
           >
             全选
@@ -556,7 +548,7 @@ const MotherMachine = () => {
         </div>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default MotherMachine
+export default MotherMachine;

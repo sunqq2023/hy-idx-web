@@ -1,43 +1,51 @@
-import { makemmmSvg, noSvg, percentSvg, rmbSvg } from '@/assets'
-import { Button, Divider, Input, TextArea, Toast } from 'antd-mobile'
-import { useCallback, useEffect, useState } from 'react'
+import { makemmmSvg, noSvg, percentSvg, rmbSvg } from "@/assets";
+import { Button, Divider, Input, TextArea, Toast } from "antd-mobile";
+import { useCallback, useEffect, useState } from "react";
 import {
   writeContract,
   waitForTransactionReceipt,
   readContract,
-  multicall
-} from '@wagmi/core'
-import config from '@/proviers/config'
-import { useNavigate } from 'react-router-dom'
+  multicall,
+} from "@wagmi/core";
+import config from "@/proviers/config";
+import { useNavigate } from "react-router-dom";
 import {
-  CHAIN_ID,
   MiningMachineSystemLogicABI,
-  MiningMachineSystemLogicAddress,
   MiningMachineSystemStorageABI,
-  MiningMachineSystemStorageAddress
-} from '@/constants'
-import { formatEther } from 'viem'
-import { useAccount, useWriteContract } from 'wagmi'
-import AdaptiveNumber, { NumberType } from '@/components/AdaptiveNumber'
+  CHAIN_ID,
+} from "@/constants";
+import { useChainConfig } from "@/hooks/useChainConfig";
+import { useChainId, useAccount, useWriteContract } from "wagmi";
+import { formatEther, parseGwei } from "viem";
+import AdaptiveNumber, { NumberType } from "@/components/AdaptiveNumber";
 
 const isEmptyString = (str: string) => {
-  return !str || str.trim().length === 0
-}
+  return !str || str.trim().length === 0;
+};
 
 const MakeMotherMiningMachine = () => {
-  const { address } = useAccount()
-  const [count, setCount] = useState('')
-  const [price, setPrice] = useState('')
-  const [percent, setPercent] = useState('')
-  const [distributorAddress, setDistributorAddress] = useState('')
-  const [distributorName, setDistributorName] = useState('')
+  const { address } = useAccount();
+  const chainConfig = useChainConfig();
+  const chainId = useChainId();
 
-  const [activeAndGasFee, setActiveAndGasFee] = useState('')
+  // 使用动态地址
+  const MiningMachineSystemLogicAddress =
+    chainConfig.LOGIC_ADDRESS as `0x${string}`;
+  const MiningMachineSystemStorageAddress =
+    chainConfig.STORAGE_ADDRESS as `0x${string}`;
 
-  const [PLATFORM_FEE_USD, setPLATFORM_FEE_USD] = useState('')
-  const [SELLER_INCOME_USD, setSELLER_INCOME_USD] = useState('')
-  const [feeLoading, setFeeLoading] = useState(false)
-  const { writeContractAsync } = useWriteContract()
+  const [count, setCount] = useState("");
+  const [price, setPrice] = useState("");
+  const [percent, setPercent] = useState("");
+  const [distributorAddress, setDistributorAddress] = useState("");
+  const [distributorName, setDistributorName] = useState("");
+
+  const [activeAndGasFee, setActiveAndGasFee] = useState("");
+
+  const [PLATFORM_FEE_USD, setPLATFORM_FEE_USD] = useState("");
+  const [SELLER_INCOME_USD, setSELLER_INCOME_USD] = useState("");
+  const [feeLoading, setFeeLoading] = useState(false);
+  const { writeContractAsync } = useWriteContract();
 
   const queryActiveAndGasFee = async () => {
     try {
@@ -45,80 +53,85 @@ const MakeMotherMiningMachine = () => {
         {
           address: MiningMachineSystemLogicAddress,
           abi: MiningMachineSystemLogicABI,
-          functionName: 'PLATFORM_FEE_USD',
-          args: []
+          functionName: "PLATFORM_FEE_USD",
+          args: [],
         },
         {
           address: MiningMachineSystemLogicAddress,
           abi: MiningMachineSystemLogicABI,
-          functionName: 'SELLER_INCOME_USD',
-          args: []
-        }
-      ]
+          functionName: "SELLER_INCOME_USD",
+          args: [],
+        },
+      ];
 
       const res = await multicall(config, {
-        contracts
-      })
+        contracts,
+      });
 
-      setPLATFORM_FEE_USD(String(res[0].result))
-      setSELLER_INCOME_USD(String(res[1].result))
+      setPLATFORM_FEE_USD(String(res[0].result));
+      setSELLER_INCOME_USD(String(res[1].result));
     } catch (error) {
-      console.error(error)
+      console.error(error);
     }
-  }
+  };
 
   useEffect(() => {
-    queryActiveAndGasFee()
-  }, [])
+    queryActiveAndGasFee();
+  }, []);
 
   const handleChangeActiveAndGasFee = async () => {
-    if (PLATFORM_FEE_USD === '' || SELLER_INCOME_USD === '') {
+    if (PLATFORM_FEE_USD === "" || SELLER_INCOME_USD === "") {
       Toast.show({
-        content: '正在读取链上数据，请稍后再尝试',
-        position: 'center'
-      })
-      return
+        content: "正在读取链上数据，请稍后再尝试",
+        position: "center",
+      });
+      return;
     }
 
-    if (+activeAndGasFee === 0 || activeAndGasFee === '') {
+    if (+activeAndGasFee === 0 || activeAndGasFee === "") {
       Toast.show({
-        content: '燃料费、提现费不能为0',
-        position: 'center'
-      })
-      return
+        content: "燃料费、提现费不能为0",
+        position: "center",
+      });
+      return;
     }
     try {
-      setFeeLoading(true)
+      setFeeLoading(true);
       const hash = await writeContractAsync({
         address: MiningMachineSystemLogicAddress,
         abi: MiningMachineSystemLogicABI,
-        functionName: 'setChildMachineTradeConfig',
-        args: [PLATFORM_FEE_USD, SELLER_INCOME_USD, activeAndGasFee]
-      })
+        functionName: "setChildMachineTradeConfig",
+        args: [PLATFORM_FEE_USD, SELLER_INCOME_USD, activeAndGasFee],
+        gas: 400000n, // 复杂操作：修改多个参数
+        maxFeePerGas: parseGwei("10"),
+        maxPriorityFeePerGas: parseGwei("2"),
+        chainId: CHAIN_ID,
+      });
 
       await waitForTransactionReceipt(config, {
-        hash
-      })
+        hash,
+        chainId,
+      });
       Toast.show({
-        content: '修改成功!',
-        position: 'center'
-      })
-      setFeeLoading(false)
-      setActiveAndGasFee('')
+        content: "修改成功!",
+        position: "center",
+      });
+      setFeeLoading(false);
+      setActiveAndGasFee("");
     } catch (error) {
       Toast.show({
-        content: '修改失败',
-        position: 'center'
-      })
-      setFeeLoading(false)
-      console.error(error)
+        content: "修改失败",
+        position: "center",
+      });
+      setFeeLoading(false);
+      console.error(error);
     }
-  }
+  };
 
-  const [isMaking, setIsMaking] = useState(false)
-  const navigate = useNavigate()
+  const [isMaking, setIsMaking] = useState(false);
+  const navigate = useNavigate();
 
-  const [usdtToIdxRate, setUsdtToIdxRate] = useState('0')
+  const [usdtToIdxRate, setUsdtToIdxRate] = useState("0");
 
   const handleMake = async () => {
     // navigate('/sale-person')
@@ -133,82 +146,91 @@ const MakeMotherMiningMachine = () => {
       isEmptyString(distributorAddress)
     ) {
       Toast.show({
-        content: '请填充完整表单',
-        position: 'center',
-        duration: 1000
-      })
-      return
+        content: "请填充完整表单",
+        position: "center",
+        duration: 1000,
+      });
+      return;
     }
 
     try {
       Toast.show({
-        content: '制作中...',
-        position: 'center',
-        duration: 0
-      })
+        content: "制作中...",
+        position: "center",
+        duration: 0,
+      });
 
-      setIsMaking(true)
+      setIsMaking(true);
 
       const args = [
         +count,
         +price,
         +percent,
         distributorName,
-        distributorAddress
-      ]
+        distributorAddress,
+      ];
+
+      // 动态计算 Gas Limit（批量铸造母矿机）
+      const baseGas = 300000n;
+      const perMachineGas = 150000n;
+      const gasLimit = baseGas + BigInt(count) * perMachineGas;
 
       // storage
       const hash = await writeContract(config, {
         address: MiningMachineSystemLogicAddress,
         abi: MiningMachineSystemLogicABI,
-        functionName: 'batchMintMotherMachine',
-        args
-      })
+        functionName: "batchMintMotherMachine",
+        args,
+        gas: gasLimit, // 动态计算 gas limit
+        maxFeePerGas: parseGwei("10"),
+        maxPriorityFeePerGas: parseGwei("2"),
+        chainId: CHAIN_ID,
+      });
 
       await waitForTransactionReceipt(config, {
         hash,
-        chainId: CHAIN_ID
-      })
+        chainId,
+      });
 
-      Toast.clear()
+      Toast.clear();
     } catch (error) {
       Toast.show({
-        content: '制作失败',
-        position: 'center',
-        duration: 2000
-      })
-      console.error(error)
+        content: "制作失败",
+        position: "center",
+        duration: 2000,
+      });
+      console.error(error);
     } finally {
-      setIsMaking(false)
+      setIsMaking(false);
     }
-  }
+  };
 
   const handleQueryHistory = () => {
     if (isMaking) {
-      return
+      return;
     }
-    navigate('/make-mmm/history')
-  }
+    navigate("/make-mmm/history");
+  };
 
   const getUsdtToIdxRate = async () => {
     try {
       const data = await readContract(config, {
         address: MiningMachineSystemLogicAddress,
         abi: MiningMachineSystemLogicABI,
-        functionName: 'getIDXAmount',
-        args: [1]
-      })
+        functionName: "getIDXAmount",
+        args: [1],
+      });
 
-      const rate = data ? formatEther(data) : '0'
-      setUsdtToIdxRate(rate)
+      const rate = data ? formatEther(data) : "0";
+      setUsdtToIdxRate(rate);
     } catch (error) {
-      console.error(error)
+      console.error(error);
     }
-  }
+  };
 
   useEffect(() => {
-    getUsdtToIdxRate()
-  }, [])
+    getUsdtToIdxRate();
+  }, []);
 
   // const getIsSalePerson = useCallback(async () => {
   //   try {
@@ -325,7 +347,7 @@ const MakeMotherMiningMachine = () => {
         <Input
           placeholder="燃烧费、激活费"
           style={{
-            '--font-size': '13px'
+            "--font-size": "13px",
           }}
           className="!bg-[#f3f3f3] rounded-3xl px-4 py-2 !flex !items-center !justify-center mb-2"
           value={activeAndGasFee}
@@ -335,7 +357,7 @@ const MakeMotherMiningMachine = () => {
         <Button
           className="!bg-black !text-white !rounded-3xl !ml-auto !mt-2  !py-1 !w-full"
           style={{
-            fontSize: '13px'
+            fontSize: "13px",
           }}
           loading={feeLoading}
           onClick={() => handleChangeActiveAndGasFee()}
@@ -344,8 +366,8 @@ const MakeMotherMiningMachine = () => {
         </Button>
       </div>
     </div>
-  )
-}
+  );
+};
 
 const Item = ({
   value,
@@ -355,22 +377,22 @@ const Item = ({
   inputText,
   unit,
   slot,
-  max
+  max,
 }: {
-  value: string | undefined
-  setValue: React.Dispatch<React.SetStateAction<string>>
-  src: string
-  text: string
-  inputText: string
-  unit: string
-  slot?: React.ReactNode
-  max: number
+  value: string | undefined;
+  setValue: React.Dispatch<React.SetStateAction<string>>;
+  src: string;
+  text: string;
+  inputText: string;
+  unit: string;
+  slot?: React.ReactNode;
+  max: number;
 }) => {
   const handleChange = (val: string) => {
     if (+val <= max) {
-      setValue(val)
+      setValue(val);
     }
-  }
+  };
   return (
     <div>
       <div className="flex items-center justify-between">
@@ -396,7 +418,7 @@ const Item = ({
       {slot}
       <Divider className="mt-4  w-full h-0.5 bg-[#ececee]" />
     </div>
-  )
-}
+  );
+};
 
-export default MakeMotherMiningMachine
+export default MakeMotherMiningMachine;

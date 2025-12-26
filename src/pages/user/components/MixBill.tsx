@@ -12,14 +12,11 @@ import {
 } from "@wagmi/core";
 import config from "@/proviers/config";
 import {
-  CHAIN_ID,
   MiningMachineHistoryABI,
-  MiningMachineHistoryAddress,
   MiningMachineProductionLogicABI,
-  MiningMachineProductionLogicAddress,
   MiningMachineSystemLogicABI,
-  MiningMachineSystemLogicAddress,
 } from "@/constants";
+import { useChainConfig } from "@/hooks/useChainConfig";
 import { useAccount } from "wagmi";
 import { formatEther } from "viem";
 import EmptyComp from "@/components/EmptyComp";
@@ -46,6 +43,16 @@ interface MixChildRecord {
 
 const MixBill = () => {
   const { address: userAddress } = useAccount();
+  const chainConfig = useChainConfig();
+
+  // 使用动态地址（添加类型断言）
+  const MiningMachineHistoryAddress =
+    chainConfig.HISTORY_ADDRESS as `0x${string}`;
+  const MiningMachineProductionLogicAddress =
+    chainConfig.PRODUCTION_LOGIC_ADDRESS as `0x${string}`;
+  const MiningMachineSystemLogicAddress =
+    chainConfig.LOGIC_ADDRESS as `0x${string}`;
+
   const navigate = useNavigate();
   const [recordList, setRecordList] = useState<Array<{ type: number } & any>>(
     [],

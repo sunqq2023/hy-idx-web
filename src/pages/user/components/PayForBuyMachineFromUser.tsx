@@ -1,207 +1,215 @@
-import React from 'react'
-
-import { arrowSvg } from '@/assets'
-import { Button, Divider, Toast } from 'antd-mobile'
-import { SHA256 } from 'crypto-js'
-import { useEffect, useRef, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
-import { FixedSizeList as List } from 'react-window'
+import { useEffect, useRef, useState } from "react";
+import { arrowSvg } from "@/assets";
+import { Button, Divider, Toast } from "antd-mobile";
+import { SHA256 } from "crypto-js";
+import { useLocation, useNavigate } from "react-router-dom";
+import { FixedSizeList as List } from "react-window";
 import {
   waitForTransactionReceipt,
   writeContract,
-  readContract
-} from '@wagmi/core'
-import config from '@/proviers/config'
+  readContract,
+} from "@wagmi/core";
+import config from "@/proviers/config";
+import { MiningMachineSystemLogicABI } from "@/constants";
+import { useChainConfig } from "@/hooks/useChainConfig";
+import { useWriteContract, useAccount, useChainId } from "wagmi";
+import LoadingButton from "@/components/LoadingButton";
+import AdaptiveNumber, { NumberType } from "@/components/AdaptiveNumber";
+import { erc20Abi, formatEther, parseEther, parseGwei } from "viem";
+import { usePaymentCheck } from "@/hooks/usePaymentCheck";
 import {
-  ALLOWANCE_QUOTA,
-  CHAIN_ID,
-  IDX_CONTRACTS_ADDRESS,
-  MiningMachineSystemLogicABI,
-  MiningMachineSystemLogicAddress
-} from '@/constants'
-import { useWriteContract, useAccount } from 'wagmi'
-import LoadingButton from '@/components/LoadingButton'
-import AdaptiveNumber, { NumberType } from '@/components/AdaptiveNumber'
-import { erc20Abi, formatEther, parseEther, parseGwei } from 'viem'
-import { usePaymentCheck } from '@/hooks/usePaymentCheck'
-import { writeContractWithGasFallback, getGasConfigByFunctionName } from '@/utils/contractUtils'
+  writeContractWithGasFallback,
+  getGasConfigByFunctionName,
+} from "@/utils/contractUtils";
 
 const getMachineName = (val: number) => {
-  return val === 1 ? '母矿机' : '子矿机'
-}
+  return val === 1 ? "母矿机" : "子矿机";
+};
 
 const generateCode = (num: number) => {
-  const input = num + ''
-  const hashHex = SHA256(input).toString()
+  const input = num + "";
+  const hashHex = SHA256(input).toString();
   // 提取前4位字母和后4位十六进制
   const letterPart =
     hashHex
       .match(/[a-zA-Z]/g)
       ?.slice(0, 4)
-      .join('') || 'ABCD'
-  const hexPart = hashHex.slice(10, 14)
+      .join("") || "ABCD";
+  const hexPart = hashHex.slice(10, 14);
 
-  return (letterPart + hexPart).toUpperCase()
-}
+  return (letterPart + hexPart).toUpperCase();
+};
 
 const PayForBuyMachineFromUser = () => {
-  const navigate = useNavigate()
-  const { writeContractAsync } = useWriteContract()
-  const { address: userAddress } = useAccount()
-  const [isPaying, setIsPaying] = useState(false)
+  const navigate = useNavigate();
+  const chainConfig = useChainConfig();
+  const chainId = useChainId();
+  const { writeContractAsync } = useWriteContract();
+  const { address: userAddress } = useAccount();
+  const [isPaying, setIsPaying] = useState(false);
 
-  const location = useLocation()
+  const MiningMachineSystemLogicAddress =
+    chainConfig.LOGIC_ADDRESS as `0x${string}`;
+  const IDX_CONTRACTS_ADDRESS = chainConfig.IDX_TOKEN as `0x${string}`;
 
-  const pageData = location.state
+  const location = useLocation();
+
+  const pageData = location.state;
 
   const machineIdsAndOrderTypeList = location.state.machineIds.map(
     (id: number) => {
       return {
         id,
-        mtype: location.state.orderType
-      }
-    }
-  )
+        mtype: location.state.orderType,
+      };
+    },
+  );
 
   const handlBack = () => {
-    navigate('/user/history')
-  }
+    navigate("/user/history");
+  };
 
-  const [listHeight, setListHeight] = useState(0)
-  const listContainerRef = useRef<HTMLDivElement>(null)
-  const [usdtToIdxRate, setUsdtToIdxRate] = useState('')
+  const [listHeight, setListHeight] = useState(0);
+  const listContainerRef = useRef<HTMLDivElement>(null);
+  const [usdtToIdxRate, setUsdtToIdxRate] = useState("");
 
   // 动态计算高度
   useEffect(() => {
-    if (!listContainerRef.current) return
+    if (!listContainerRef.current) return;
 
     const calculateHeight = () => {
-      const windowHeight = window.innerHeight
-      const topSectionHeight = 370
-      const newHeight = windowHeight - topSectionHeight
-      setListHeight(newHeight)
-    }
+      const windowHeight = window.innerHeight;
+      const topSectionHeight = 370;
+      const newHeight = windowHeight - topSectionHeight;
+      setListHeight(newHeight);
+    };
 
     // 初始化计算
-    calculateHeight()
+    calculateHeight();
 
     // 监听窗口变化（如旋转屏幕、键盘弹出等）
-    window.addEventListener('resize', calculateHeight)
-    return () => window.removeEventListener('resize', calculateHeight)
-  }, [])
+    window.addEventListener("resize", calculateHeight);
+    return () => window.removeEventListener("resize", calculateHeight);
+  }, []);
 
   const getUsdtToIdxRate = async () => {
     try {
       const data = await readContract(config, {
         address: MiningMachineSystemLogicAddress,
         abi: MiningMachineSystemLogicABI,
-        functionName: 'getIDXAmount',
-        args: [1]
-      })
+        functionName: "getIDXAmount",
+        args: [1],
+      });
 
-      const rate = data ? formatEther(data as bigint) : '0'
-      setUsdtToIdxRate(rate)
+      const rate = data ? formatEther(data as bigint) : "0";
+      setUsdtToIdxRate(rate);
     } catch (error) {
-      console.error(error)
+      console.error(error);
     }
-  }
+  };
 
   useEffect(() => {
-    getUsdtToIdxRate()
-  }, [])
+    getUsdtToIdxRate();
+  }, []);
 
   const {
     isLoading: isPaymentCheckLoading,
     isBalanceSufficient,
-    isAllowanceSufficient
+    isAllowanceSufficient,
   } = usePaymentCheck(
-    parseEther(String(Math.ceil(pageData.price * +usdtToIdxRate)))
-  )
+    parseEther(String(Math.ceil(pageData.price * +usdtToIdxRate))),
+  );
 
   const handlePay = async () => {
     try {
-      if (isPaymentCheckLoading) return
+      if (isPaymentCheckLoading) return;
 
       if (!isBalanceSufficient) {
         Toast.show({
-          content: '余额不足',
-          position: 'center',
-          duration: 2000
-        })
-        return
+          content: "余额不足",
+          position: "center",
+          duration: 2000,
+        });
+        return;
       }
 
-      setIsPaying(true)
+      setIsPaying(true);
       if (!isAllowanceSufficient) {
         // 计算实际需要的金额（这里需要根据具体业务逻辑计算）
         // 假设购买单台矿机需要一定数量的IDX，这里需要根据实际情况调整
-        const actualAmount = parseEther(String(pageData.price || 100)) // 需要根据实际业务逻辑调整
-        const smartAllowance = actualAmount * 30n  // 调整为30倍授权
-        
-        console.log('实际需要金额:', formatEther(actualAmount), 'IDX')
-        console.log('期望智能授权额度:', formatEther(smartAllowance), 'IDX')
-        
+        const actualAmount = parseEther(String(pageData.price || 100)); // 需要根据实际业务逻辑调整
+        const smartAllowance = actualAmount * 30n; // 调整为30倍授权
+
+        console.log("实际需要金额:", formatEther(actualAmount), "IDX");
+        console.log("期望智能授权额度:", formatEther(smartAllowance), "IDX");
+
         // 先查询当前allowance值
-        console.log('查询当前allowance值...')
-        const currentAllowance = await readContract(config, {
+        console.log("查询当前allowance值...");
+        const currentAllowance = (await readContract(config, {
           address: IDX_CONTRACTS_ADDRESS,
           abi: erc20Abi,
-          functionName: 'allowance',
-          args: [userAddress!, MiningMachineSystemLogicAddress]
-        }) as bigint
-        
-        console.log('当前allowance值:', formatEther(currentAllowance), 'IDX')
-        
+          functionName: "allowance",
+          args: [userAddress!, MiningMachineSystemLogicAddress],
+        })) as bigint;
+
+        console.log("当前allowance值:", formatEther(currentAllowance), "IDX");
+
         // 检查当前allowance是否已经足够（超过2倍实际需要）
         if (currentAllowance >= smartAllowance) {
-          console.log('当前allowance已足够，无需重新授权')
+          console.log("当前allowance已足够，无需重新授权");
         } else {
-          console.log('当前allowance不足，执行智能授权')
-          
-          await writeContractWithGasFallback({
-            address: IDX_CONTRACTS_ADDRESS,
-            abi: erc20Abi,
-            functionName: 'approve',
-            args: [MiningMachineSystemLogicAddress, smartAllowance]
-          }, getGasConfigByFunctionName('approve'))
+          console.log("当前allowance不足，执行智能授权");
+
+          await writeContractWithGasFallback(
+            {
+              address: IDX_CONTRACTS_ADDRESS,
+              abi: erc20Abi,
+              functionName: "approve",
+              args: [MiningMachineSystemLogicAddress, smartAllowance],
+            },
+            getGasConfigByFunctionName("approve"),
+          );
         }
       }
 
-      const hash = await writeContractWithGasFallback({
-        address: MiningMachineSystemLogicAddress,
-        abi: MiningMachineSystemLogicABI as any,
-        functionName: 'buyMachine',
-        args: [pageData.orderId]
-      }, getGasConfigByFunctionName('buyMachine'))
+      const hash = await writeContractWithGasFallback(
+        {
+          address: MiningMachineSystemLogicAddress,
+          abi: MiningMachineSystemLogicABI as any,
+          functionName: "buyMachine",
+          args: [pageData.orderId],
+        },
+        getGasConfigByFunctionName("buyMachine"),
+      );
 
       await waitForTransactionReceipt(config, {
         hash,
-        chainId: CHAIN_ID
-      })
+        chainId,
+      });
 
-      setIsPaying(false)
-      navigate('/user/history')
+      setIsPaying(false);
+      navigate("/user/history");
     } catch (error) {
-      setIsPaying(false)
-      
+      setIsPaying(false);
+
       // 直接显示原始错误信息
-      let errorMessage = '支付失败'
+      let errorMessage = "支付失败";
       if (error instanceof Error) {
-        errorMessage = `支付失败: ${error.message}`
-      } else if (error && typeof error === 'object') {
-        errorMessage = `支付失败: ${JSON.stringify(error)}`
+        errorMessage = `支付失败: ${error.message}`;
+      } else if (error && typeof error === "object") {
+        errorMessage = `支付失败: ${JSON.stringify(error)}`;
       } else if (error) {
-        errorMessage = `支付失败: ${String(error)}`
+        errorMessage = `支付失败: ${String(error)}`;
       }
-      
+
       Toast.show({
         content: errorMessage,
-        position: 'center',
-        duration: 10000
-      })
-      console.error(error)
+        position: "center",
+        duration: 10000,
+      });
+      console.error(error);
     }
-  }
+  };
 
   return (
     <div>
@@ -303,27 +311,27 @@ const PayForBuyMachineFromUser = () => {
         </Button>
       </div>
     </div>
-  )
-}
+  );
+};
 
 const Row = ({
   index,
   style,
-  data
+  data,
 }: {
   data: {
-    id: number
-    mtype: number
-  }[]
-  index: number
-  style: React.CSSProperties
+    id: number;
+    mtype: number;
+  }[];
+  index: number;
+  style: React.CSSProperties;
 }) => {
-  const item = data[index]
+  const item = data[index];
   return (
     <div
       style={{
         ...style,
-        height: '50px'
+        height: "50px",
       }}
     >
       <div className="flex justify-between py-2">
@@ -333,7 +341,7 @@ const Row = ({
       </div>
       <Divider className="!my-[0]" />
     </div>
-  )
-}
+  );
+};
 
-export default PayForBuyMachineFromUser
+export default PayForBuyMachineFromUser;

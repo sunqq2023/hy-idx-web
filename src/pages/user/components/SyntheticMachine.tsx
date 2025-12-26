@@ -1,128 +1,143 @@
-import { arrowSvg, calculatorSvg } from '@/assets'
-import AdaptiveNumber, { NumberType } from '@/components/AdaptiveNumber'
-import config from '@/proviers/config'
-import { Button, Input, Toast } from 'antd-mobile'
-import React, { useCallback, useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { arrowSvg, calculatorSvg } from "@/assets";
+import AdaptiveNumber, { NumberType } from "@/components/AdaptiveNumber";
+import config from "@/proviers/config";
+import { Button, Input, Toast } from "antd-mobile";
+import React, { useCallback, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   readContract,
   writeContract,
-  waitForTransactionReceipt
-} from '@wagmi/core'
+  waitForTransactionReceipt,
+} from "@wagmi/core";
 import {
-  CHAIN_ID,
   MiningMachineProductionLogicABI,
-  MiningMachineProductionLogicAddress,
   MiningMachineSystemStorageABI,
-  MiningMachineSystemStorageAddress
-} from '@/constants'
-import { useAccount } from 'wagmi'
-import { formatEther } from 'viem'
+} from "@/constants";
+import { useChainConfig } from "@/hooks/useChainConfig";
+import { useAccount, useChainId } from "wagmi";
+import { formatEther, parseGwei } from "viem";
 
 const SyntheticMachine = () => {
-  const [isSyntheticLoading, setIsSyntheticLoading] = useState(false)
-  const navigate = useNavigate()
-  const [count, setCount] = useState('')
-  const { address } = useAccount()
+  const [isSyntheticLoading, setIsSyntheticLoading] = useState(false);
+  const navigate = useNavigate();
+  const chainConfig = useChainConfig();
+  const chainId = useChainId();
+  const [count, setCount] = useState("");
+  const { address } = useAccount();
 
-  const [mixBalance, setMixBalance] = useState('')
+  const MiningMachineProductionLogicAddress =
+    chainConfig.PRODUCTION_LOGIC_ADDRESS as `0x${string}`;
+  const MiningMachineSystemStorageAddress =
+    chainConfig.STORAGE_ADDRESS as `0x${string}`;
+
+  const [mixBalance, setMixBalance] = useState("");
   const handleChangeCount = (val: string) => {
-    setCount(val)
-  }
+    setCount(val);
+  };
   const handlBack = () => {
-    navigate('/user')
-  }
+    navigate("/user");
+  };
 
   const handleMax = () => {
-    const maxVal = Math.floor(+mixBalance / 80)
+    const maxVal = Math.floor(+mixBalance / 80);
 
     if (maxVal > 10) {
-      setCount('10')
+      setCount("10");
     } else if (maxVal === 0) {
-      setCount('')
+      setCount("");
     } else {
-      setCount(String(maxVal))
+      setCount(String(maxVal));
     }
-  }
+  };
 
   const queryMIXBalance = useCallback(async () => {
+    if (!address) return;
     try {
       const res = await readContract(config, {
         address: MiningMachineSystemStorageAddress,
         abi: MiningMachineSystemStorageABI,
-        functionName: 'mixBalances',
-        args: [address]
-      })
-      setMixBalance(res ? formatEther(res) : '0')
+        functionName: "mixBalances",
+        args: [address],
+      });
+      setMixBalance(res ? formatEther(res as bigint) : "0");
     } catch (error) {
-      console.error(error)
+      console.error(error);
     }
-  }, [address])
+  }, [address, MiningMachineSystemStorageAddress]);
 
   useEffect(() => {
-    queryMIXBalance()
-  }, [queryMIXBalance])
+    queryMIXBalance();
+  }, [queryMIXBalance]);
 
   const handleSyntheticMachine = async () => {
-    if (+count === 0 || count === '') {
+    if (+count === 0 || count === "") {
       Toast.show({
-        content: '至少合成1台矿机',
-        position: 'center'
-      })
-      return
+        content: "至少合成1台矿机",
+        position: "center",
+      });
+      return;
     }
     try {
-      setIsSyntheticLoading(true)
+      setIsSyntheticLoading(true);
+
+      // 动态计算 Gas Limit
+      const baseGas = 200000n;
+      const perMachineGas = 100000n;
+      const gasLimit = baseGas + BigInt(count) * perMachineGas;
+
       const hash = await writeContract(config, {
         address: MiningMachineProductionLogicAddress,
         abi: MiningMachineProductionLogicABI,
-        functionName: 'mixToChildMachine',
-        args: [count]
-      })
+        functionName: "mixToChildMachine",
+        args: [count],
+        gas: gasLimit, // 动态计算 Gas Limit
+        maxFeePerGas: parseGwei("10"),
+        maxPriorityFeePerGas: parseGwei("2"),
+      });
 
       await waitForTransactionReceipt(config, {
         hash,
-        chainId: CHAIN_ID
-      })
+        chainId,
+      });
       Toast.show({
-        content: '合成成功',
-        position: 'center'
-      })
-      queryMIXBalance()
-      setCount('')
+        content: "合成成功",
+        position: "center",
+      });
+      queryMIXBalance();
+      setCount("");
     } catch (error) {
       Toast.show({
-        content: '合成失败',
-        position: 'center'
-      })
-      console.error(error)
+        content: "合成失败",
+        position: "center",
+      });
+      console.error(error);
     } finally {
-      setIsSyntheticLoading(false)
+      setIsSyntheticLoading(false);
     }
-  }
+  };
 
   const isDisabled = () => {
-    if (count !== '' && count !== '0') {
+    if (count !== "" && count !== "0") {
       if (+count > 10) {
-        return true
+        return true;
       }
       if (+mixBalance < 80 * +count) {
-        return true
+        return true;
       }
     }
-  }
+  };
 
   const getButtonText = () => {
-    if (count !== '' && count !== '0') {
+    if (count !== "" && count !== "0") {
       if (+count > 10) {
-        return '每次最多10台'
+        return "每次最多10台";
       }
       if (+mixBalance < 80 * +count) {
-        return '余额不足'
+        return "余额不足";
       }
     }
-    return '合成'
-  }
+    return "合成";
+  };
   return (
     <div className="px-[21px]">
       <div className="flex pt-4">
@@ -173,7 +188,7 @@ const SyntheticMachine = () => {
               type="number"
               onChange={handleChangeCount}
               style={{
-                '--font-size': '14px'
+                "--font-size": "14px",
               }}
             />
             <span
@@ -206,7 +221,7 @@ const SyntheticMachine = () => {
             className="!bg-black !text-white !rounded-3xl !ml-auto !py-2 !w-full "
             disabled={isDisabled()}
             style={{
-              fontSize: '14px'
+              fontSize: "14px",
             }}
           >
             {getButtonText()}
@@ -214,7 +229,7 @@ const SyntheticMachine = () => {
         </div>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default SyntheticMachine
+export default SyntheticMachine;

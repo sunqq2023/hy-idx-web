@@ -1,154 +1,158 @@
-import { nextArrowSvg, userMachineSvg } from '@/assets'
-import AdaptiveNumber, { NumberType } from '@/components/AdaptiveNumber'
+import { nextArrowSvg, userMachineSvg } from "@/assets";
+import AdaptiveNumber, { NumberType } from "@/components/AdaptiveNumber";
 import {
-  IDX_CONTRACTS_ADDRESS,
   MiningMachineHistoryABI,
-  MiningMachineHistoryAddress,
   MiningMachineSystemLogicABI,
-  MiningMachineSystemLogicAddress
-} from '@/constants'
-import config from '@/proviers/config'
-import { formatTime, shortenAddress } from '@/utils/helper'
-import { Button, Divider, Input, Toast } from 'antd-mobile'
-import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { FixedSizeList } from 'react-window'
-import { useAccount } from 'wagmi'
-import { multicall, readContract } from '@wagmi/core'
-import { erc20Abi, formatEther } from 'viem'
-import orderStore from '@/stores/orderStore'
-import classNames from 'classnames'
-import EmptyComp from '@/components/EmptyComp'
+} from "@/constants";
+import { useChainConfig } from "@/hooks/useChainConfig";
+import config from "@/proviers/config";
+import { formatTime, shortenAddress } from "@/utils/helper";
+import { Button, Divider, Input, Toast } from "antd-mobile";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { FixedSizeList } from "react-window";
+import { useAccount, useChainId } from "wagmi";
+import { multicall, readContract } from "@wagmi/core";
+import { erc20Abi, formatEther } from "viem";
+import orderStore from "@/stores/orderStore";
+import classNames from "classnames";
+import EmptyComp from "@/components/EmptyComp";
 
 interface IMachineTx {
-  orderId: number
-  machineId: number
-  seller: `0x${string}`
+  orderId: number;
+  machineId: number;
+  seller: `0x${string}`;
   // 以 IDX 为单位的价格
-  priceInIdx: number
-  listedAt: number
+  priceInIdx: number;
+  listedAt: number;
   // 订单状态（0 = 有效，1 = 已成交，2 = 已取消，3 = 已售给平台）
-  status: number
-  NO: number
+  status: number;
+  NO: number;
 }
 
 export const MachineTx = ({ isShow }: { isShow: boolean }) => {
-  const [count, setCount] = useState('')
-  const { address: userAddress } = useAccount()
-  const [machineList, setMachineList] = useState<IMachineTx[]>([])
-  const navigate = useNavigate()
+  const [count, setCount] = useState("");
+  const chainConfig = useChainConfig();
+  const chainId = useChainId();
+  const { address: userAddress } = useAccount();
+  const [machineList, setMachineList] = useState<IMachineTx[]>([]);
+  const navigate = useNavigate();
 
-  const awaitingPaymentItemsLength = orderStore.getUnPaidLength()
+  const MiningMachineSystemLogicAddress =
+    chainConfig.LOGIC_ADDRESS as `0x${string}`;
+  const IDX_CONTRACTS_ADDRESS = chainConfig.IDX_TOKEN as `0x${string}`;
+
+  const awaitingPaymentItemsLength = orderStore.getUnPaidLength();
 
   const handleChangeCount = (val: string) => {
-    setCount(val)
-  }
+    setCount(val);
+  };
 
-  const [listHeight, setListHeight] = useState(0)
-  const listContainerRef = useRef<HTMLDivElement>(null)
-  const [idxBalance, setIdxBalance] = useState(0)
-  const [machinePrice, setMachinePrice] = useState(0)
-  const [usdtToIdxRate, setUsdtToIdxRate] = useState(0)
+  const [listHeight, setListHeight] = useState(0);
+  const listContainerRef = useRef<HTMLDivElement>(null);
+  const [idxBalance, setIdxBalance] = useState(0);
+  const [machinePrice, setMachinePrice] = useState(0);
+  const [usdtToIdxRate, setUsdtToIdxRate] = useState(0);
 
   const handleQueryIdxBalance = useCallback(async () => {
     try {
       const res = await readContract(config, {
         address: IDX_CONTRACTS_ADDRESS,
         abi: erc20Abi,
-        functionName: 'balanceOf',
-        args: [userAddress!]
-      })
+        functionName: "balanceOf",
+        args: [userAddress!],
+      });
 
-      setIdxBalance(+formatEther(res))
+      setIdxBalance(+formatEther(res));
     } catch (error) {
-      console.error(error)
+      console.error(error);
     }
-  }, [userAddress])
+  }, [userAddress]);
 
   const handleQueryChildMachinePrice = useCallback(async () => {
     try {
       const res = await readContract(config, {
         address: MiningMachineSystemLogicAddress,
         abi: MiningMachineSystemLogicABI,
-        functionName: 'CHILD_MACHINE_PRICE',
-        args: []
-      })
-      setMachinePrice(Number(res))
+        functionName: "CHILD_MACHINE_PRICE",
+        args: [],
+      });
+      setMachinePrice(Number(res));
     } catch (error) {
-      console.error(error)
+      console.error(error);
     }
-  }, [])
+  }, []);
 
   useEffect(() => {
-    if (isShow) handleQueryChildMachinePrice()
-  }, [handleQueryChildMachinePrice, isShow])
+    if (isShow) handleQueryChildMachinePrice();
+  }, [handleQueryChildMachinePrice, isShow]);
 
   useEffect(() => {
     if (isShow) {
-      handleQueryIdxBalance()
+      handleQueryIdxBalance();
     }
-  }, [handleQueryIdxBalance, isShow])
+  }, [handleQueryIdxBalance, isShow]);
 
   // 动态计算高度
   useEffect(() => {
-    if (!listContainerRef.current) return
+    if (!listContainerRef.current) return;
 
     const calculateHeight = () => {
-      const windowHeight = window.innerHeight
-      const topSectionHeight = 100
-      const newHeight = windowHeight - topSectionHeight
-      setListHeight(newHeight)
-    }
+      const windowHeight = window.innerHeight;
+      const topSectionHeight = 100;
+      const newHeight = windowHeight - topSectionHeight;
+      setListHeight(newHeight);
+    };
 
     // 初始化计算
-    calculateHeight()
+    calculateHeight();
 
     // 监听窗口变化（如旋转屏幕、键盘弹出等）
-    window.addEventListener('resize', calculateHeight)
-    return () => window.removeEventListener('resize', calculateHeight)
-  }, [])
+    window.addEventListener("resize", calculateHeight);
+    return () => window.removeEventListener("resize", calculateHeight);
+  }, []);
 
   const handlePay = () => {
     if (+count === 0) {
       Toast.show({
-        content: '请输入购买数量',
-        position: 'center'
-      })
-      return
+        content: "请输入购买数量",
+        position: "center",
+      });
+      return;
     }
-    navigate('/user/myOrders', {
-      state: machineList.filter((_, index) => index < +count)
-    })
-  }
+    navigate("/user/myOrders", {
+      state: machineList.filter((_, index) => index < +count),
+    });
+  };
 
   const Row = ({
     index,
     style,
-    data
+    data,
   }: {
-    data: IMachineTx[]
-    index: number
-    style: React.CSSProperties
+    data: IMachineTx[];
+    index: number;
+    style: React.CSSProperties;
   }) => {
-    const item = data[index]
+    const item = data[index];
     const handleMyPublishClick = () => {
       if (item.seller === userAddress) {
-        navigate('/user/myPublishMachineTx', { state: item })
+        navigate("/user/myPublishMachineTx", { state: item });
       } else {
-        return
+        return;
       }
-    }
+    };
     return (
       <div
         style={{
           ...style,
-          height: '70px'
+          height: "70px",
         }}
       >
         <div
           className={classNames(
-            [item.seller !== userAddress ? 'px-[.9375rem]' : 'pl-[.9375rem]'],
-            ' py-[.9375rem] bg-white rounded-3xl flex mt-2 gap-2'
+            [item.seller !== userAddress ? "px-[.9375rem]" : "pl-[.9375rem]"],
+            " py-[.9375rem] bg-white rounded-3xl flex mt-2 gap-2",
           )}
           onClick={handleMyPublishClick}
         >
@@ -184,17 +188,17 @@ export const MachineTx = ({ isShow }: { isShow: boolean }) => {
           )}
         </div>
       </div>
-    )
-  }
+    );
+  };
 
   const handleQuery = useCallback(async () => {
     try {
       const orderCount = await readContract(config, {
         address: MiningMachineSystemLogicAddress,
         abi: MiningMachineSystemLogicABI,
-        functionName: 'activeListedOrderCount',
-        args: []
-      })
+        functionName: "activeListedOrderCount",
+        args: [],
+      });
       // console.log('orderCount', orderCount)
 
       const allListedOrderIdsContract = new Array(Number(orderCount))
@@ -202,29 +206,29 @@ export const MachineTx = ({ isShow }: { isShow: boolean }) => {
         .map((_, i) => ({
           address: MiningMachineSystemLogicAddress,
           abi: MiningMachineSystemLogicABI,
-          functionName: 'allListedOrderIds',
-          args: [i]
-        }))
+          functionName: "allListedOrderIds",
+          args: [i],
+        }));
 
       const orderIds = await multicall(config, {
-        contracts: allListedOrderIdsContract
-      })
+        contracts: allListedOrderIdsContract,
+      });
 
       // console.log('orderIds', orderIds)
 
-      const bignumToNumber = orderIds.map((e) => Number(e.result))
+      const bignumToNumber = orderIds.map((e) => Number(e.result));
 
       const contracts = bignumToNumber.map((id) => {
         return {
           address: MiningMachineSystemLogicAddress,
           abi: MiningMachineSystemLogicABI,
-          functionName: 'listedOrders',
-          args: [id]
-        }
-      })
+          functionName: "listedOrders",
+          args: [id],
+        };
+      });
       const data2 = await multicall(config, {
-        contracts
-      })
+        contracts,
+      });
 
       const itemList = data2.map((item) => {
         return {
@@ -233,84 +237,84 @@ export const MachineTx = ({ isShow }: { isShow: boolean }) => {
           seller: item.result[2],
           priceInIdx: +formatEther(item.result[3]),
           listedAt: Number(item.result[4]),
-          status: Number(item.result[5])
-        }
-      })
+          status: Number(item.result[5]),
+        };
+      });
 
       const allListedOrdersWithBuyerContract = itemList.map((item) => ({
         address: MiningMachineSystemLogicAddress,
         abi: MiningMachineSystemLogicABI,
-        functionName: 'internalOrders',
-        args: [item.orderId]
-      }))
+        functionName: "internalOrders",
+        args: [item.orderId],
+      }));
 
       const ordersWithBuyer = await multicall(config, {
-        contracts: allListedOrdersWithBuyerContract
-      })
+        contracts: allListedOrdersWithBuyerContract,
+      });
 
       const itemListWithBuyer = itemList.map((item, index) => {
         return {
           ...item,
-          buyer: ordersWithBuyer[index].result[1]
-        }
-      })
+          buyer: ordersWithBuyer[index].result[1],
+        };
+      });
 
       let list = itemListWithBuyer.filter((item) => {
         return (
           item.status === 0 &&
-          item.seller !== '0x0000000000000000000000000000000000000000'
-        )
-      })
-      console.log('itemListWithBuyer', list)
-      orderStore.updateAllListedOrders(list)
+          item.seller !== "0x0000000000000000000000000000000000000000"
+        );
+      });
+      console.log("itemListWithBuyer", list);
+      orderStore.updateAllListedOrders(list);
 
       list = list
         .sort((a, b) => a.listedAt - b.listedAt)
         .map((item, i) => ({
           ...item,
-          NO: i + 1
-        }))
+          NO: i + 1,
+        }));
 
-      setMachineList(list)
-      console.log('user machine tx list', list)
+      setMachineList(list);
+      console.log("user machine tx list", list);
     } catch (error) {
-      console.error(error)
+      console.error(error);
     }
-  }, [])
+  }, []);
 
   useEffect(() => {
-    handleQuery()
-  }, [handleQuery])
+    handleQuery();
+  }, [handleQuery]);
 
   const getUsdtToIdxRate = async () => {
     try {
       const res = await readContract(config, {
         address: MiningMachineSystemLogicAddress,
         abi: MiningMachineSystemLogicABI,
-        functionName: 'getIDXAmount',
-        args: [1]
-      })
+        functionName: "getIDXAmount",
+        args: [1],
+      });
 
-      setUsdtToIdxRate(Number(res ? formatEther(res) : '0'))
+      setUsdtToIdxRate(Number(res ? formatEther(res) : "0"));
     } catch (error) {
-      console.error(error)
+      console.error(error);
     }
-  }
+  };
 
   useEffect(() => {
-    getUsdtToIdxRate()
-  }, [])
+    getUsdtToIdxRate();
+  }, []);
 
   const getPayButtonText = () => {
     if (+count > machineList.length) {
-      return '库存不足'
+      return "库存不足";
     }
-    return idxBalance < +count * machinePrice ? '余额不足' : '去支付'
-  }
+    return idxBalance < +count * machinePrice ? "余额不足" : "去支付";
+  };
 
   const handleTxRecordsClick = () => {
-    navigate('/user/history')
-  }
+    navigate("/user/history");
+  };
 
   return (
     <div className="mt-2">
@@ -341,7 +345,7 @@ export const MachineTx = ({ isShow }: { isShow: boolean }) => {
               {awaitingPaymentItemsLength > 0 && (
                 <div
                   className={
-                    'bg-[red]  p-1 rounded-3xl h-[15px] flex items-center justify-center text-white text-[.6rem] leading-[.6rem]'
+                    "bg-[red]  p-1 rounded-3xl h-[15px] flex items-center justify-center text-white text-[.6rem] leading-[.6rem]"
                   }
                 >
                   {awaitingPaymentItemsLength}
@@ -376,7 +380,7 @@ export const MachineTx = ({ isShow }: { isShow: boolean }) => {
               <Input
                 placeholder="输入整数"
                 style={{
-                  '--font-size': '.875rem'
+                  "--font-size": ".875rem",
                 }}
                 className="!bg-[#f3f3f3] rounded-3xl px-4 py-1 "
                 value={count}
@@ -438,7 +442,7 @@ export const MachineTx = ({ isShow }: { isShow: boolean }) => {
         <Button
           className="!bg-black !text-white !rounded-3xl !ml-auto   !h-[40px] !w-[100px]"
           style={{
-            fontSize: '15px'
+            fontSize: "15px",
           }}
           onClick={handlePay}
           disabled={
@@ -450,5 +454,5 @@ export const MachineTx = ({ isShow }: { isShow: boolean }) => {
         </Button>
       </div>
     </div>
-  )
-}
+  );
+};

@@ -50,6 +50,8 @@ export default defineConfig({
         },
       },
     },
+    // 生成 manifest.json 用于版本控制
+    manifest: true,
   },
   resolve: {
     // 确保只有一个 React 实例
@@ -66,8 +68,6 @@ export default defineConfig({
       "@rainbow-me/rainbowkit",
       "antd-mobile",
     ],
-    // 强制预构建，避免运行时错误
-    force: false,
   },
   plugins: [
     nodePolyfills({

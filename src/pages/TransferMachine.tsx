@@ -1,175 +1,190 @@
-import { arrowSvg } from '@/assets'
-import { Button, Divider, TextArea, Toast } from 'antd-mobile'
-import { SHA256 } from 'crypto-js'
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
-import { FixedSizeList as List } from 'react-window'
-import { MachineInfo } from '@/constants/types'
-import { validateAddressFnMap } from '@/utils/validateAddress'
+import { arrowSvg } from "@/assets";
+import { Button, Divider, TextArea, Toast } from "antd-mobile";
+import { SHA256 } from "crypto-js";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { FixedSizeList as List } from "react-window";
+import { MachineInfo } from "@/constants/types";
+import { validateAddressFnMap } from "@/utils/validateAddress";
 import {
   waitForTransactionReceipt,
   writeContract,
   readContract,
-  multicall
-} from '@wagmi/core'
-import config from '@/proviers/config'
+  multicall,
+} from "@wagmi/core";
+import config from "@/proviers/config";
 import {
-  CHAIN_ID,
   MiningMachineSystemLogicABI,
-  MiningMachineSystemLogicAddress,
   MiningMachineSystemStorageABI,
-  MiningMachineSystemStorageAddress
-} from '@/constants'
-import LoadingButton from '@/components/LoadingButton'
-import { formatEther } from 'viem'
-import AdaptiveNumber, { NumberType } from '@/components/AdaptiveNumber'
+} from "@/constants";
+import { useChainConfig } from "@/hooks/useChainConfig";
+import { useChainId } from "wagmi";
+import LoadingButton from "@/components/LoadingButton";
+import { formatEther, parseGwei } from "viem";
+import AdaptiveNumber, { NumberType } from "@/components/AdaptiveNumber";
 
 const getMachineName = (val: number) => {
-  return val === 1 ? '母矿机' : '子矿机'
-}
+  return val === 1 ? "母矿机" : "子矿机";
+};
 
 const generateCode = (num: number) => {
-  const input = num + ''
-  const hashHex = SHA256(input).toString()
+  const input = num + "";
+  const hashHex = SHA256(input).toString();
   // 提取前4位字母和后4位十六进制
   const letterPart =
     hashHex
       .match(/[a-zA-Z]/g)
       ?.slice(0, 4)
-      .join('') || 'ABCD'
-  const hexPart = hashHex.slice(10, 14)
+      .join("") || "ABCD";
+  const hexPart = hashHex.slice(10, 14);
 
-  return (letterPart + hexPart).toUpperCase()
-}
+  return (letterPart + hexPart).toUpperCase();
+};
 
 const TransferMachine = () => {
-  const navigate = useNavigate()
-  const location = useLocation()
+  const navigate = useNavigate();
+  const location = useLocation();
+  const chainConfig = useChainConfig();
+  const chainId = useChainId();
 
-  const pageData: MachineInfo[] = location.state
+  // 使用动态地址
+  const MiningMachineSystemLogicAddress =
+    chainConfig.LOGIC_ADDRESS as `0x${string}`;
+  const MiningMachineSystemStorageAddress =
+    chainConfig.STORAGE_ADDRESS as `0x${string}`;
 
-  const [receiveAddress, setReceiveAddress] = useState('')
+  const pageData: MachineInfo[] = location.state;
 
-  const [transferLoading, setTransferLoading] = useState(false)
+  const [receiveAddress, setReceiveAddress] = useState("");
+
+  const [transferLoading, setTransferLoading] = useState(false);
 
   const handlBack = () => {
-    navigate('/sale-person')
-  }
+    navigate("/sale-person");
+  };
 
-  const [listHeight, setListHeight] = useState(0)
-  const listContainerRef = useRef<HTMLDivElement>(null)
+  const [listHeight, setListHeight] = useState(0);
+  const listContainerRef = useRef<HTMLDivElement>(null);
 
-  const [usdtToIdxRate, setUsdtToIdxRate] = useState(0)
-  const [motherPrice, setMotherPrice] = useState(0)
+  const [usdtToIdxRate, setUsdtToIdxRate] = useState(0);
+  const [motherPrice, setMotherPrice] = useState(0);
 
   // 动态计算高度
   useEffect(() => {
-    if (!listContainerRef.current) return
+    if (!listContainerRef.current) return;
 
     const calculateHeight = () => {
-      const windowHeight = window.innerHeight
-      const topSectionHeight = 450
-      const newHeight = windowHeight - topSectionHeight
-      setListHeight(newHeight)
-    }
+      const windowHeight = window.innerHeight;
+      const topSectionHeight = 450;
+      const newHeight = windowHeight - topSectionHeight;
+      setListHeight(newHeight);
+    };
 
     // 初始化计算
-    calculateHeight()
+    calculateHeight();
 
     // 监听窗口变化（如旋转屏幕、键盘弹出等）
-    window.addEventListener('resize', calculateHeight)
-    return () => window.removeEventListener('resize', calculateHeight)
-  }, [])
+    window.addEventListener("resize", calculateHeight);
+    return () => window.removeEventListener("resize", calculateHeight);
+  }, []);
 
   const handleTransferOut = async () => {
-    const isValid = validateAddressFnMap?.['EVM']?.(receiveAddress)
+    const isValid = validateAddressFnMap?.["EVM"]?.(receiveAddress);
 
     if (!isValid) {
       Toast.show({
-        content: '请输入合法的BNB地址',
-        position: 'center',
-        duration: 2000
-      })
-      return
+        content: "请输入合法的BNB地址",
+        position: "center",
+        duration: 2000,
+      });
+      return;
     }
 
     try {
       const ids = pageData.map((e: MachineInfo) => {
-        return e.id
-      })
+        return e.id;
+      });
 
       Toast.show({
-        content: '转出中...',
-        position: 'center',
-        duration: 0
-      })
+        content: "转出中...",
+        position: "center",
+        duration: 0,
+      });
 
-      setTransferLoading(true)
+      setTransferLoading(true);
+
+      // 动态计算 Gas Limit
+      const baseGas = 150000n;
+      const perMachineGas = 50000n;
+      const gasLimit = baseGas + BigInt(ids.length) * perMachineGas;
 
       const res = await writeContract(config, {
         address: MiningMachineSystemLogicAddress,
         abi: MiningMachineSystemLogicABI,
-        functionName: 'createInternalMachineOrder',
-        args: [receiveAddress, ids]
-      })
+        functionName: "createInternalMachineOrder",
+        args: [receiveAddress, ids],
+        gas: gasLimit, // 动态计算 Gas Limit
+        maxFeePerGas: parseGwei("10"),
+        maxPriorityFeePerGas: parseGwei("2"),
+      });
 
       await waitForTransactionReceipt(config, {
         hash: res,
-        chainId: CHAIN_ID
-      })
-      Toast.clear()
+        chainId,
+      });
+      Toast.clear();
 
       // 完成后返回到主页
-      navigate('/sale-person')
+      navigate("/sale-person");
     } catch (error) {
-      console.error(error)
+      console.error(error);
     } finally {
-      setTransferLoading(false)
+      setTransferLoading(false);
     }
-  }
+  };
 
   const handleChangeAddress = (value: string) => {
-    setReceiveAddress(value)
-  }
+    setReceiveAddress(value);
+  };
 
   const getUsdtToIdxRate = async () => {
     try {
       const data = await readContract(config, {
         address: MiningMachineSystemLogicAddress,
         abi: MiningMachineSystemLogicABI,
-        functionName: 'getIDXAmount',
-        args: [1]
-      })
+        functionName: "getIDXAmount",
+        args: [1],
+      });
 
-      const rate = data ? formatEther(data) : '0'
-      setUsdtToIdxRate(+rate)
+      const rate = data ? formatEther(data) : "0";
+      setUsdtToIdxRate(+rate);
     } catch (error) {
-      console.error(error)
+      console.error(error);
     }
-  }
+  };
 
   useEffect(() => {
-    getUsdtToIdxRate()
-  }, [])
+    getUsdtToIdxRate();
+  }, []);
 
   const queryMotherMachinePrice = useCallback(async () => {
     try {
-      const machineId = pageData[0].id
+      const machineId = pageData[0].id;
       const res = await readContract(config, {
         address: MiningMachineSystemStorageAddress,
         abi: MiningMachineSystemStorageABI,
-        functionName: 'motherMachinePrices',
-        args: [machineId]
-      })
-      setMotherPrice(Number(res))
+        functionName: "motherMachinePrices",
+        args: [machineId],
+      });
+      setMotherPrice(Number(res));
     } catch (error) {
-      console.error(error)
+      console.error(error);
     }
-  }, [pageData])
+  }, [pageData]);
 
   useEffect(() => {
-    queryMotherMachinePrice()
-  }, [queryMotherMachinePrice])
+    queryMotherMachinePrice();
+  }, [queryMotherMachinePrice]);
 
   return (
     <div className="">
@@ -269,7 +284,7 @@ const TransferMachine = () => {
         <Button
           className="!bg-black !text-white !rounded-3xl !ml-auto   !py-2 !w-[100px]"
           style={{
-            fontSize: '14px'
+            fontSize: "14px",
           }}
           loading={transferLoading}
           onClick={handleTransferOut}
@@ -278,25 +293,25 @@ const TransferMachine = () => {
         </Button>
       </div>
     </div>
-  )
-}
+  );
+};
 
 const Row = ({
   index,
   style,
-  data
+  data,
 }: {
-  data: MachineInfo[]
-  index: number
-  style: React.CSSProperties
+  data: MachineInfo[];
+  index: number;
+  style: React.CSSProperties;
 }) => {
-  const item = data[index]
+  const item = data[index];
 
   return (
     <div
       style={{
         ...style,
-        height: '50px'
+        height: "50px",
       }}
     >
       <div className="flex justify-between py-2">
@@ -306,7 +321,7 @@ const Row = ({
       </div>
       <Divider className="!my-[0]" />
     </div>
-  )
-}
+  );
+};
 
-export default TransferMachine
+export default TransferMachine;

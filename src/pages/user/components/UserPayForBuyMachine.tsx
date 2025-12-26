@@ -1,124 +1,131 @@
-import { arrowSvg } from '@/assets'
-import { Button, Divider, Toast } from 'antd-mobile'
-import { SHA256 } from 'crypto-js'
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
-import { FixedSizeList as List } from 'react-window'
+import { arrowSvg } from "@/assets";
+import { Button, Divider, Toast } from "antd-mobile";
+import { SHA256 } from "crypto-js";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { FixedSizeList as List } from "react-window";
 import {
   waitForTransactionReceipt,
   writeContract,
   readContract,
-  multicall
-} from '@wagmi/core'
-import config from '@/proviers/config'
+  multicall,
+} from "@wagmi/core";
+import config from "@/proviers/config";
 import {
-  ALLOWANCE_QUOTA,
-  CHAIN_ID,
-  IDX_CONTRACTS_ADDRESS,
   MiningMachineHistoryABI,
-  MiningMachineHistoryAddress,
   MiningMachineSystemLogicABI,
-  MiningMachineSystemLogicAddress
-} from '@/constants'
-import { useAccount, useWriteContract } from 'wagmi'
-import LoadingButton from '@/components/LoadingButton'
-import AdaptiveNumber, { NumberType } from '@/components/AdaptiveNumber'
-import { erc20Abi, formatEther, parseEther, parseGwei } from 'viem'
-import orderStore from '@/stores/orderStore'
-import { usePaymentCheck } from '@/hooks/usePaymentCheck'
-import { writeContractWithGasFallback, getGasConfigByFunctionName } from '@/utils/contractUtils'
+} from "@/constants";
+import { useChainConfig } from "@/hooks/useChainConfig";
+import { useAccount, useWriteContract, useChainId } from "wagmi";
+import LoadingButton from "@/components/LoadingButton";
+import AdaptiveNumber, { NumberType } from "@/components/AdaptiveNumber";
+import { erc20Abi, formatEther, parseEther, parseGwei } from "viem";
+import orderStore from "@/stores/orderStore";
+import { usePaymentCheck } from "@/hooks/usePaymentCheck";
+import {
+  writeContractWithGasFallback,
+  getGasConfigByFunctionName,
+} from "@/utils/contractUtils";
 
 const getMachineName = (val: number) => {
-  return val === 1 ? '母矿机' : '子矿机'
-}
+  return val === 1 ? "母矿机" : "子矿机";
+};
 
 const generateCode = (num: number) => {
-  const input = num + ''
-  const hashHex = SHA256(input).toString()
+  const input = num + "";
+  const hashHex = SHA256(input).toString();
   // 提取前4位字母和后4位十六进制
   const letterPart =
     hashHex
       .match(/[a-zA-Z]/g)
       ?.slice(0, 4)
-      .join('') || 'ABCD'
-  const hexPart = hashHex.slice(10, 14)
+      .join("") || "ABCD";
+  const hexPart = hashHex.slice(10, 14);
 
-  return (letterPart + hexPart).toUpperCase()
-}
+  return (letterPart + hexPart).toUpperCase();
+};
 
 const UserPayForBuyMachine = () => {
-  const navigate = useNavigate()
-  const { writeContractAsync } = useWriteContract()
-  const [isPaying, setIsPaying] = useState(false)
-  const [usdtToIdxRate, setUsdtToIdxRate] = useState('')
+  const navigate = useNavigate();
+  const chainConfig = useChainConfig();
+  const chainId = useChainId();
+  const { writeContractAsync } = useWriteContract();
+  const [isPaying, setIsPaying] = useState(false);
+  const [usdtToIdxRate, setUsdtToIdxRate] = useState("");
 
-  const location = useLocation()
+  const MiningMachineSystemLogicAddress =
+    chainConfig.LOGIC_ADDRESS as `0x${string}`;
+  const MiningMachineHistoryAddress =
+    chainConfig.HISTORY_ADDRESS as `0x${string}`;
+  const IDX_CONTRACTS_ADDRESS = chainConfig.IDX_TOKEN as `0x${string}`;
 
-  const pageData = location.state
+  const location = useLocation();
+
+  const pageData = location.state;
 
   const machineIdsAndOrderTypeList = location.state.machineIds.map(
     (id: number) => {
       return {
         id,
-        mtype: location.state.orderType
-      }
-    }
-  )
+        mtype: location.state.orderType,
+      };
+    },
+  );
 
   const handlBack = () => {
-    navigate('/user/history')
-  }
+    navigate("/user/history");
+  };
 
   const getUsdtToIdxRate = async () => {
     try {
       const data = await readContract(config, {
         address: MiningMachineSystemLogicAddress,
         abi: MiningMachineSystemLogicABI,
-        functionName: 'getIDXAmount',
-        args: [1]
-      })
+        functionName: "getIDXAmount",
+        args: [1],
+      });
 
-      const rate = data ? formatEther(data) : '0'
-      setUsdtToIdxRate(rate)
+      const rate = data ? formatEther(data) : "0";
+      setUsdtToIdxRate(rate);
     } catch (error) {
-      console.error(error)
+      console.error(error);
     }
-  }
+  };
 
   useEffect(() => {
-    getUsdtToIdxRate()
-  }, [])
+    getUsdtToIdxRate();
+  }, []);
 
-  const [listHeight, setListHeight] = useState(0)
-  const listContainerRef = useRef<HTMLDivElement>(null)
-  const { address: userAddress } = useAccount()
+  const [listHeight, setListHeight] = useState(0);
+  const listContainerRef = useRef<HTMLDivElement>(null);
+  const { address: userAddress } = useAccount();
 
   const {
     isLoading: isPaymentCheckLoading,
     isBalanceSufficient,
-    isAllowanceSufficient
+    isAllowanceSufficient,
   } = usePaymentCheck(
-    parseEther(String(Math.ceil(pageData.price * +usdtToIdxRate)))
-  )
+    parseEther(String(Math.ceil(pageData.price * +usdtToIdxRate))),
+  );
 
   // 动态计算高度
   useEffect(() => {
-    if (!listContainerRef.current) return
+    if (!listContainerRef.current) return;
 
     const calculateHeight = () => {
-      const windowHeight = window.innerHeight
-      const topSectionHeight = 370
-      const newHeight = windowHeight - topSectionHeight
-      setListHeight(newHeight)
-    }
+      const windowHeight = window.innerHeight;
+      const topSectionHeight = 370;
+      const newHeight = windowHeight - topSectionHeight;
+      setListHeight(newHeight);
+    };
 
     // 初始化计算
-    calculateHeight()
+    calculateHeight();
 
     // 监听窗口变化（如旋转屏幕、键盘弹出等）
-    window.addEventListener('resize', calculateHeight)
-    return () => window.removeEventListener('resize', calculateHeight)
-  }, [])
+    window.addEventListener("resize", calculateHeight);
+    return () => window.removeEventListener("resize", calculateHeight);
+  }, []);
 
   const handleQueryAllListedOrders = useCallback(async () => {
     try {
@@ -126,23 +133,23 @@ const UserPayForBuyMachine = () => {
       const buyerOrderIds = await readContract(config, {
         address: MiningMachineHistoryAddress,
         abi: MiningMachineHistoryABI,
-        functionName: 'getBuyerOrderIds',
-        args: [userAddress, 0, 100]
-      })
+        functionName: "getBuyerOrderIds",
+        args: [userAddress, 0, 100],
+      });
 
-      const bignumToNumber = (buyerOrderIds as bigint[]).map((e) => Number(e))
+      const bignumToNumber = (buyerOrderIds as bigint[]).map((e) => Number(e));
 
       const contracts = bignumToNumber.map((id) => {
         return {
           address: MiningMachineHistoryAddress,
           abi: MiningMachineHistoryABI,
-          functionName: 'allOrders',
-          args: [id]
-        }
-      })
+          functionName: "allOrders",
+          args: [id],
+        };
+      });
       const data2 = await multicall(config, {
-        contracts
-      })
+        contracts,
+      });
       const itemList = data2.map((item) => {
         return {
           orderId: Number(item.result[0]),
@@ -150,79 +157,79 @@ const UserPayForBuyMachine = () => {
           buyer: item.result[2],
           createTime: String(item.result[3]),
           status: item.result[4],
-          orderType: item.result[5]
-        }
-      })
+          orderType: item.result[5],
+        };
+      });
 
       const priceAndMachineIdsContracts = bignumToNumber.map((id) => {
         return {
           address: MiningMachineSystemLogicAddress,
           abi: MiningMachineSystemLogicABI,
-          functionName: 'internalOrders',
-          args: [id]
-        }
-      })
+          functionName: "internalOrders",
+          args: [id],
+        };
+      });
 
       const data3 = await multicall(config, {
-        contracts: priceAndMachineIdsContracts
-      })
+        contracts: priceAndMachineIdsContracts,
+      });
 
       const resultList = itemList.map((item, index) => {
         return {
           ...item,
-          price: Number(data3[index].result[2])
-        }
-      })
+          price: Number(data3[index].result[2]),
+        };
+      });
 
       const machineIdsContracts = bignumToNumber.map((id) => {
         return {
           address: MiningMachineSystemLogicAddress,
           abi: MiningMachineSystemLogicABI,
-          functionName: 'getInternalOrderMachineIds',
-          args: [id]
-        }
-      })
+          functionName: "getInternalOrderMachineIds",
+          args: [id],
+        };
+      });
 
       const data4 = await multicall(config, {
-        contracts: machineIdsContracts
-      })
+        contracts: machineIdsContracts,
+      });
 
       const resultListWithMachineIds = resultList.map((item, index) => {
         const formatIdToNumber = data4[index].result.map((id: bigint) =>
-          Number(id)
-        )
+          Number(id),
+        );
         return {
           ...item,
-          machineIds: formatIdToNumber
-        }
-      })
+          machineIds: formatIdToNumber,
+        };
+      });
 
-      console.log('buyer list', resultListWithMachineIds)
+      console.log("buyer list", resultListWithMachineIds);
 
       // seller orderids
 
       const sellerOrderIds = await readContract(config, {
         address: MiningMachineHistoryAddress,
         abi: MiningMachineHistoryABI,
-        functionName: 'getSellerOrderIds',
-        args: [userAddress, 0, 100]
-      })
+        functionName: "getSellerOrderIds",
+        args: [userAddress, 0, 100],
+      });
 
       const sellerBignumToNumber = (sellerOrderIds as bigint[]).map((e) =>
-        Number(e)
-      )
+        Number(e),
+      );
 
       const sellercontracts = sellerBignumToNumber.map((id) => {
         return {
           address: MiningMachineHistoryAddress,
           abi: MiningMachineHistoryABI,
-          functionName: 'allOrders',
-          args: [id]
-        }
-      })
+          functionName: "allOrders",
+          args: [id],
+        };
+      });
       const sellerdata2 = await multicall(config, {
-        contracts: sellercontracts
-      })
+        contracts: sellercontracts,
+      });
       const selleritemList = sellerdata2.map((item) => {
         return {
           orderId: Number(item.result[0]),
@@ -230,165 +237,171 @@ const UserPayForBuyMachine = () => {
           buyer: item.result[2],
           createTime: String(item.result[3]),
           status: item.result[4],
-          orderType: 2
-        }
-      })
+          orderType: 2,
+        };
+      });
 
       const sellerpriceAndMachineIdsContracts = sellerBignumToNumber.map(
         (id) => {
           return {
             address: MiningMachineSystemLogicAddress,
             abi: MiningMachineSystemLogicABI,
-            functionName: 'internalOrders',
-            args: [id]
-          }
-        }
-      )
+            functionName: "internalOrders",
+            args: [id],
+          };
+        },
+      );
 
       const sellerdata3 = await multicall(config, {
-        contracts: sellerpriceAndMachineIdsContracts
-      })
+        contracts: sellerpriceAndMachineIdsContracts,
+      });
 
       const sellerresultList = selleritemList.map((item, index) => {
         return {
           ...item,
-          price: Number(sellerdata3[index].result[2])
-        }
-      })
+          price: Number(sellerdata3[index].result[2]),
+        };
+      });
 
       const sellermachineIdsContracts = sellerBignumToNumber.map((id) => {
         return {
           address: MiningMachineSystemLogicAddress,
           abi: MiningMachineSystemLogicABI,
-          functionName: 'getInternalOrderMachineIds',
-          args: [id]
-        }
-      })
+          functionName: "getInternalOrderMachineIds",
+          args: [id],
+        };
+      });
 
       const sellerdata4 = await multicall(config, {
-        contracts: sellermachineIdsContracts
-      })
+        contracts: sellermachineIdsContracts,
+      });
 
       const sellerresultListWithMachineIds = sellerresultList.map(
         (item, index) => {
           const formatIdToNumber = sellerdata4[index].result.map((id: bigint) =>
-            Number(id)
-          )
+            Number(id),
+          );
           return {
             ...item,
-            machineIds: formatIdToNumber
-          }
-        }
-      )
+            machineIds: formatIdToNumber,
+          };
+        },
+      );
 
-      console.log('seller list', sellerresultListWithMachineIds)
+      console.log("seller list", sellerresultListWithMachineIds);
 
       let list = [
         ...resultListWithMachineIds,
-        ...sellerresultListWithMachineIds
-      ]
+        ...sellerresultListWithMachineIds,
+      ];
 
       const sellList = orderStore.getallListedOrders().map((e) => ({
         ...e,
-        orderType: 3
-      }))
+        orderType: 3,
+      }));
 
       list = list
         .filter(
           (item) =>
             item.machineIds.length !== 0 &&
-            (item.seller === userAddress || item.buyer === userAddress)
+            (item.seller === userAddress || item.buyer === userAddress),
         )
         .concat(sellList)
-        .sort((a, b) => a.status - b.status)
+        .sort((a, b) => a.status - b.status);
 
       // 用户交易历史
       const unPaidLength = list.filter(
         (item) =>
           item.status === 0 &&
-          (item.seller === userAddress || item.buyer === userAddress)
-      ).length
-      orderStore.updateData(list, unPaidLength)
+          (item.seller === userAddress || item.buyer === userAddress),
+      ).length;
+      orderStore.updateData(list, unPaidLength);
     } catch (error) {
-      console.error(error)
+      console.error(error);
     }
-  }, [userAddress])
+  }, [userAddress]);
 
   const handlePay = async () => {
     try {
-      if (isPaymentCheckLoading) return
+      if (isPaymentCheckLoading) return;
 
       if (!isBalanceSufficient) {
         Toast.show({
-          content: '余额不足',
-          position: 'center'
-        })
-        return
+          content: "余额不足",
+          position: "center",
+        });
+        return;
       }
 
-      setIsPaying(true)
+      setIsPaying(true);
 
       if (!isAllowanceSufficient) {
         // 计算实际需要的金额（这里需要根据具体业务逻辑计算）
         // 假设购买单台矿机需要一定数量的IDX，这里需要根据实际情况调整
-        const actualAmount = parseEther(String(pageData.price || 100)) // 需要根据实际业务逻辑调整
-        const smartAllowance = actualAmount * 30n  // 调整为30倍授权
-        
-        console.log('实际需要金额:', formatEther(actualAmount), 'IDX')
-        console.log('期望智能授权额度:', formatEther(smartAllowance), 'IDX')
-        
+        const actualAmount = parseEther(String(pageData.price || 100)); // 需要根据实际业务逻辑调整
+        const smartAllowance = actualAmount * 30n; // 调整为30倍授权
+
+        console.log("实际需要金额:", formatEther(actualAmount), "IDX");
+        console.log("期望智能授权额度:", formatEther(smartAllowance), "IDX");
+
         // 先查询当前allowance值
-        console.log('查询当前allowance值...')
-        const currentAllowance = await readContract(config, {
+        console.log("查询当前allowance值...");
+        const currentAllowance = (await readContract(config, {
           address: IDX_CONTRACTS_ADDRESS,
           abi: erc20Abi,
-          functionName: 'allowance',
-          args: [userAddress!, MiningMachineSystemLogicAddress]
-        }) as bigint
-        
-        console.log('当前allowance值:', formatEther(currentAllowance), 'IDX')
-        
+          functionName: "allowance",
+          args: [userAddress!, MiningMachineSystemLogicAddress],
+        })) as bigint;
+
+        console.log("当前allowance值:", formatEther(currentAllowance), "IDX");
+
         // 检查当前allowance是否已经足够（超过2倍实际需要）
         if (currentAllowance >= smartAllowance) {
-          console.log('当前allowance已足够，无需重新授权')
+          console.log("当前allowance已足够，无需重新授权");
         } else {
-          console.log('当前allowance不足，执行智能授权')
-          
-          await writeContractWithGasFallback({
-            address: IDX_CONTRACTS_ADDRESS,
-            abi: erc20Abi,
-            functionName: 'approve',
-            args: [MiningMachineSystemLogicAddress, smartAllowance]
-          }, getGasConfigByFunctionName('approve'))
+          console.log("当前allowance不足，执行智能授权");
+
+          await writeContractWithGasFallback(
+            {
+              address: IDX_CONTRACTS_ADDRESS,
+              abi: erc20Abi,
+              functionName: "approve",
+              args: [MiningMachineSystemLogicAddress, smartAllowance],
+            },
+            getGasConfigByFunctionName("approve"),
+          );
         }
       }
 
-      const hash = await writeContractWithGasFallback({
-        address: MiningMachineSystemLogicAddress,
-        abi: MiningMachineSystemLogicABI,
-        functionName: 'buyMachine',
-        args: [pageData.orderId]
-      }, getGasConfigByFunctionName('buyMachine'))
+      const hash = await writeContractWithGasFallback(
+        {
+          address: MiningMachineSystemLogicAddress,
+          abi: MiningMachineSystemLogicABI,
+          functionName: "buyMachine",
+          args: [pageData.orderId],
+        },
+        getGasConfigByFunctionName("buyMachine"),
+      );
 
       await waitForTransactionReceipt(config, {
         hash,
-        chainId: CHAIN_ID
-      })
+        chainId,
+      });
 
-      setIsPaying(false)
-      handleQueryAllListedOrders()
+      setIsPaying(false);
+      handleQueryAllListedOrders();
 
-      navigate('/user')
+      navigate("/user");
     } catch (error) {
       Toast.show({
-        content: '支付失败',
-        position: 'center',
-        duration: 2000
-      })
-      setIsPaying(false)
-      console.error(error)
+        content: "支付失败",
+        position: "center",
+        duration: 2000,
+      });
+      setIsPaying(false);
+      console.error(error);
     }
-  }
+  };
 
   return (
     <div>
@@ -482,27 +495,27 @@ const UserPayForBuyMachine = () => {
         />
       </div>
     </div>
-  )
-}
+  );
+};
 
 const Row = ({
   index,
   style,
-  data
+  data,
 }: {
   data: {
-    id: number
-    mtype: number
-  }[]
-  index: number
-  style: React.CSSProperties
+    id: number;
+    mtype: number;
+  }[];
+  index: number;
+  style: React.CSSProperties;
 }) => {
-  const item = data[index]
+  const item = data[index];
   return (
     <div
       style={{
         ...style,
-        height: '50px'
+        height: "50px",
       }}
     >
       <div className="flex justify-between py-2">
@@ -512,7 +525,7 @@ const Row = ({
       </div>
       <Divider className="!my-[0]" />
     </div>
-  )
-}
+  );
+};
 
-export default UserPayForBuyMachine
+export default UserPayForBuyMachine;

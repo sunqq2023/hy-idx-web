@@ -5,144 +5,153 @@ import {
   toBeActiveSvg,
   wreckageSvg,
   noOpenSvg,
-  userMachineSvg
-} from '@/assets'
-import { Button, Dialog, Divider, ProgressBar, Toast } from 'antd-mobile'
-import { useCallback, useEffect, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
-import { MachineInfo } from '@/constants/types'
-import { formatTime } from '@/utils/helper'
-import AdaptiveNumber, { NumberType } from '@/components/AdaptiveNumber'
-import { useAccount, useReadContract } from 'wagmi'
-import { generateCode } from '../../../components/CheckableItem';
+  userMachineSvg,
+} from "@/assets";
+import { Button, Dialog, Divider, ProgressBar, Toast } from "antd-mobile";
+import { useCallback, useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { MachineInfo } from "@/constants/types";
+import { formatTime } from "@/utils/helper";
+import AdaptiveNumber, { NumberType } from "@/components/AdaptiveNumber";
+import { useAccount, useReadContract, useChainId } from "wagmi";
+import { generateCode } from "../../../components/CheckableItem";
 
 import {
   readContract,
   writeContract,
-  waitForTransactionReceipt
-} from '@wagmi/core'
-import config from '@/proviers/config'
+  waitForTransactionReceipt,
+} from "@wagmi/core";
+import config from "@/proviers/config";
 import {
-  CHAIN_ID,
-  IDX_CONTRACTS_ADDRESS,
   MiningMachineSystemLogicABI,
-  MiningMachineSystemLogicAddress,
   MiningMachineSystemStorageABI,
-  MiningMachineSystemStorageAddress
-} from '@/constants'
-import usePopup from '@/components/usePopup'
-import { erc20Abi, formatEther } from 'viem'
-import dayjs from 'dayjs'
+} from "@/constants";
+import { useChainConfig } from "@/hooks/useChainConfig";
+import usePopup from "@/components/usePopup";
+import { erc20Abi, formatEther, parseGwei } from "viem";
+import dayjs from "dayjs";
 
 const MachineDetail = () => {
-  const navigate = useNavigate()
-  const { isConnected, address: userAddress } = useAccount()
+  const navigate = useNavigate();
+  const chainConfig = useChainConfig();
+  const chainId = useChainId();
+  const { isConnected, address: userAddress } = useAccount();
   const [isMotherMachineDistributor, setIsMotherMachineDistributor] =
-    useState(false)
-  const location = useLocation()
+    useState(false);
+  const location = useLocation();
+
+  const MiningMachineSystemLogicAddress =
+    chainConfig.LOGIC_ADDRESS as `0x${string}`;
+  const MiningMachineSystemStorageAddress =
+    chainConfig.STORAGE_ADDRESS as `0x${string}`;
+  const IDX_CONTRACTS_ADDRESS = chainConfig.IDX_TOKEN as `0x${string}`;
 
   // 确保 pageData 初始化为空对象，避免 undefined 错误
-  const pageData = location.state as MachineInfo || { id: 0 }
-  console.log('machine detail', pageData)
+  const pageData = (location.state as MachineInfo) || { id: 0 };
+  console.log("machine detail", pageData);
 
   const handlBack = () => {
-    navigate(-1, { state: { fromMachineDetail: true } })
-  }
+    navigate(-1, { state: { fromMachineDetail: true } });
+  };
 
-  const [needToPayIdxAmount, setneedToPayIdxAmount] = useState(0)
-  const [idxBalance, setidxBalance] = useState(0)
+  const [needToPayIdxAmount, setneedToPayIdxAmount] = useState(0);
+  const [idxBalance, setidxBalance] = useState(0);
 
   const {
     data: idxPrice,
     isLoading: idxPriceLoading,
-    error: idxPriceError
+    error: idxPriceError,
   } = useReadContract({
     address: MiningMachineSystemLogicAddress,
     abi: MiningMachineSystemLogicABI,
-    functionName: 'getIDXAmount',
-    args: [30]
-  })
+    functionName: "getIDXAmount",
+    args: [30],
+  });
 
   const {
     data: idxData,
     isLoading: idxBalanceLoading,
-    error: idxBalanceError
+    error: idxBalanceError,
   } = useReadContract({
     address: IDX_CONTRACTS_ADDRESS,
     abi: erc20Abi,
-    functionName: 'balanceOf',
-    args: [userAddress!]
-  })
+    functionName: "balanceOf",
+    args: [userAddress!],
+  });
 
   useEffect(() => {
     if (!idxBalanceLoading) {
-      setidxBalance(Number(idxData ? formatEther(idxData) : '0'))
+      setidxBalance(Number(idxData ? formatEther(idxData) : "0"));
     }
-  }, [idxBalanceLoading, idxData])
+  }, [idxBalanceLoading, idxData]);
 
   useEffect(() => {
     if (!idxPriceLoading) {
-      setneedToPayIdxAmount(Number(idxPrice ? formatEther(idxPrice) : '0'))
+      setneedToPayIdxAmount(Number(idxPrice ? formatEther(idxPrice) : "0"));
     }
-  }, [idxPriceLoading, idxPrice])
+  }, [idxPriceLoading, idxPrice]);
 
   const handleShutdown = () => {
     // 显示确认对话框
     Dialog.confirm({
-      content: '是否关停矿机',
-      onConfirm: async () => { // 用户确认后执行的逻辑
+      content: "是否关停矿机",
+      onConfirm: async () => {
+        // 用户确认后执行的逻辑
         try {
           // 调用合约的关停方法
           const hash = await writeContract(config, {
             address: MiningMachineSystemLogicAddress, // 合约地址
-            abi: MiningMachineSystemLogicABI,         // 合约ABI
-            functionName: 'deactivateLP',             // 关停对应的合约函数
-            args: [pageData.id]                       // 传入当前矿机ID作为参数
-          })
+            abi: MiningMachineSystemLogicABI, // 合约ABI
+            functionName: "deactivateLP", // 关停对应的合约函数
+            args: [pageData.id], // 传入当前矿机ID作为参数
+            gas: 200000n, // 固定 gas limit
+            maxFeePerGas: parseGwei("10"),
+            maxPriorityFeePerGas: parseGwei("2"),
+          });
 
           // 等待交易上链确认
           const receipt = await waitForTransactionReceipt(config, {
             hash,
-            chainId: CHAIN_ID
-          })
+            chainId,
+          });
 
           // 确保交易成功
-          if (receipt.status === 'success') {
+          if (receipt.status === "success") {
             // 操作成功后的反馈
             Toast.show({
-              content: '关停成功',
-              position: 'center'
-            })
+              content: "关停成功",
+              position: "center",
+            });
             // 返回主页面并携带刷新信号
-            navigate('/user', { 
+            navigate("/user", {
               state: { needRefresh: true },
-              replace: true  // 替换历史记录，避免回退问题
-            })
+              replace: true, // 替换历史记录，避免回退问题
+            });
           } else {
-            throw new Error('交易未成功确认')
+            throw new Error("交易未成功确认");
           }
         } catch (error) {
           // 操作失败后的反馈
           Toast.show({
-            content: '关停失败',
-            position: 'center'
-          })
-          console.error(error)
+            content: "关停失败",
+            position: "center",
+          });
+          console.error(error);
         }
-      }
-    })
-  }
+      },
+    });
+  };
 
-  const [isPaying, setIsPaying] = useState(false)
+  const [isPaying, setIsPaying] = useState(false);
   const handlePay = async () => {
     setIsPaying(true);
 
     // 参数校验：确保矿机ID有效
-    if (typeof pageData.id !== 'number' || pageData.id <= 0) {
-      Toast.show({ 
-        content: '矿机ID无效', 
-        position: 'center', 
-        duration: 2000 
+    if (typeof pageData.id !== "number" || pageData.id <= 0) {
+      Toast.show({
+        content: "矿机ID无效",
+        position: "center",
+        duration: 2000,
       });
       setIsPaying(false);
       return;
@@ -152,43 +161,49 @@ const MachineDetail = () => {
       const hash = await writeContract(config, {
         address: MiningMachineSystemLogicAddress as `0x${string}`,
         abi: MiningMachineSystemLogicABI,
-        functionName: 'batchActivateMachinesWithLP',
-        args: [[pageData.id]]
+        functionName: "batchActivateMachinesWithLP",
+        args: [[pageData.id]],
+        gas: 300000n, // 激活矿机操作
+        maxFeePerGas: parseGwei("10"),
+        maxPriorityFeePerGas: parseGwei("2"),
       });
 
-      const receipt = await waitForTransactionReceipt(config, { hash });
-      
-      if (receipt.status === 'success') {
-        Toast.show({ 
-          content: '激活成功!', 
-          position: 'center', 
-          duration: 2000 
+      const receipt = await waitForTransactionReceipt(config, {
+        hash,
+        chainId, // 添加 chainId
+      });
+
+      if (receipt.status === "success") {
+        Toast.show({
+          content: "激活成功!",
+          position: "center",
+          duration: 2000,
         });
         setOpen(false);
         // 激活成功后返回主页面并刷新
-        navigate('/user', { 
+        navigate("/user", {
           state: { needRefresh: true },
-          replace: true 
+          replace: true,
         });
       } else {
-        throw new Error('交易未成功确认')
+        throw new Error("交易未成功确认");
       }
     } catch (error) {
       Toast.show({
-        content: `激活失败: ${error instanceof Error ? error.message : '未知错误'}`,
-        position: 'center',
-        duration: 3000
+        content: `激活失败: ${error instanceof Error ? error.message : "未知错误"}`,
+        position: "center",
+        duration: 3000,
       });
-      console.error('激活失败详情:', error);
+      console.error("激活失败详情:", error);
     } finally {
       setIsPaying(false);
     }
   };
 
   const { setOpen, component } = usePopup({
-    title: '',
-    contentClassName: '',
-    closeButtonClassName: '',
+    title: "",
+    contentClassName: "",
+    closeButtonClassName: "",
     content: (
       <div className="w-full">
         <div className="text-[#6433EC] font-bold text-[15px] pt-2 pb-4">
@@ -228,74 +243,74 @@ const MachineDetail = () => {
           loading={isPaying}
           disabled={idxBalance < needToPayIdxAmount}
         >
-          {idxBalance > needToPayIdxAmount ? '支付费用' : '余额不足'}
+          {idxBalance > needToPayIdxAmount ? "支付费用" : "余额不足"}
         </Button>
       </div>
-    )
-  })
-  
+    ),
+  });
+
   const handleActivate = () => {
-    setOpen(true)
-  }
+    setOpen(true);
+  };
 
   const getFormattedMix = (producedMix: any) => {
     if (producedMix !== undefined && producedMix > 0) {
-      const val = formatEther(BigInt(producedMix))
-      return +val
+      const val = formatEther(BigInt(producedMix));
+      return +val;
     }
-    return 0
-  }
+    return 0;
+  };
 
   const getRemainingLife = () => {
     if (pageData.mtype === 1) {
       if (pageData.isActivatedStakedLP) {
-        const now = new Date().getTime() / 1000
-        const daysDiff = dayjs(now).diff(dayjs(pageData.activatedAt), 'day')
-        return 90 - daysDiff
+        const now = new Date().getTime() / 1000;
+        const daysDiff = dayjs(now).diff(dayjs(pageData.activatedAt), "day");
+        return 90 - daysDiff;
       }
-      return 90
+      return 90;
     }
 
     return Math.floor(
-      (360 * (1440 - getFormattedMix(pageData.producedMix))) / 1440
-    )
-  }
+      (360 * (1440 - getFormattedMix(pageData.producedMix))) / 1440,
+    );
+  };
 
   const getRemainingLifePercent = () => {
     if (pageData.mtype === 1) {
       if (pageData.isActivatedStakedLP) {
-        const now = new Date().getTime() / 1000
-        const daysDiff = dayjs(now).diff(dayjs(pageData.activatedAt), 'day')
-        return ((90 - daysDiff) / 90) * 100
+        const now = new Date().getTime() / 1000;
+        const daysDiff = dayjs(now).diff(dayjs(pageData.activatedAt), "day");
+        return ((90 - daysDiff) / 90) * 100;
       }
-      return 0
+      return 0;
     }
 
     const producedHoursToDay =
-      (360 * (1440 - getFormattedMix(pageData.producedMix))) / 1440
-    return (producedHoursToDay / 360) * 100
-  }
+      (360 * (1440 - getFormattedMix(pageData.producedMix))) / 1440;
+    return (producedHoursToDay / 360) * 100;
+  };
 
   const getRemainingFuel = (fuelRemainingMinutes: number) => {
     if (pageData.mtype === 2) {
-      const minutesInDay = 24 * 60
-      const RemainingFuelToDay = fuelRemainingMinutes / minutesInDay
-      return parseFloat(RemainingFuelToDay.toFixed(2))
+      const minutesInDay = 24 * 60;
+      const RemainingFuelToDay = fuelRemainingMinutes / minutesInDay;
+      return parseFloat(RemainingFuelToDay.toFixed(2));
     }
-    return 0
-  }
+    return 0;
+  };
 
   const getRemainingFuelPercent = (fuelRemainingMinutes: number) => {
     if (pageData.mtype === 2) {
-      const minutesInDay = 24 * 60
-      return (fuelRemainingMinutes / minutesInDay / 360) * 100
+      const minutesInDay = 24 * 60;
+      return (fuelRemainingMinutes / minutesInDay / 360) * 100;
     }
-    return 0
-  }
+    return 0;
+  };
 
   const isActivate = () => {
-    return pageData.isActivatedStakedLP
-  }
+    return pageData.isActivatedStakedLP;
+  };
 
   const getIsMotherMachineDistributor = useCallback(async () => {
     if (isConnected) {
@@ -303,42 +318,42 @@ const MachineDetail = () => {
         const result = await readContract(config, {
           address: MiningMachineSystemStorageAddress,
           abi: MiningMachineSystemStorageABI,
-          functionName: 'isMotherMachineDistributor',
-          args: [userAddress]
-        })
-        setIsMotherMachineDistributor(result)
+          functionName: "isMotherMachineDistributor",
+          args: [userAddress],
+        });
+        setIsMotherMachineDistributor(result);
       } catch (error) {
-        console.log(error)
+        console.log(error);
       }
     }
-  }, [userAddress, isConnected])
+  }, [userAddress, isConnected]);
 
   useEffect(() => {
-    getIsMotherMachineDistributor()
-  }, [getIsMotherMachineDistributor])
+    getIsMotherMachineDistributor();
+  }, [getIsMotherMachineDistributor]);
 
   const getImage = () => {
     if (pageData.isActivatedStakedLP && pageData.isProducing) {
-      return startedSvg
+      return startedSvg;
     } else if (pageData.destroyed) {
-      return wreckageSvg
+      return wreckageSvg;
     } else if (
       pageData.isActivatedStakedLP &&
       !pageData.isProducing &&
       pageData.mtype === 1
     ) {
-      return startedSvg
+      return startedSvg;
     } else if (
       pageData.isActivatedStakedLP &&
       !pageData.isProducing &&
       pageData.mtype === 2
     ) {
-      return noOpenSvg
+      return noOpenSvg;
     } else if (!pageData.isActivatedStakedLP) {
-      return toBeActiveSvg
+      return toBeActiveSvg;
     }
-    return toBeActiveSvg // 默认返回未激活图标
-  }
+    return toBeActiveSvg; // 默认返回未激活图标
+  };
 
   return (
     <div className="h-full overflow-scroll px-[21px]">
@@ -366,24 +381,23 @@ const MachineDetail = () => {
             <div className="flex gap-3">
               <div className="text-[#666666]">矿机编号：</div>
               <div className="font-bold text-gray-800">
-                {typeof pageData.id === 'number' && pageData.id > 0
+                {typeof pageData.id === "number" && pageData.id > 0
                   ? `#${generateCode(pageData.id)}`
-                  : '加载中...'
-                }
+                  : "加载中..."}
               </div>
             </div>
 
             <div className="flex gap-3">
               <div className="text-[#666666]">矿机类型：</div>
               <div className="font-bold text-[#BB7054]">
-                {pageData.mtype === 1 ? '母矿机' : '子矿机'}
+                {pageData.mtype === 1 ? "母矿机" : "子矿机"}
               </div>
             </div>
 
             <div className="flex gap-3">
               <div className="text-[#666666]">激活日期：</div>
               <div className="font-bold">
-                {isActivate() ? formatTime(pageData.activatedAt) : '未激活'}
+                {isActivate() ? formatTime(pageData.activatedAt) : "未激活"}
               </div>
             </div>
           </div>
@@ -397,11 +411,11 @@ const MachineDetail = () => {
               <div className="w-[100px] text-[#666666]">燃料费剩余：</div>
               <ProgressBar
                 percent={getRemainingFuelPercent(
-                  pageData.fuelRemainingMinutes ?? 0
+                  pageData.fuelRemainingMinutes ?? 0,
                 )}
                 className="w-[45%]"
                 style={{
-                  '--fill-color': '#615371'
+                  "--fill-color": "#615371",
                 }}
               />
               <div className="ml-2 font-bold">
@@ -416,7 +430,7 @@ const MachineDetail = () => {
               percent={getRemainingLifePercent()}
               className="w-[45%]"
               style={{
-                '--fill-color': '#615371'
+                "--fill-color": "#615371",
               }}
             />
             <div className="ml-2 font-bold">{getRemainingLife()}天</div>
@@ -450,7 +464,7 @@ const MachineDetail = () => {
             className="!mt-4 w-full !rounded-2xl !border-[#d6d6d6]"
             onClick={handleShutdown}
             style={{
-              fontSize: '14px'
+              fontSize: "14px",
             }}
           >
             关停矿机
@@ -461,7 +475,7 @@ const MachineDetail = () => {
               className="!mt-4 w-full !rounded-2xl !border-[#d6d6d6] !bg-black !text-white"
               onClick={handleActivate}
               style={{
-                fontSize: '14px'
+                fontSize: "14px",
               }}
             >
               激活矿机
@@ -504,7 +518,7 @@ const MachineDetail = () => {
         </div>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default MachineDetail
+export default MachineDetail;

@@ -1,119 +1,119 @@
-import { arrowSvg, querySvg } from '@/assets'
-import { Input, Skeleton } from 'antd-mobile'
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { FixedSizeList as List } from 'react-window'
-import { readContract } from '@wagmi/core'
-import config from '@/proviers/config'
+import { arrowSvg, querySvg } from "@/assets";
+import { Input, Skeleton } from "antd-mobile";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { FixedSizeList as List } from "react-window";
+import { readContract } from "@wagmi/core";
+import config from "@/proviers/config";
 
 import {
   MiningMachineHistoryABI,
   MiningMachineSystemLogicABI,
   MiningMachineSystemStorageABI,
-} from '@/constants'
-import { useChainConfig } from '@/hooks/useChainConfig'
-import { formatTime, shortenAddress } from '@/utils/helper'
+} from "@/constants";
+import { useChainConfig } from "@/hooks/useChainConfig";
+import { formatTime, shortenAddress } from "@/utils/helper";
 interface Item {
-  id: number
-  time: number
-  makenum: number
-  num: number
-  distributorUsername: string
-  rate: string
-  address: string
+  id: number;
+  time: number;
+  makenum: number;
+  num: number;
+  distributorUsername: string;
+  rate: string;
+  address: string;
 }
 
 const MakeMHistory = () => {
-  const navigate = useNavigate()
-  const chainConfig = useChainConfig()
-  const [pageData, setPageData] = useState<Item[]>([])
-  const [cloneData, setCloneData] = useState<Item[]>([])
-  const [isLoading, setIsLoading] = useState(false)
+  const navigate = useNavigate();
+  const chainConfig = useChainConfig();
+  const [pageData, setPageData] = useState<Item[]>([]);
+  const [cloneData, setCloneData] = useState<Item[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const [inputValue, setInputValue] = useState('')
+  const [inputValue, setInputValue] = useState("");
   const handlBack = () => {
-    navigate('/make-mmm')
-  }
+    navigate("/make-mmm");
+  };
 
   const handleChange = (value: string) => {
-    setInputValue(value)
+    setInputValue(value);
 
     const newData = cloneData.filter((item) => {
-      const toLowerCaseName = item.distributorUsername.toLowerCase()
-      const toLowerCaseValue = value.toLowerCase()
-      const toLowerCaseAddress = item.address.toLowerCase()
+      const toLowerCaseName = item.distributorUsername.toLowerCase();
+      const toLowerCaseValue = value.toLowerCase();
+      const toLowerCaseAddress = item.address.toLowerCase();
       return (
         toLowerCaseName.includes(toLowerCaseValue) ||
         toLowerCaseAddress.includes(toLowerCaseValue)
-      )
-    })
-    setPageData(newData)
-  }
+      );
+    });
+    setPageData(newData);
+  };
 
   const handleQuery = useCallback(async () => {
     try {
-      setIsLoading(true)
-      const result = []
+      setIsLoading(true);
+      const result = [];
       for (let index = 1; index < 100; index++) {
         const data = await readContract(config, {
           address: chainConfig.STORAGE_ADDRESS as `0x${string}`,
           abi: MiningMachineSystemStorageABI,
-          functionName: 'batchInfos',
-          args: [index]
-        })
+          functionName: "batchInfos",
+          args: [index],
+        });
         const batchDistributorUsername = await readContract(config, {
           address: chainConfig.LOGIC_ADDRESS as `0x${string}`,
           abi: MiningMachineSystemLogicABI,
-          functionName: 'batchDistributorUsernames',
-          args: [index]
-        })
+          functionName: "batchDistributorUsernames",
+          args: [index],
+        });
 
-        if (data[4] === 0) break
+        if (data[4] === 0) break;
 
         result.push({
           time: data[4],
           makenum: Number(data[5]),
           address: data[3],
           rate: data[2],
-          distributorUsername: batchDistributorUsername
-        })
+          distributorUsername: batchDistributorUsername,
+        });
       }
 
-      setPageData(result)
-      setCloneData(result)
+      setPageData(result);
+      setCloneData(result);
       // console.log(result)
     } catch (error) {
-      console.error(error)
+      console.error(error);
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }, [chainConfig.STORAGE_ADDRESS, chainConfig.LOGIC_ADDRESS])
+  }, [chainConfig.STORAGE_ADDRESS, chainConfig.LOGIC_ADDRESS]);
 
   useEffect(() => {
-    handleQuery()
-  }, [handleQuery])
+    handleQuery();
+  }, [handleQuery]);
 
-  const [listHeight, setListHeight] = useState(0)
-  const listContainerRef = useRef<HTMLDivElement>(null)
+  const [listHeight, setListHeight] = useState(0);
+  const listContainerRef = useRef<HTMLDivElement>(null);
 
   // 动态计算高度
   useEffect(() => {
-    if (!listContainerRef.current) return
+    if (!listContainerRef.current) return;
 
     const calculateHeight = () => {
-      const windowHeight = window.innerHeight
-      const topSectionHeight = 180
-      const newHeight = windowHeight - topSectionHeight
-      setListHeight(newHeight)
-    }
+      const windowHeight = window.innerHeight;
+      const topSectionHeight = 180;
+      const newHeight = windowHeight - topSectionHeight;
+      setListHeight(newHeight);
+    };
 
     // 初始化计算
-    calculateHeight()
+    calculateHeight();
 
     // 监听窗口变化（如旋转屏幕、键盘弹出等）
-    window.addEventListener('resize', calculateHeight)
-    return () => window.removeEventListener('resize', calculateHeight)
-  }, [])
+    window.addEventListener("resize", calculateHeight);
+    return () => window.removeEventListener("resize", calculateHeight);
+  }, []);
 
   return (
     <div className="h-full overflow-hidden px-[21px]">
@@ -157,24 +157,24 @@ const MakeMHistory = () => {
         )}
       </div>
     </div>
-  )
-}
+  );
+};
 
 const Row = ({
   index,
   style,
-  data
+  data,
 }: {
-  data: Item[]
-  index: number
-  style: React.CSSProperties
+  data: Item[];
+  index: number;
+  style: React.CSSProperties;
 }) => {
-  const item = data[index]
+  const item = data[index];
   return (
     <div
       style={{
         ...style,
-        height: '227px'
+        height: "227px",
       }}
     >
       <div className="history-container flex text-[15px] mt-4">
@@ -194,7 +194,7 @@ const Row = ({
         </div>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default MakeMHistory
+export default MakeMHistory;

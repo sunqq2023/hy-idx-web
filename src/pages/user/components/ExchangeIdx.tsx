@@ -1,14 +1,12 @@
 import { arrowSvg, blackExchangeSvg, whiteExchangeSvg } from "@/assets";
 import AdaptiveNumber, { NumberType } from "@/components/AdaptiveNumber";
 import {
-  CHAIN_ID,
   MiningMachineProductionLogicABI,
-  MiningMachineProductionLogicAddress,
   MiningMachineSystemLogicABI,
-  MiningMachineSystemLogicAddress,
   MiningMachineSystemStorageABI,
-  MiningMachineSystemStorageAddress,
 } from "@/constants";
+import { useChainConfig } from "@/hooks/useChainConfig";
+import { useChainId, useAccount } from "wagmi";
 import { MachineInfo } from "@/constants/types";
 import { useSequentialContractWrite } from "@/hooks/useSequentialContractWrite";
 import { Button, Divider, Modal, Toast } from "antd-mobile";
@@ -17,7 +15,6 @@ import { useNavigate } from "react-router-dom";
 import { FixedSizeList as List } from "react-window";
 import { formatEther, parseEther, TransactionReceipt } from "viem";
 import config from "@/proviers/config";
-import { useAccount } from "wagmi";
 import {
   readContract,
   writeContract,
@@ -47,6 +44,17 @@ interface IReleaseInfo {
 
 const ExchangeIdx = () => {
   const { address } = useAccount();
+  const chainConfig = useChainConfig();
+  const chainId = useChainId();
+
+  // 使用动态地址（添加类型断言）
+  const MiningMachineSystemStorageAddress =
+    chainConfig.STORAGE_ADDRESS as `0x${string}`;
+  const MiningMachineSystemLogicAddress =
+    chainConfig.LOGIC_ADDRESS as `0x${string}`;
+  const MiningMachineProductionLogicAddress =
+    chainConfig.PRODUCTION_LOGIC_ADDRESS as `0x${string}`;
+
   const [mixBalance, setMixBalance] = useState("");
   const [machineList, setMachineList] = useState<IReleaseInfo[]>([]);
   const [usdtToIdxRate, setUsdtToIdxRate] = useState("");
@@ -107,10 +115,10 @@ const ExchangeIdx = () => {
 
       setReleasedAmount(data.reduce((acc, cur) => acc + cur.releasedAmount, 0));
       setRemainingAmount(
-        data.reduce((acc, cur) => acc + cur.remainingAmount, 0)
+        data.reduce((acc, cur) => acc + cur.remainingAmount, 0),
       );
       setIdxToBeClaimed(
-        data.reduce((acc, cur) => acc + cur.releasableAmount, 0)
+        data.reduce((acc, cur) => acc + cur.releasableAmount, 0),
       );
       console.log("release Info", data);
     } catch (error) {
@@ -196,11 +204,14 @@ const ExchangeIdx = () => {
           abi: MiningMachineProductionLogicABI,
           functionName: "convertMIXtoIDX",
           args: [exchangeMixCount],
+          gas: 300000n, // 固定 gas limit
+          maxFeePerGas: parseGwei("10"),
+          maxPriorityFeePerGas: parseGwei("2"),
         });
 
         await waitForTransactionReceipt(config, {
           hash,
-          chainId: CHAIN_ID,
+          chainId,
         });
         Toast.show({
           content: "兑换成功",
@@ -217,11 +228,20 @@ const ExchangeIdx = () => {
           const errorMsg = contractError.message || String(contractError);
 
           // 检查常见的合约错误
-          if (errorMsg.includes("Insufficient MIX") || errorMsg.includes("余额不足")) {
+          if (
+            errorMsg.includes("Insufficient MIX") ||
+            errorMsg.includes("余额不足")
+          ) {
             errorMessage = "MIX余额不足";
-          } else if (errorMsg.includes("No IDX to release") || errorMsg.includes("IDX数量为0")) {
+          } else if (
+            errorMsg.includes("No IDX to release") ||
+            errorMsg.includes("IDX数量为0")
+          ) {
             errorMessage = "无法兑换：IDX数量为0，可能是交易对余额不足";
-          } else if (errorMsg.includes("IDX transfer failed") || errorMsg.includes("转账失败")) {
+          } else if (
+            errorMsg.includes("IDX transfer failed") ||
+            errorMsg.includes("转账失败")
+          ) {
             errorMessage = "兑换失败：合约IDX余额不足，请联系管理员";
           } else if (errorMsg.includes("gas") || errorMsg.includes("Gas")) {
             errorMessage = "Gas估算失败，可能是合约状态不允许兑换";
@@ -248,7 +268,11 @@ const ExchangeIdx = () => {
     } catch (error) {
       console.error("兑换过程错误:", error);
       // 外层catch处理非合约错误（如网络错误等）
-      if (!(error instanceof Error && error.message.includes("execution reverted"))) {
+      if (
+        !(
+          error instanceof Error && error.message.includes("execution reverted")
+        )
+      ) {
         Toast.show({
           content: "兑换失败，请稍后重试",
           position: "center",
@@ -268,7 +292,7 @@ const ExchangeIdx = () => {
     try {
       // console.log(123, machineList.filter(item => item.totalAmount !== item.releasedAmount))
       const notClaimList = machineList.filter(
-        (item) => item.releasableAmount > 0
+        (item) => item.releasableAmount > 0,
       );
       setIsClaimingIDX(true);
 
@@ -562,7 +586,7 @@ const Row = memo(
         <Divider />
       </div>
     );
-  }
+  },
 );
 
 export default ExchangeIdx;
