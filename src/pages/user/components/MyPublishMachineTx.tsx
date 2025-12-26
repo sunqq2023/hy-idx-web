@@ -12,7 +12,7 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { FixedSizeList as List } from "react-window";
 import dayjs from "dayjs";
-import { erc20Abi, formatEther } from "viem";
+import { erc20Abi, formatEther, parseGwei } from "viem";
 import { formatTime, shortenAddress } from "@/utils/helper";
 import { writeContract, waitForTransactionReceipt } from "@wagmi/core";
 import config from "@/proviers/config";

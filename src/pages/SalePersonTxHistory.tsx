@@ -18,7 +18,7 @@ import {
 import { useChainConfig } from "@/hooks/useChainConfig";
 import { useChainId, useAccount } from "wagmi";
 import AdaptiveNumber, { NumberType } from "@/components/AdaptiveNumber";
-import { formatEther } from "viem";
+import { formatEther, parseGwei } from "viem";
 
 interface Item {
   orderId: number;

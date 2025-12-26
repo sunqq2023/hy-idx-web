@@ -15,7 +15,7 @@ import {
 } from "@/constants";
 import { useChainConfig } from "@/hooks/useChainConfig";
 import { useChainId } from "wagmi";
-import { formatEther } from "viem";
+import { formatEther, parseGwei } from "viem";
 import { shortenAddress } from "@/utils/helper";
 
 const SellToPlatform = () => {

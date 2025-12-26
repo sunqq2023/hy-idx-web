@@ -19,7 +19,7 @@ import config from "@/proviers/config";
 import { MiningMachineSystemLogicABI } from "@/constants";
 import { useChainConfig } from "@/hooks/useChainConfig";
 import { useAccount, useChainId } from "wagmi";
-import { formatEther } from "viem";
+import { formatEther, parseGwei } from "viem";
 import orderStore from "@/stores/orderStore";
 import AdaptiveNumber, { NumberType } from "@/components/AdaptiveNumber";
 

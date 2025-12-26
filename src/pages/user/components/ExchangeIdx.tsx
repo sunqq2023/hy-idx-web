@@ -13,7 +13,7 @@ import { Button, Divider, Modal, Toast } from "antd-mobile";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FixedSizeList as List } from "react-window";
-import { formatEther, parseEther, TransactionReceipt } from "viem";
+import { formatEther, parseEther, parseGwei, TransactionReceipt } from "viem";
 import config from "@/proviers/config";
 import {
   readContract,
@@ -204,7 +204,7 @@ const ExchangeIdx = () => {
           abi: MiningMachineProductionLogicABI,
           functionName: "convertMIXtoIDX",
           args: [exchangeMixCount],
-          gas: 300000n, // 固定 gas limit
+          gas: 500000n, // 兑换操作：涉及 MIX 扣除、IDX 转账、锁仓记录创建
           maxFeePerGas: parseGwei("10"),
           maxPriorityFeePerGas: parseGwei("2"),
         });
@@ -301,6 +301,7 @@ const ExchangeIdx = () => {
         abi: MiningMachineProductionLogicABI,
         functionName: "claimReleasedIdx",
         args: [item.id],
+        gas: 300000n, // 提取 IDX：涉及 IDX 转账和锁仓记录更新
         onConfirmed: (receipt: TransactionReceipt, index: number) => {
           // 这里可以执行其他操作，比如更新UI或触发下一个操作
           console.log(`Approval confirmed for call ${index + 1}`);

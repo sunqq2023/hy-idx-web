@@ -10,6 +10,7 @@ interface ContractCall {
   functionName: string;
   args?: any[];
   value?: bigint;
+  gas?: bigint; // 可选的自定义 gas limit
   onConfirmed?: (
     receipt: TransactionReceipt,
     callIndex: number,
@@ -58,7 +59,7 @@ export function useSequentialContractWrite() {
             args: call.args || [],
             value: call.value || BigInt(0),
             chainId: chain.id,
-            gas: 500000n, // 通用操作的 gas limit
+            gas: call.gas || 500000n, // 使用自定义 gas 或默认 500000
             maxFeePerGas: parseGwei("10"),
             maxPriorityFeePerGas: parseGwei("2"),
           });
