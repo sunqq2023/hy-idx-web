@@ -84,11 +84,21 @@ const ClaimMix = () => {
           });
         }
 
+        // 动态计算 Gas Limit（批量领取 MIX）
+        const baseGas = 150000n;
+        const perMachineGas = 50000n;
+        const gasLimit = baseGas + BigInt(batch.length) * perMachineGas;
+
+        console.log(
+          `第 ${i + 1} 批计算的 Gas Limit: ${gasLimit} (${batch.length} 个矿机)`,
+        );
+
         const contractCall = {
           address: MiningMachineProductionLogicAddress as `0x${string}`,
           abi: MiningMachineProductionLogicABI,
           functionName: "claimMixByMachineIds",
           args: [batch],
+          gas: gasLimit, // 动态计算 gas limit
         };
 
         const [result] = await executeSequentialCalls([contractCall]);
