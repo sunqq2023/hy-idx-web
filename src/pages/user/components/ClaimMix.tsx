@@ -230,10 +230,39 @@ const ClaimMix = () => {
       setIsClaimingMIX(false);
 
       // 显示错误提示
+      let errorMsg = "领取失败: 未知错误";
+      if (error instanceof Error) {
+        const errorMessage = error.message.toLowerCase();
+
+        // 检测 BNB 余额不足
+        if (
+          errorMessage.includes("exceeds the balance of the account") ||
+          errorMessage.includes("insufficient funds") ||
+          errorMessage.includes("gas * gas fee")
+        ) {
+          errorMsg = "领取失败: BNB 余额不足，请充值 BNB 用于支付 Gas 费";
+        }
+        // 用户拒绝签名
+        else if (
+          errorMessage.includes("user rejected") ||
+          errorMessage.includes("user denied")
+        ) {
+          errorMsg = "领取失败: 用户取消了交易";
+        }
+        // Gas 不足
+        else if (errorMessage.includes("out of gas")) {
+          errorMsg = "领取失败: Gas 不足，请减少选择的矿机数量";
+        }
+        // 其他错误
+        else {
+          errorMsg = `领取失败: ${error.message}`;
+        }
+      }
+
       Toast.show({
-        content: `领取失败: ${error instanceof Error ? error.message : "未知错误"}`,
+        content: errorMsg,
         position: "center",
-        duration: 3000,
+        duration: 4000,
       });
     }
   };

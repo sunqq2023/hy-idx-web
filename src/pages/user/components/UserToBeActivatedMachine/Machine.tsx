@@ -1116,12 +1116,49 @@ const Machine = ({ isShow }: { isShow: boolean }) => {
       setOpen(false);
     } catch (error) {
       // 错误处理：保留弹窗方便重试
-      Toast.show({
-        content: `激活失败: ${error instanceof Error ? error.message : "未知错误"}`,
-        position: "center",
-        duration: 3000,
-      });
       console.error("激活失败详情:", error);
+
+      let errorMsg = "激活失败: 未知错误";
+      if (error instanceof Error) {
+        const errorMessage = error.message.toLowerCase();
+
+        // 检测 BNB 余额不足
+        if (
+          errorMessage.includes("exceeds the balance of the account") ||
+          errorMessage.includes("insufficient funds") ||
+          errorMessage.includes("gas * gas fee")
+        ) {
+          errorMsg = "激活失败: BNB 余额不足，请充值 BNB 用于支付 Gas 费";
+        }
+        // 检测 IDX 余额不足
+        else if (
+          errorMessage.includes("insufficient allowance") ||
+          errorMessage.includes("transfer amount exceeds balance")
+        ) {
+          errorMsg = "激活失败: IDX 余额不足，请充值 IDX";
+        }
+        // 用户拒绝签名
+        else if (
+          errorMessage.includes("user rejected") ||
+          errorMessage.includes("user denied")
+        ) {
+          errorMsg = "激活失败: 用户取消了交易";
+        }
+        // Gas 不足
+        else if (errorMessage.includes("out of gas")) {
+          errorMsg = "激活失败: Gas 不足，请减少选择的矿机数量";
+        }
+        // 其他错误
+        else {
+          errorMsg = `激活失败: ${error.message}`;
+        }
+      }
+
+      Toast.show({
+        content: errorMsg,
+        position: "center",
+        duration: 4000,
+      });
       // 错误时不关闭弹窗和mask
     } finally {
       setIsPaying(false);
