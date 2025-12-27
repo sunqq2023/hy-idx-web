@@ -21,7 +21,7 @@ const axios = require("axios");
 // ========== 配置区域 ==========
 // 1. 配置服务器地址
 // const SERVER_URL = 'http://localhost:8090';
-const SERVER_URL = "https://www.ihealth.vip/api";
+const SERVER_URL = "https://www.ihealth.vip/app";
 
 // 2. 配置 API Key（管理接口必需）
 const API_KEY = "5rLeqyHtwwMzZ1CD4YlXBg/qSfKDbrpDCNkAvS186F4="; // 请替换为实际的 API Key

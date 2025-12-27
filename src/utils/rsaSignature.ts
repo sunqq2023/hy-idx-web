@@ -142,12 +142,14 @@ export async function sendSignedRequest<T = unknown>(
       // 只使用 pathname，不包含查询参数
       urlPath = urlObj.pathname;
 
-      // 特殊处理：如果 URL 包含 /api 前缀，需要移除
-      // 例如：https://www.ihealth.vip/api/mix/confirmBinding
-      // pathname: /api/mix/confirmBinding
-      // 签名应该使用: /mix/confirmBinding
+      // 特殊处理：移除 /api 或 /app 前缀，只保留实际的接口路径
+      // 例如：
+      // https://www.ihealth.vip/api/mix/confirmBinding -> /mix/confirmBinding
+      // https://www.ihealth.vip/app/mix/confirmBinding -> /mix/confirmBinding
       if (urlPath.startsWith("/api/")) {
         urlPath = urlPath.substring(4); // 移除 "/api"
+      } else if (urlPath.startsWith("/app/")) {
+        urlPath = urlPath.substring(4); // 移除 "/app"
       }
 
       console.log("🔍 URL 解析:", {
@@ -160,8 +162,10 @@ export async function sendSignedRequest<T = unknown>(
       const match = url.match(/^https?:\/\/[^/]+(\/[^?#]*)/);
       urlPath = match ? match[1] : url;
 
-      // 同样处理 /api 前缀
+      // 同样处理 /api 和 /app 前缀
       if (urlPath.startsWith("/api/")) {
+        urlPath = urlPath.substring(4);
+      } else if (urlPath.startsWith("/app/")) {
         urlPath = urlPath.substring(4);
       }
 
