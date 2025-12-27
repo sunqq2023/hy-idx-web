@@ -278,6 +278,16 @@ export const Team = () => {
         ExtendLogicAddress: MiningMachineSystemLogicExtendAddress,
       });
 
+      // 验证合约地址是否有效
+      if (!MiningMachineSystemLogicExtendAddress || !MiningMachineSystemStorageExtendAddress) {
+        console.error("合约地址未配置");
+        Toast.show({
+          content: "合约地址未配置，请检查网络配置",
+          position: "center",
+        });
+        return;
+      }
+
       // 获取已空投的值
       console.log("正在调用 getActivatedMachineRewards...");
       const activatedRewards = (await readContract(config, {
@@ -306,26 +316,40 @@ export const Team = () => {
 
       // 获取可提取的IDX值
       console.log("正在调用 calculateActivatedMachineRewards...");
-      const withdrawable = (await readContract(config, {
-        address: MiningMachineSystemLogicExtendAddress as `0x${string}`,
-        abi: MiningMachineSystemLogicExtendABI,
-        functionName: "calculateActivatedMachineRewards",
-        args: [userAddress],
-      })) as bigint;
-      console.log(
-        "calculateActivatedMachineRewards 结果:",
-        withdrawable.toString(),
-      );
+      let withdrawable: bigint;
+      try {
+        withdrawable = (await readContract(config, {
+          address: MiningMachineSystemLogicExtendAddress as `0x${string}`,
+          abi: MiningMachineSystemLogicExtendABI,
+          functionName: "calculateActivatedMachineRewards",
+          args: [userAddress],
+        })) as bigint;
+        console.log(
+          "calculateActivatedMachineRewards 结果:",
+          withdrawable.toString(),
+        );
+      } catch (error) {
+        console.warn("calculateActivatedMachineRewards 调用失败，使用默认值 0:", error);
+        // 如果函数调用失败（可能是合约未部署或函数不存在），使用默认值 0
+        withdrawable = 0n;
+      }
 
       // 获取每天释放速率
       console.log("正在调用 calculateRewardRate...");
-      const rewardRate = (await readContract(config, {
-        address: MiningMachineSystemLogicExtendAddress as `0x${string}`,
-        abi: MiningMachineSystemLogicExtendABI,
-        functionName: "calculateRewardRate",
-        args: [userAddress],
-      })) as bigint;
-      console.log("calculateRewardRate 结果:", rewardRate.toString());
+      let rewardRate: bigint;
+      try {
+        rewardRate = (await readContract(config, {
+          address: MiningMachineSystemLogicExtendAddress as `0x${string}`,
+          abi: MiningMachineSystemLogicExtendABI,
+          functionName: "calculateRewardRate",
+          args: [userAddress],
+        })) as bigint;
+        console.log("calculateRewardRate 结果:", rewardRate.toString());
+      } catch (error) {
+        console.warn("calculateRewardRate 调用失败，使用默认值 0:", error);
+        // 如果函数调用失败，使用默认值 0
+        rewardRate = 0n;
+      }
 
       // 计算每天释放速率百分比 (除以 1e18)
       const rateInWei = BigInt(rewardRate.toString());

@@ -114,8 +114,9 @@ const TransferMachine = () => {
       setTransferLoading(true);
 
       // 动态计算 Gas Limit
-      const baseGas = 150000n;
-      const perMachineGas = 50000n;
+      // 优化：提高安全余量，确保交易成功
+      const baseGas = 250000n; // 150000n → 250000n (+67%)⚠️ 已提高
+      const perMachineGas = 80000n; // 50000n → 80000n (+60%)⚠️ 已提高
       const gasLimit = baseGas + BigInt(ids.length) * perMachineGas;
 
       const res = await writeContract(config, {
@@ -124,8 +125,6 @@ const TransferMachine = () => {
         functionName: "createInternalMachineOrder",
         args: [receiveAddress, ids],
         gas: gasLimit, // 动态计算 Gas Limit
-        maxFeePerGas: parseGwei("10"),
-        maxPriorityFeePerGas: parseGwei("2"),
       });
 
       await waitForTransactionReceipt(config, {

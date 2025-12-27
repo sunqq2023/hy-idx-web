@@ -103,8 +103,7 @@ const MakeMotherMiningMachine = () => {
         functionName: "setChildMachineTradeConfig",
         args: [PLATFORM_FEE_USD, SELLER_INCOME_USD, activeAndGasFee],
         gas: 400000n, // 复杂操作：修改多个参数
-        maxFeePerGas: parseGwei("10"),
-        maxPriorityFeePerGas: parseGwei("2"),
+        // 移除硬编码的 gas price，让钱包自动估算
         chainId: CHAIN_ID,
       });
 
@@ -171,8 +170,9 @@ const MakeMotherMiningMachine = () => {
       ];
 
       // 动态计算 Gas Limit（批量铸造母矿机）
-      const baseGas = 300000n;
-      const perMachineGas = 150000n;
+      // 优化：提高安全余量，确保交易成功
+      const baseGas = 500000n; // 300000n → 500000n (+67%)⚠️ 已提高
+      const perMachineGas = 200000n; // 150000n → 200000n (+33%)⚠️ 已提高
       const gasLimit = baseGas + BigInt(count) * perMachineGas;
 
       // storage
@@ -182,8 +182,7 @@ const MakeMotherMiningMachine = () => {
         functionName: "batchMintMotherMachine",
         args,
         gas: gasLimit, // 动态计算 gas limit
-        maxFeePerGas: parseGwei("10"),
-        maxPriorityFeePerGas: parseGwei("2"),
+        // 移除硬编码的 gas price，让钱包自动估算
         chainId: CHAIN_ID,
       });
 

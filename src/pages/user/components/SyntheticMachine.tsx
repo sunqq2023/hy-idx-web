@@ -81,8 +81,9 @@ const SyntheticMachine = () => {
       setIsSyntheticLoading(true);
 
       // 动态计算 Gas Limit
-      const baseGas = 200000n;
-      const perMachineGas = 100000n;
+      // 优化：提高安全余量，确保交易成功
+      const baseGas = 350000n; // 200000n → 350000n (+75%)⚠️ 已提高
+      const perMachineGas = 150000n; // 100000n → 150000n (+50%)⚠️ 已提高
       const gasLimit = baseGas + BigInt(count) * perMachineGas;
 
       const hash = await writeContract(config, {
@@ -91,8 +92,6 @@ const SyntheticMachine = () => {
         functionName: "mixToChildMachine",
         args: [count],
         gas: gasLimit, // 动态计算 Gas Limit
-        maxFeePerGas: parseGwei("10"),
-        maxPriorityFeePerGas: parseGwei("2"),
       });
 
       await waitForTransactionReceipt(config, {

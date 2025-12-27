@@ -24,6 +24,7 @@ import usePopup from "@/components/usePopup";
 import {
   MiningMachineProductionLogicABI,
   MiningMachineSystemLogicABI,
+  MiningMachineSystemLogicExtendABI,
   MiningMachineSystemStorageABI,
   SelluserManagerABI,
 } from "@/constants";
@@ -38,6 +39,7 @@ import {
   readContract,
   writeContract,
   waitForTransactionReceipt,
+  getTransactionReceipt,
   multicall,
 } from "@wagmi/core";
 import config from "@/proviers/config";
@@ -57,7 +59,13 @@ import { useVisibleMachineQuery } from "@/hooks/useVisibleMachineQuery";
 import { useMachineDataCache } from "@/hooks/useMachineDataCache";
 import MachineRefreshButton from "@/components/MachineRefreshButton";
 
-const Machine = ({ isShow }: { isShow: boolean }) => {
+const Machine = ({
+  isShow,
+  onRefresh,
+}: {
+  isShow: boolean;
+  onRefresh?: () => void;
+}) => {
   const { address: userAddress } = useAccount();
   const [machineList, setMachineList] = useState<MachineInfo[]>([]);
   const [allMachines, setAllMachines] = useState<MachineInfo[]>([]);
@@ -81,7 +89,7 @@ const Machine = ({ isShow }: { isShow: boolean }) => {
   const chainConfig = useChainConfig();
   const chainId = useChainId();
   const MiningMachineSystemLogicAddress =
-    chainConfig.LOGIC_ADDRESS as `0x${string}`;
+    chainConfig.LOGIC_ADDRESS as `0x${string}`; // 使用 LOGIC_ADDRESS 进行激活操作
   const MiningMachineSystemStorageAddress =
     chainConfig.STORAGE_ADDRESS as `0x${string}`;
   const MiningMachineProductionLogicAddress =
@@ -558,8 +566,9 @@ const Machine = ({ isShow }: { isShow: boolean }) => {
       console.log("校验通过的母矿机ID:", validationResult.validIds);
 
       // 动态计算 Gas Limit（批量领取子矿机）
-      const baseGas = 150000n;
-      const perMachineGas = 50000n;
+      // 优化：提高安全余量，确保交易成功
+      const baseGas = 250000n; // 150000n → 250000n (+67%)⚠️ 已提高
+      const perMachineGas = 80000n; // 50000n → 80000n (+60%)⚠️ 已提高
       const gasLimit =
         baseGas + BigInt(validationResult.validIds.length) * perMachineGas;
 
@@ -569,8 +578,6 @@ const Machine = ({ isShow }: { isShow: boolean }) => {
         functionName: "claimChildrenByMachineIds",
         args: [validationResult.validIds],
         gas: gasLimit, // 动态计算 gas limit
-        maxFeePerGas: parseGwei("10"),
-        maxPriorityFeePerGas: parseGwei("2"),
         chainId,
       });
       console.log("批量领取子矿机交易已发送，哈希:", hash);
@@ -835,7 +842,14 @@ const Machine = ({ isShow }: { isShow: boolean }) => {
                     台矿机
                   </p>
                   <p className="mb-2">
-                    再选择 1 台需要:{" "}
+                    {fuelList.length === 0 ? "激活" : "再选择"} 1 台需要:{" "}
+                    <span className="font-bold text-[#ff6b6b]">
+                      {(+needToPayIdxAmount).toFixed(2)}
+                    </span>{" "}
+                    IDX
+                  </p>
+                  <p className="mb-2">
+                    总费用:{" "}
                     <span className="font-bold text-[#ff6b6b]">
                       {totalCost.toFixed(2)}
                     </span>{" "}
@@ -1007,17 +1021,22 @@ const Machine = ({ isShow }: { isShow: boolean }) => {
       setMaskCount(1);
       setMaskVisible(true);
       setIsPaying(true);
+
+      console.log("=== 开始激活矿机流程 ===");
+      console.log("选中的矿机数量:", fuelList.length);
       console.log(
-        "开始执行支付流程，检查授权状态:",
-        isAllowanceSufficient ? "已授权" : "未授权",
+        "选中的矿机ID:",
+        fuelList.map((item) => item.id),
       );
+      console.log("单台费用:", needToPayIdxAmount, "IDX");
+      console.log("总费用:", +needToPayIdxAmount * fuelList.length, "IDX");
+      console.log("当前授权状态:", isAllowanceSufficient ? "已授权" : "未授权");
+      console.log("IDX 余额:", idxBalance, "IDX");
 
       // 1. 检查并处理智能授权
       if (!isAllowanceSufficient) {
-        console.log(
-          "开始执行智能授权检查，授权地址:",
-          MiningMachineSystemLogicAddress,
-        );
+        console.log("=== 开始授权流程 ===");
+        console.log("授权地址:", MiningMachineSystemLogicAddress);
 
         // 计算实际需要的金额（使用实际的激活费用）
         const actualAmount = parseEther(
@@ -1039,24 +1058,27 @@ const Machine = ({ isShow }: { isShow: boolean }) => {
 
         console.log("当前allowance值:", formatEther(currentAllowance), "IDX");
 
-        // 检查当前allowance是否已经足够（超过2倍实际需要）
-        if (currentAllowance >= smartAllowance) {
-          console.log("当前allowance已足够，无需重新授权");
+        // 检查当前allowance是否已经足够
+        if (currentAllowance >= actualAmount) {
+          console.log("✅ 当前allowance已足够，无需重新授权");
         } else {
-          console.log("当前allowance不足，执行智能授权");
+          console.log("❌ 当前allowance不足，执行授权");
+          console.log(
+            "缺少授权:",
+            formatEther(actualAmount - currentAllowance),
+            "IDX",
+          );
 
-          // 使用显式 gas 配置
-          console.log("执行 IDX 授权...");
+          // 执行授权
+          console.log("发送授权交易...");
           const approveHash = await writeContractAsync({
             address: IDX_CONTRACTS_ADDRESS,
             abi: erc20Abi,
             functionName: "approve",
             args: [MiningMachineSystemLogicAddress, smartAllowance],
-            gas: 350000n, // 授权操作
-            maxFeePerGas: parseGwei("10"),
-            maxPriorityFeePerGas: parseGwei("2"),
+            gas: 350000n,
           });
-          console.log("智能授权交易已发送，哈希:", approveHash);
+          console.log("✅ 授权交易已发送，哈希:", approveHash);
 
           // 等待授权交易确认
           console.log("等待授权交易确认...");
@@ -1064,59 +1086,455 @@ const Machine = ({ isShow }: { isShow: boolean }) => {
             hash: approveHash,
             chainId,
           });
-          console.log("授权交易已确认，区块号:", approveReceipt.blockNumber);
+          console.log("✅ 授权交易已确认，区块号:", approveReceipt.blockNumber);
+
+          // 等待 1 秒确保授权生效
+          console.log("等待授权生效...");
+          await new Promise((resolve) => setTimeout(resolve, 1000));
         }
+      } else {
+        console.log("✅ 授权已充足，跳过授权步骤");
       }
 
       // 2. 提取所有选中矿机的ID组成数组
       const machineIds = fuelList.map((item) => item.id);
+      console.log("=== 开始激活矿机 ===");
       console.log("准备激活的矿机ID列表:", machineIds);
 
-      // 3. 执行批量激活合约调用
-      console.log("开始执行批量激活合约调用...");
+      // 注意：这些矿机ID都是通过 getOwnerToMachineIds 查询得到的，
+      // 已经确认属于当前用户，无需再次验证所有权
 
-      // 动态计算 Gas Limit
-      const baseGas = 100000n;
-      const perMachineGas = 50000n;
+      // 2.5. 在激活前再次检查矿机状态（防止状态变化）
+      console.log("=== 激活前状态检查 ===");
+      for (const machineId of machineIds) {
+        try {
+          const lifecycle = await readContract(config, {
+            address: MiningMachineSystemStorageAddress,
+            abi: MiningMachineSystemStorageABI,
+            functionName: "getMachineLifecycle",
+            args: [BigInt(machineId)],
+            chainId,
+          });
+
+          const isActivated =
+            (lifecycle as any).isActivatedStakedLP ?? lifecycle[4];
+          const isDestroyed = (lifecycle as any).destroyed ?? lifecycle[5];
+          const isOnSale = await readContract(config, {
+            address: MiningMachineSystemStorageAddress,
+            abi: MiningMachineSystemStorageABI,
+            functionName: "_isOnSale",
+            args: [BigInt(machineId)],
+            chainId,
+          });
+
+          if (isActivated) {
+            throw new Error(`矿机 ${machineId} 已经激活，请刷新页面后重试`);
+          }
+          if (isDestroyed) {
+            throw new Error(`矿机 ${machineId} 已销毁，无法激活`);
+          }
+          if (isOnSale) {
+            throw new Error(`矿机 ${machineId} 正在出售中，无法激活`);
+          }
+          console.log(`✅ 矿机 ${machineId} 状态检查通过`);
+        } catch (error) {
+          if (error instanceof Error && error.message.includes("矿机")) {
+            throw error;
+          }
+          console.warn(`检查矿机 ${machineId} 状态时出错:`, error);
+        }
+      }
+
+      // 3. 执行批量激活合约调用
+      // 动态计算 Gas Limit（增加安全余量）
+      // 优化：提高安全余量，确保交易成功
+      // 注意：IDX token 是代理合约，需要更多 Gas
+      // 实测：单台激活需要约 330,000 Gas
+      // 修正：每台矿机需要足够的 gas，不能平均分摊
+      const baseGas = 200000n; // 基础合约调用开销
+      const perMachineGas = 400000n; // 每台矿机需要 400k（330k × 1.21 安全余量）
       const gasLimit = baseGas + BigInt(machineIds.length) * perMachineGas;
 
       console.log(
-        `计算的 Gas Limit: ${gasLimit} (${machineIds.length} 台矿机)`,
+        "计算的 Gas Limit:",
+        gasLimit,
+        "(",
+        machineIds.length,
+        "台矿机)",
       );
+      console.log("发送激活交易...");
 
-      const hash = await writeContract(config, {
-        address: MiningMachineSystemLogicAddress as `0x${string}`,
-        abi: MiningMachineSystemLogicABI,
-        functionName: "batchActivateMachinesWithLP",
-        args: [machineIds],
-        gas: gasLimit, // 动态计算 Gas Limit
-        maxFeePerGas: parseGwei("10"), // 统一标准 10 Gwei
-        maxPriorityFeePerGas: parseGwei("2"), // 统一标准 2 Gwei
-        chainId,
-      });
-      console.log("批量激活交易已发送，哈希:", hash);
+      // 3. 执行批量激活合约调用
+      console.log("=== 发送激活交易 ===");
+      console.log("合约地址:", MiningMachineSystemLogicAddress);
+      console.log("函数名: batchActivateMachinesWithLP");
+      console.log("矿机ID列表:", machineIds);
+      console.log("Gas Limit:", gasLimit.toString());
 
-      // 4. 等待交易确认
-      console.log("等待批量激活交易确认...");
-      const receipt = await waitForTransactionReceipt(config, {
-        hash,
-        chainId,
-      });
-      console.log("批量激活交易已确认，区块号:", receipt.blockNumber);
+      let hash: `0x${string}` | undefined;
+      try {
+        hash = await writeContract(config, {
+          address: MiningMachineSystemLogicAddress as `0x${string}`,
+          abi: MiningMachineSystemLogicABI,
+          functionName: "batchActivateMachinesWithLP",
+          args: [machineIds],
+          gas: gasLimit,
+          chainId,
+        });
+        console.log("✅ 激活交易已发送，哈希:", hash);
+        console.log("可以在区块链浏览器查看: https://bscscan.com/tx/" + hash);
 
-      // 5. 交易成功处理
-      Toast.show({
-        content: "激活成功",
-        position: "center",
-      });
-      console.log("激活成功，刷新矿机列表");
-      handleQuery();
-      setFuelList([]);
-      setActivateCount(""); // 清空输入的数量
-      setOpen(false);
+        // 4. 等待交易确认
+        console.log("等待激活交易确认...");
+        console.log("交易哈希:", hash);
+        console.log(
+          "可以在区块链浏览器查看交易状态:",
+          `https://bscscan.com/tx/${hash}`,
+        );
+
+        let receipt;
+        try {
+          // 尝试使用 waitForTransactionReceipt 等待确认
+          receipt = await waitForTransactionReceipt(config, {
+            hash,
+            chainId,
+            confirmations: 1,
+            timeout: 120000, // 2分钟超时
+          });
+        } catch (waitError: any) {
+          // 检查是否是 RPC 调用失败（eth_call 模拟执行失败）
+          const isRpcCallError =
+            waitError?.message?.includes("RPC request failed") ||
+            waitError?.message?.includes("execution reverted") ||
+            waitError?.message?.includes("EthCall") ||
+            waitError?.cause?.message?.includes("execution reverted");
+
+          if (isRpcCallError) {
+            // 如果是 RPC 调用失败，可能是 waitForTransactionReceipt 的模拟执行失败
+            // 但实际交易可能已经成功，直接查询交易收据
+            console.warn(
+              "RPC 调用失败（可能是模拟执行失败），直接查询交易收据:",
+              waitError,
+            );
+          } else {
+            console.warn(
+              "等待交易确认时出错，尝试直接查询交易状态:",
+              waitError,
+            );
+          }
+
+          // 给一些时间让交易被打包
+          await new Promise((resolve) => setTimeout(resolve, 5000));
+
+          // 直接查询交易收据（不依赖 waitForTransactionReceipt 的模拟执行）
+          let retryCount = 0;
+          const maxRetries = 6; // 最多重试6次（30秒）
+
+          while (retryCount < maxRetries) {
+            try {
+              receipt = await getTransactionReceipt(config, {
+                hash,
+                chainId,
+              });
+              console.log("✅ 查询到交易收据，状态:", receipt.status);
+              break; // 成功查询到收据，退出循环
+            } catch (directQueryError: any) {
+              retryCount++;
+              if (retryCount >= maxRetries) {
+                // 如果多次重试都失败，说明交易可能还在待处理中或已失败
+                console.error("多次查询交易收据失败:", directQueryError);
+                throw new Error(
+                  `交易已发送但确认失败。交易哈希: ${hash}，请在区块链浏览器查看交易状态: https://bscscan.com/tx/${hash}。如果交易已成功，请刷新页面。`,
+                );
+              }
+              // 等待后重试
+              console.log(
+                `查询交易收据失败，${retryCount}/${maxRetries} 次重试，等待5秒后重试...`,
+              );
+              await new Promise((resolve) => setTimeout(resolve, 5000));
+            }
+          }
+        }
+
+        if (!receipt) {
+          throw new Error(
+            `无法获取交易收据。交易哈希: ${hash}，请在区块链浏览器查看交易状态: https://bscscan.com/tx/${hash}`,
+          );
+        }
+
+        if (receipt.status === "reverted") {
+          // 交易被回滚，提供详细的诊断信息
+          console.error("=== 交易被回滚，开始诊断 ===");
+          console.error("交易哈希:", hash);
+          console.error("区块号:", receipt.blockNumber);
+          console.error("Gas 使用量:", receipt.gasUsed?.toString());
+
+          // 尝试诊断可能的原因
+          let diagnosticInfo = "\n\n诊断信息：\n";
+
+          // 检查 IDX 余额和授权
+          try {
+            const idxBalance = (await readContract(config, {
+              address: IDX_CONTRACTS_ADDRESS,
+              abi: erc20Abi,
+              functionName: "balanceOf",
+              args: [userAddress!],
+              chainId,
+            })) as bigint;
+
+            const totalNeeded = parseEther(
+              String(+needToPayIdxAmount * machineIds.length),
+            );
+            const allowance = (await readContract(config, {
+              address: IDX_CONTRACTS_ADDRESS,
+              abi: erc20Abi,
+              functionName: "allowance",
+              args: [userAddress!, MiningMachineSystemLogicAddress],
+              chainId,
+            })) as bigint;
+
+            console.log("IDX 余额:", formatEther(idxBalance), "IDX");
+            console.log("需要金额:", formatEther(totalNeeded), "IDX");
+            console.log("授权额度:", formatEther(allowance), "IDX");
+
+            if (idxBalance < totalNeeded) {
+              diagnosticInfo += `❌ IDX 余额不足: 需要 ${formatEther(totalNeeded)} IDX，当前余额 ${formatEther(idxBalance)} IDX\n`;
+            } else if (allowance < totalNeeded) {
+              diagnosticInfo += `❌ IDX 授权不足: 需要授权 ${formatEther(totalNeeded)} IDX，当前授权 ${formatEther(allowance)} IDX\n`;
+            } else {
+              diagnosticInfo += `✅ IDX 余额和授权充足\n`;
+            }
+          } catch (diagError) {
+            console.warn("诊断 IDX 余额时出错:", diagError);
+            diagnosticInfo += `⚠️ 无法检查 IDX 余额和授权\n`;
+          }
+
+          // 检查矿机状态和所有权
+          for (const machineId of machineIds) {
+            try {
+              // 检查所有权
+              const machineInfo = (await readContract(config, {
+                address: MiningMachineSystemStorageAddress,
+                abi: MiningMachineSystemStorageABI,
+                functionName: "machines",
+                args: [BigInt(machineId)],
+                chainId,
+              })) as [string, bigint];
+
+              const owner = machineInfo[0];
+              console.log(`矿机 ${machineId} 所有者:`, owner);
+              console.log(`当前用户:`, userAddress);
+
+              if (owner.toLowerCase() !== userAddress?.toLowerCase()) {
+                diagnosticInfo += `❌ 矿机 ${machineId} 所有权不匹配: 所有者 ${owner}，当前用户 ${userAddress}\n`;
+              } else {
+                diagnosticInfo += `✅ 矿机 ${machineId} 所有权正确\n`;
+              }
+
+              const lifecycle = await readContract(config, {
+                address: MiningMachineSystemStorageAddress,
+                abi: MiningMachineSystemStorageABI,
+                functionName: "getMachineLifecycle",
+                args: [BigInt(machineId)],
+                chainId,
+              });
+
+              const isActivated =
+                (lifecycle as any).isActivatedStakedLP ?? lifecycle[4];
+              const isDestroyed = (lifecycle as any).destroyed ?? lifecycle[5];
+              const isOnSale = await readContract(config, {
+                address: MiningMachineSystemStorageAddress,
+                abi: MiningMachineSystemStorageABI,
+                functionName: "_isOnSale",
+                args: [BigInt(machineId)],
+                chainId,
+              });
+
+              if (isActivated) {
+                diagnosticInfo += `❌ 矿机 ${machineId} 已激活\n`;
+              }
+              if (isDestroyed) {
+                diagnosticInfo += `❌ 矿机 ${machineId} 已销毁\n`;
+              }
+              if (isOnSale) {
+                diagnosticInfo += `❌ 矿机 ${machineId} 正在出售中\n`;
+              }
+              if (
+                !isActivated &&
+                !isDestroyed &&
+                !isOnSale &&
+                owner.toLowerCase() === userAddress?.toLowerCase()
+              ) {
+                diagnosticInfo += `✅ 矿机 ${machineId} 状态正常\n`;
+              }
+            } catch (diagError) {
+              console.warn(`诊断矿机 ${machineId} 状态时出错:`, diagError);
+              diagnosticInfo += `⚠️ 无法检查矿机 ${machineId} 状态\n`;
+            }
+          }
+
+          // 检查激活奖励合约地址是否配置
+          try {
+            const extendLogicAddress = (await readContract(config, {
+              address: MiningMachineSystemLogicAddress,
+              abi: MiningMachineSystemLogicABI,
+              functionName: "extendLogic",
+              chainId,
+            })) as string;
+
+            console.log("Extend Logic 地址:", extendLogicAddress);
+            if (
+              !extendLogicAddress ||
+              extendLogicAddress ===
+                "0x0000000000000000000000000000000000000000"
+            ) {
+              diagnosticInfo += `❌ Extend Logic 合约地址未配置\n`;
+            } else {
+              diagnosticInfo += `✅ Extend Logic 合约地址已配置: ${extendLogicAddress}\n`;
+
+              // 检查 Extend Logic 合约是否可调用
+              try {
+                // 尝试调用一个简单的 view 函数来验证合约是否可用
+                await readContract(config, {
+                  address: extendLogicAddress as `0x${string}`,
+                  abi: MiningMachineSystemLogicExtendABI,
+                  functionName: "calculateRewardRate",
+                  args: [userAddress!],
+                  chainId,
+                });
+                console.log("Extend Logic 合约可调用，测试调用成功");
+                diagnosticInfo += `✅ Extend Logic 合约可调用\n`;
+              } catch (extendError) {
+                console.warn("Extend Logic 合约调用测试失败:", extendError);
+                diagnosticInfo += `⚠️ Extend Logic 合约可能存在问题，无法调用\n`;
+              }
+            }
+          } catch (diagError) {
+            console.warn("检查 Extend Logic 地址时出错:", diagError);
+            diagnosticInfo += `⚠️ 无法检查 Extend Logic 合约地址\n`;
+          }
+
+          // 检查交易实际调用的合约地址（从收据中获取）
+          try {
+            console.log("交易收据详情:");
+            console.log("- To 地址:", receipt.to);
+            console.log("- From 地址:", receipt.from);
+            console.log(
+              "- 实际调用的合约:",
+              receipt.to === MiningMachineSystemLogicAddress
+                ? "✅ Logic 合约"
+                : "❌ 错误的合约地址",
+            );
+
+            if (
+              receipt.to?.toLowerCase() !==
+              MiningMachineSystemLogicAddress.toLowerCase()
+            ) {
+              diagnosticInfo += `❌ 交易调用了错误的合约地址: ${receipt.to}，期望: ${MiningMachineSystemLogicAddress}\n`;
+            }
+          } catch (diagError) {
+            console.warn("检查交易收据时出错:", diagError);
+          }
+
+          console.error("=== 诊断完成 ===");
+
+          // 如果所有基础检查都通过，但交易仍被回滚，可能是其他原因
+          const hasAllChecksPassed =
+            diagnosticInfo.includes("✅") &&
+            !diagnosticInfo.includes("❌") &&
+            !diagnosticInfo.includes("⚠️");
+
+          let additionalSuggestions = "";
+          if (hasAllChecksPassed) {
+            additionalSuggestions =
+              `\n注意：所有基础检查都通过，但交易仍被回滚。可能原因：\n` +
+              `1. 在交易执行时，矿机状态发生了变化（可能是并发交易）\n` +
+              `2. Extend Logic 合约的 activeMachineRewards 调用失败\n` +
+              `3. 合约内部的其他检查失败\n` +
+              `\n建议：\n` +
+              `- 尝试只激活一台矿机，看看是否能成功\n` +
+              `- 等待几秒后刷新页面，再次检查矿机状态\n` +
+              `- 在区块链浏览器查看交易详情，查看具体的 revert reason\n`;
+          } else {
+            additionalSuggestions =
+              `\n建议：\n` +
+              `1. 根据上述诊断信息修复问题\n` +
+              `2. 刷新页面后重试\n` +
+              `3. 如果问题持续，请在区块链浏览器查看交易详情\n`;
+          }
+
+          throw new Error(
+            `交易执行被回滚。\n` +
+              `交易哈希: ${hash}\n` +
+              `区块号: ${receipt.blockNumber}\n` +
+              `Gas 使用量: ${receipt.gasUsed?.toString() || "未知"}\n` +
+              `区块链浏览器: https://bscscan.com/tx/${hash}\n` +
+              diagnosticInfo +
+              additionalSuggestions,
+          );
+        }
+
+        console.log("✅ 激活交易已确认，区块号:", receipt.blockNumber);
+        console.log("交易状态:", receipt.status);
+        console.log("=== 激活流程完成 ===");
+
+        // 5. 交易成功处理
+        Toast.show({
+          content: "激活成功",
+          position: "center",
+        });
+        console.log("刷新矿机列表");
+
+        // 等待 2 秒后刷新，确保区块链数据已更新
+        setTimeout(async () => {
+          console.log("延迟刷新矿机列表");
+
+          // 重新查询矿机ID列表
+          try {
+            const res = await readContract(config, {
+              address: MiningMachineSystemStorageAddress,
+              abi: MiningMachineSystemStorageABI,
+              functionName: "getOwnerToMachineIds",
+              args: [userAddress],
+            });
+
+            const machineIds = (res as bigint[]).map((id) => Number(id));
+            console.log("刷新后的矿机ID列表:", machineIds);
+            setAllMachineIds(machineIds);
+
+            // 强制重新初始化查询
+            if (machineIds.length > 0) {
+              await initializeQuery();
+              await handleVisibleDataUpdate();
+            }
+          } catch (error) {
+            console.error("刷新矿机列表失败:", error);
+          }
+
+          // 通知父组件刷新
+          if (onRefresh) {
+            console.log("通知父组件刷新数据");
+            onRefresh();
+          }
+        }, 2000);
+
+        setFuelList([]);
+        setActivateCount("");
+        setOpen(false);
+        setMaskVisible(false);
+      } catch (receiptError) {
+        // 如果交易已发送但确认失败，抛出包含 hash 的错误
+        if (hash) {
+          (receiptError as any).hash = hash;
+        }
+        throw receiptError;
+      }
     } catch (error) {
       // 错误处理：保留弹窗方便重试
       console.error("激活失败详情:", error);
+
+      // 提取交易哈希（如果存在）
+      const hash = (error as any)?.hash || (error as any)?.cause?.hash;
 
       let errorMsg = "激活失败: 未知错误";
       if (error instanceof Error) {
@@ -1130,12 +1548,32 @@ const Machine = ({ isShow }: { isShow: boolean }) => {
         ) {
           errorMsg = "激活失败: BNB 余额不足，请充值 BNB 用于支付 Gas 费";
         }
-        // 检测 IDX 余额不足
+        // 检测 IDX 余额不足或授权不足
         else if (
           errorMessage.includes("insufficient allowance") ||
-          errorMessage.includes("transfer amount exceeds balance")
+          errorMessage.includes("transfer amount exceeds balance") ||
+          errorMessage.includes("execution reverted") ||
+          errorMessage.includes("revert")
         ) {
-          errorMsg = "激活失败: IDX 余额不足，请充值 IDX";
+          // 检查是否是 IDX 相关错误
+          if (
+            errorMessage.includes("allowance") ||
+            errorMessage.includes("balance")
+          ) {
+            errorMsg =
+              "激活失败: IDX 余额不足或授权不足，请检查 IDX 余额和授权状态";
+          } else if (
+            errorMessage.includes("already activated") ||
+            errorMessage.includes("m")
+          ) {
+            errorMsg =
+              "激活失败: 矿机状态异常（可能已激活、已销毁或正在出售），请刷新页面后重试";
+          } else {
+            const hashStr = hash
+              ? `交易哈希: ${hash}`
+              : "请查看控制台获取交易哈希";
+            errorMsg = `激活失败: 合约执行被回滚。可能原因：1) IDX 余额不足或授权不足 2) 矿机已激活 3) 矿机已销毁 4) 矿机正在出售。${hashStr}`;
+          }
         }
         // 用户拒绝签名
         else if (
@@ -1143,6 +1581,14 @@ const Machine = ({ isShow }: { isShow: boolean }) => {
           errorMessage.includes("user denied")
         ) {
           errorMsg = "激活失败: 用户取消了交易";
+        }
+        // 钱包有待处理的请求
+        else if (
+          errorMessage.includes("pending request") ||
+          errorMessage.includes("request after it resolved")
+        ) {
+          errorMsg =
+            "激活失败: 钱包有待处理的交易，请先完成或取消钱包中的待处理交易，然后重试";
         }
         // Gas 不足
         else if (errorMessage.includes("out of gas")) {

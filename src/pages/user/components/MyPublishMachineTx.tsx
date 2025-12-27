@@ -102,8 +102,6 @@ const MyPublishMachineTx = () => {
         functionName: "cancelListedChildMachine",
         args: [pageData.orderId],
         gas: 200000n, // 固定 gas limit
-        maxFeePerGas: parseGwei("10"),
-        maxPriorityFeePerGas: parseGwei("2"),
       });
 
       await waitForTransactionReceipt(config, { hash, chainId });

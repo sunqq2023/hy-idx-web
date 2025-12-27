@@ -104,9 +104,7 @@ const MachineDetail = () => {
             abi: MiningMachineSystemLogicABI, // 合约ABI
             functionName: "deactivateLP", // 关停对应的合约函数
             args: [pageData.id], // 传入当前矿机ID作为参数
-            gas: 200000n, // 固定 gas limit
-            maxFeePerGas: parseGwei("10"),
-            maxPriorityFeePerGas: parseGwei("2"),
+            gas: 250000n, // 关停矿机（200000n → 250000n）⚠️ 已提高
           });
 
           // 等待交易上链确认
@@ -163,9 +161,7 @@ const MachineDetail = () => {
         abi: MiningMachineSystemLogicABI,
         functionName: "batchActivateMachinesWithLP",
         args: [[pageData.id]],
-        gas: 300000n, // 激活矿机操作
-        maxFeePerGas: parseGwei("10"),
-        maxPriorityFeePerGas: parseGwei("2"),
+        gas: 400000n, // 激活矿机操作（300000n → 400000n）⚠️ 已提高
       });
 
       const receipt = await waitForTransactionReceipt(config, {

@@ -34,10 +34,16 @@ const ClaimMix = () => {
 
   const handleCloseModal = () => {
     Modal.clear();
-    navigate("/user");
+    // 返回时传递刷新信号
+    navigate("/user", {
+      state: { needRefresh: true },
+      replace: true,
+    });
   };
 
   const handleClaimMix = async () => {
+    let progressToast: ReturnType<typeof Toast.show> | null = null;
+
     try {
       setIsClaimingMIX(true);
 
@@ -49,144 +55,100 @@ const ClaimMix = () => {
       // 提取需要领取的矿机ID数组
       const machineIds = producedMixList.map((item: MachineInfo) => item.id);
 
-      // 分批设置：每批最多 10 个矿机
-      const MAX_BATCH_SIZE = 10;
-      const batches: bigint[][] = [];
+      console.log(`准备一次性领取 ${machineIds.length} 个矿机的 MIX`);
 
-      for (let i = 0; i < machineIds.length; i += MAX_BATCH_SIZE) {
-        batches.push(machineIds.slice(i, i + MAX_BATCH_SIZE));
-      }
+      // 显示进度提示
+      progressToast = Toast.show({
+        content: `正在领取 ${machineIds.length} 个矿机的 MIX，请在钱包中确认签名`,
+        position: "center",
+        duration: 0, // 持久显示
+        icon: "loading",
+      });
+
+      // 动态计算 Gas Limit
+      // 基于实测：10 台矿机约需 1,400,000 Gas
+      const baseGas = 500000n;
+      const perMachineGas = 150000n;
+      const gasLimit = baseGas + BigInt(machineIds.length) * perMachineGas;
 
       console.log(
-        `需要分 ${batches.length} 批领取，共 ${machineIds.length} 个矿机`,
+        `计算的 Gas Limit: ${gasLimit} (${machineIds.length} 个矿机)`,
       );
 
-      // 如果需要分批，先让用户确认
-      if (batches.length > 1) {
-        const confirmed = await new Promise<boolean>((resolve) => {
-          Modal.show({
-            bodyStyle: {
-              background: "#ffffff",
-              borderRadius: "20px",
-              padding: "20px",
-            },
-            closeOnMaskClick: false,
-            content: (
-              <div className="text-center">
-                <div className="text-[18px] font-bold mb-4 text-[#333]">
-                  分批领取提示
-                </div>
-                <div className="text-[14px] text-[#666] mb-3 text-left">
-                  <p className="mb-2">
-                    您有{" "}
-                    <span className="font-bold text-[#7334FE]">
-                      {machineIds.length}
-                    </span>{" "}
-                    个矿机待领取
-                  </p>
-                  <p className="mb-2">
-                    将分{" "}
-                    <span className="font-bold text-[#7334FE]">
-                      {batches.length}
-                    </span>{" "}
-                    批领取
-                  </p>
-                  <p className="mb-2 text-[#ff6b6b]">
-                    ⚠️ 需要在钱包中签名{" "}
-                    <span className="font-bold">{batches.length}</span> 次
-                  </p>
-                  <p className="text-[12px] text-[#999]">
-                    预计耗时: 约 {batches.length * 15} 秒
-                  </p>
-                </div>
-                <div className="flex gap-2 mt-4">
-                  <button
-                    className="flex-1 bg-[#f0f0f0] text-[#666] rounded-3xl py-2 text-[14px]"
-                    onClick={() => {
-                      Modal.clear();
-                      resolve(false);
-                    }}
-                  >
-                    取消
-                  </button>
-                  <button
-                    className="flex-1 bg-[#7334FE] text-white rounded-3xl py-2 text-[14px]"
-                    onClick={() => {
-                      Modal.clear();
-                      resolve(true);
-                    }}
-                  >
-                    确认领取
-                  </button>
-                </div>
-              </div>
-            ),
-          });
-        });
+      const contractCall = {
+        address: MiningMachineProductionLogicAddress as `0x${string}`,
+        abi: MiningMachineProductionLogicABI,
+        functionName: "claimMixByMachineIds",
+        args: [machineIds],
+        gas: gasLimit, // 使用动态计算的 gas limit
+      };
 
-        if (!confirmed) {
-          setIsClaimingMIX(false);
-          return;
-        }
+      const [result] = await executeSequentialCalls([contractCall]);
 
-        Toast.show({
-          content: `开始分批领取，请耐心等待并及时签名`,
-          position: "center",
-          duration: 3000,
-        });
+      // 关闭进度提示
+      if (progressToast) {
+        progressToast.close();
       }
 
-      let totalClaimed = 0;
+      if (!result?.success) {
+        console.error(`领取失败，详细信息:`, result);
 
-      // 依次处理每批
-      for (let i = 0; i < batches.length; i++) {
-        const batch = batches[i];
+        // 提供更详细的错误信息
+        let errorMsg = "领取失败";
+        if (result && "error" in result) {
+          const errorStr = String(result.error).toLowerCase();
 
-        if (batches.length > 1) {
-          Toast.show({
-            content: `正在领取第 ${i + 1}/${batches.length} 批，请在钱包中确认签名`,
-            position: "center",
-            duration: 3000,
-          });
-        }
-
-        // 动态计算 Gas Limit（批量领取 MIX）
-        const baseGas = 150000n;
-        const perMachineGas = 50000n;
-        const gasLimit = baseGas + BigInt(batch.length) * perMachineGas;
-
-        console.log(
-          `第 ${i + 1} 批计算的 Gas Limit: ${gasLimit} (${batch.length} 个矿机)`,
-        );
-
-        const contractCall = {
-          address: MiningMachineProductionLogicAddress as `0x${string}`,
-          abi: MiningMachineProductionLogicABI,
-          functionName: "claimMixByMachineIds",
-          args: [batch],
-          gas: gasLimit, // 动态计算 gas limit
-        };
-
-        const [result] = await executeSequentialCalls([contractCall]);
-
-        if (!result?.success) {
-          throw new Error(`第 ${i + 1} 批领取失败`);
-        }
-
-        // 累计领取数量
-        try {
-          if (result && "data" in result && result.data != null) {
-            const data = BigInt(result.data.toString());
-            totalClaimed += Number(formatEther(data));
+          // 检测超时错误
+          if (errorStr.includes("超时")) {
+            errorMsg += ": 交易确认超时，请刷新页面查看交易是否成功";
           }
-        } catch (e) {
-          console.warn("解析第", i + 1, "批返回值失败:", e);
+          // 检测执行回退（通常是矿机未激活或没有 MIX）
+          else if (errorStr.includes("execution reverted")) {
+            errorMsg +=
+              ": 矿机未激活或没有可领取的 MIX，请确认矿机已激活并加燃料";
+          }
+          // 检测 BNB 余额不足
+          else if (
+            errorStr.includes("exceeds the balance") ||
+            errorStr.includes("insufficient funds for gas")
+          ) {
+            errorMsg += ": BNB 余额不足，请充值 BNB";
+          }
+          // 用户拒绝签名
+          else if (
+            errorStr.includes("user rejected") ||
+            errorStr.includes("user denied")
+          ) {
+            errorMsg += ": 用户取消了交易";
+          }
+          // 没有可领取的 MIX
+          else if (errorStr.includes("no mix to claim")) {
+            errorMsg += ": 没有可领取的 MIX";
+          }
+          // 其他错误
+          else {
+            errorMsg += `: ${result.error}`;
+          }
         }
+
+        throw new Error(errorMsg);
       }
 
-      // 使用累计的总数或备选值
-      const finalClaimed =
-        totalClaimed > 0 ? totalClaimed : mixPointsToBeClaimed;
+      // 获取领取的数量
+      let totalClaimed = mixPointsToBeClaimed;
+      try {
+        if (result && "data" in result && result.data != null) {
+          const data = BigInt(result.data.toString());
+          totalClaimed = Number(formatEther(data));
+        }
+      } catch (e) {
+        console.warn("解析返回值失败:", e);
+      }
+
+      // 关闭进度提示
+      if (progressToast) {
+        progressToast.close();
+      }
 
       setIsClaimingMIX(false);
 
@@ -209,7 +171,7 @@ const ClaimMix = () => {
                 你已成功提取所有MIX收益：
                 <AdaptiveNumber
                   type={NumberType.BALANCE}
-                  value={finalClaimed}
+                  value={totalClaimed}
                   decimalSubLen={2}
                   className="font-bold text-[15px]"
                 />
@@ -227,6 +189,12 @@ const ClaimMix = () => {
       });
     } catch (error) {
       console.error("领取MIX失败:", error);
+
+      // 关闭进度提示（如果存在）
+      if (progressToast) {
+        progressToast.close();
+      }
+
       setIsClaimingMIX(false);
 
       // 显示错误提示
@@ -234,11 +202,17 @@ const ClaimMix = () => {
       if (error instanceof Error) {
         const errorMessage = error.message.toLowerCase();
 
-        // 检测 BNB 余额不足
+        // 检测执行回退（矿机未激活或没有 MIX）
         if (
+          errorMessage.includes("矿机未激活") ||
+          errorMessage.includes("没有可领取")
+        ) {
+          errorMsg = error.message; // 使用已经格式化的错误消息
+        }
+        // 检测 BNB 余额不足
+        else if (
           errorMessage.includes("exceeds the balance of the account") ||
-          errorMessage.includes("insufficient funds") ||
-          errorMessage.includes("gas * gas fee")
+          errorMessage.includes("insufficient funds for gas")
         ) {
           errorMsg = "领取失败: BNB 余额不足，请充值 BNB 用于支付 Gas 费";
         }
@@ -251,7 +225,7 @@ const ClaimMix = () => {
         }
         // Gas 不足
         else if (errorMessage.includes("out of gas")) {
-          errorMsg = "领取失败: Gas 不足，请减少选择的矿机数量";
+          errorMsg = "领取失败: Gas 不足";
         }
         // 其他错误
         else {
@@ -268,7 +242,11 @@ const ClaimMix = () => {
   };
 
   const handlBack = () => {
-    navigate("/user");
+    // 返回时传递刷新信号（以防用户在领取后点击返回）
+    navigate("/user", {
+      state: { needRefresh: true },
+      replace: true,
+    });
   };
 
   // 动态计算高度

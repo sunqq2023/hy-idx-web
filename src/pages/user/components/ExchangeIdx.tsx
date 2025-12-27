@@ -204,9 +204,7 @@ const ExchangeIdx = () => {
           abi: MiningMachineProductionLogicABI,
           functionName: "convertMIXtoIDX",
           args: [exchangeMixCount],
-          gas: 500000n, // 兑换操作：涉及 MIX 扣除、IDX 转账、锁仓记录创建
-          maxFeePerGas: parseGwei("10"),
-          maxPriorityFeePerGas: parseGwei("2"),
+          gas: 600000n, // 兑换操作：涉及 MIX 扣除、IDX 转账、锁仓记录创建（500000n → 600000n）⚠️ 已提高
         });
 
         await waitForTransactionReceipt(config, {
@@ -301,7 +299,7 @@ const ExchangeIdx = () => {
         abi: MiningMachineProductionLogicABI,
         functionName: "claimReleasedIdx",
         args: [item.id],
-        gas: 300000n, // 提取 IDX：涉及 IDX 转账和锁仓记录更新
+        gas: 350000n, // 提取 IDX：涉及 IDX 转账和锁仓记录更新（300000n → 350000n）⚠️ 已提高
         onConfirmed: (receipt: TransactionReceipt, index: number) => {
           // 这里可以执行其他操作，比如更新UI或触发下一个操作
           console.log(`Approval confirmed for call ${index + 1}`);

@@ -86,8 +86,7 @@ const SellToPlatform = () => {
         functionName: "sellToPlatform",
         args: [pageData.machineId],
         gas: 250000n, // 固定 gas limit
-        maxFeePerGas: parseGwei("10"),
-        maxPriorityFeePerGas: parseGwei("2"),
+        // 移除硬编码的 gas price，让钱包自动估算
       });
 
       await waitForTransactionReceipt(config, {

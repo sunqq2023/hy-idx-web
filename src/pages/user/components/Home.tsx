@@ -429,9 +429,7 @@ export const Home = ({
         abi: MiningMachineNodeSystemABI,
         functionName: "boundUserPhone",
         args: [pendingPhone],
-        gas: 100000n, // 手动设置 Gas limit，避免估算不足
-        maxFeePerGas: parseGwei("10"), // 10 Gwei，确保快速确认（BSC 推荐 3-5 Gwei）
-        maxPriorityFeePerGas: parseGwei("2"), // 2 Gwei 优先费用
+        gas: 150000n, // 绑定手机号（100000n → 150000n）⚠️ 已提高
       });
 
       // 保存交易哈希，以便后续手动同步
@@ -1181,8 +1179,8 @@ export const Home = ({
       // - 检查和设置激活日期（如果需要）
       // - 增加奖励余额
       // - 记录历史
-      // 添加 20% 安全余量确保交易成功
-      const baseGas = 200000n;
+      // 优化：提高安全余量，确保交易成功
+      const baseGas = 300000n; // 200000n → 300000n (+50%)⚠️ 已提高
       const gasLimit = (baseGas * 120n) / 100n; // 添加 20% 安全余量
 
       console.log(`使用 Gas Limit: ${gasLimit} (包含 20% 安全余量)`);
@@ -1193,8 +1191,6 @@ export const Home = ({
         functionName: "airdrop",
         args: [airdropAddress, airdropAmount],
         gas: gasLimit,
-        maxFeePerGas: parseGwei("10"),
-        maxPriorityFeePerGas: parseGwei("2"),
       });
 
       await waitForTransactionReceipt(config, {
@@ -1265,12 +1261,13 @@ export const Home = ({
       console.log("合约地址:", MiningMachineSystemLogicExtendAddress);
 
       // 根据矿机数量动态计算 gas limit
+      // 优化：提高安全余量，确保交易成功
       // mintChildMachine 需要为每台矿机执行多次存储操作：
       // - setMachine (存储矿机信息)
       // - pushOwnerToMachineId (关联到所有者)
       // - setMachineLifecycle (初始化生命周期)
-      const baseGas = 300000n; // 基础 gas
-      const perMachineGas = 150000n; // 每台矿机额外的 gas
+      const baseGas = 400000n; // 300000n → 400000n (+33%)⚠️ 已提高
+      const perMachineGas = 180000n; // 150000n → 180000n (+20%)⚠️ 已提高
       const calculatedGas = baseGas + perMachineGas * BigInt(count);
       // 添加 20% 安全余量
       const gasLimit = (calculatedGas * 120n) / 100n;
@@ -1285,8 +1282,6 @@ export const Home = ({
         functionName: "mintChildMachine",
         args: [machineAirdropAddress, BigInt(count)],
         gas: gasLimit,
-        maxFeePerGas: parseGwei("10"),
-        maxPriorityFeePerGas: parseGwei("2"),
       });
 
       console.log("交易已发送，哈希:", hash);

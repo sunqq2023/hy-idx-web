@@ -72,9 +72,7 @@ const SyntheticNode = () => {
         abi: MiningMachineNodeSystemABI,
         functionName: "claimMixReward",
         args: [],
-        gas: 300000n, // 固定 gas limit
-        maxFeePerGas: parseGwei("10"),
-        maxPriorityFeePerGas: parseGwei("2"),
+        gas: 350000n, // 领取 MIX 奖励（300000n → 350000n）⚠️ 已提高
       });
 
       await waitForTransactionReceipt(config, {
@@ -361,9 +359,7 @@ const SyntheticNode = () => {
         abi: MiningMachineNodeSystemABI,
         functionName: "createNode",
         args: [],
-        gas: 400000n, // 固定 gas limit（创建节点需要更多 gas）
-        maxFeePerGas: parseGwei("10"),
-        maxPriorityFeePerGas: parseGwei("2"),
+        gas: 450000n, // 创建节点（400000n → 450000n）⚠️ 已提高
       });
 
       await waitForTransactionReceipt(config, {

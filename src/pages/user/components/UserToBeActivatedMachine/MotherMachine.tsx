@@ -393,8 +393,7 @@ const MotherMachine = () => {
             functionName: "approve",
             args: [MiningMachineSystemLogicAddress, smartAllowance],
             gas: 350000n, // 授权操作
-            maxFeePerGas: parseGwei("10"),
-            maxPriorityFeePerGas: parseGwei("2"),
+            // 移除硬编码的 gas price，让钱包自动估算
           });
           console.log("IDX智能授权交易已发送");
         }

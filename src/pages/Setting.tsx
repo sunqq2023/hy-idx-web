@@ -179,8 +179,6 @@ const Setting = () => {
         functionName: "setSadmin",
         args: [adminAddress],
         gas: 400000n, // 管理员操作：统一提高到 400000
-        maxFeePerGas: parseGwei("10"),
-        maxPriorityFeePerGas: parseGwei("2"),
         chainId: walletChainId,
       });
 
@@ -223,8 +221,6 @@ const Setting = () => {
         functionName: "setPlatformWallet",
         args: [mintAddress],
         gas: 400000n, // 管理员操作：统一提高到 400000
-        maxFeePerGas: parseGwei("10"),
-        maxPriorityFeePerGas: parseGwei("2"),
         chainId: walletChainId,
       });
 
@@ -272,8 +268,6 @@ const Setting = () => {
         functionName: "setChildMachineTradeConfig",
         args: [PLATFORM_FEE_USD, SELLER_INCOME_USD, activeAndGasFee],
         gas: 600000n, // 复杂操作：修改多个参数，提高到 600000
-        maxFeePerGas: parseGwei("10"),
-        maxPriorityFeePerGas: parseGwei("2"),
         chainId: walletChainId,
       });
 
@@ -372,8 +366,6 @@ const Setting = () => {
         functionName: "setPromotionPowerLimit",
         args: [BigInt(promotionPowerLimit)],
         gas: 400000n, // 管理员操作：统一提高到 400000
-        maxFeePerGas: parseGwei("10"),
-        maxPriorityFeePerGas: parseGwei("2"),
         chainId: walletChainId,
       });
 
@@ -417,8 +409,6 @@ const Setting = () => {
         functionName: "setActivatedPowerLimit",
         args: [BigInt(activatedPowerLimit)],
         gas: 400000n, // 管理员操作：统一提高到 400000
-        maxFeePerGas: parseGwei("10"),
-        maxPriorityFeePerGas: parseGwei("2"),
         chainId: walletChainId,
       });
 
@@ -489,8 +479,6 @@ const Setting = () => {
         functionName: "addMixForOperator",
         args: [parseEther(addMixForOperatorAmount)],
         gas: 400000n, // 管理员操作：统一提高到 400000
-        maxFeePerGas: parseGwei("10"),
-        maxPriorityFeePerGas: parseGwei("2"),
         chainId: walletChainId,
       });
 
@@ -535,8 +523,6 @@ const Setting = () => {
         functionName: "subMixForOperator",
         args: [parseEther(subMixForOperatorAmount)],
         gas: 400000n, // 管理员操作：统一提高到 400000
-        maxFeePerGas: parseGwei("10"),
-        maxPriorityFeePerGas: parseGwei("2"),
         chainId: walletChainId,
       });
 
@@ -608,8 +594,6 @@ const Setting = () => {
           parseEther(transferMixAmount),
         ],
         gas: 400000n, // 管理员操作：统一提高到 400000
-        maxFeePerGas: parseGwei("10"),
-        maxPriorityFeePerGas: parseGwei("2"),
         chainId: walletChainId,
       });
 
@@ -675,8 +659,6 @@ const Setting = () => {
           parseEther(childProductInterval), // 4* 1e18
         ],
         gas: 600000n, // 复杂操作：修改多个矿机参数，提高到 600000
-        maxFeePerGas: parseGwei("10"),
-        maxPriorityFeePerGas: parseGwei("2"),
         chainId: walletChainId,
       });
 
@@ -733,8 +715,6 @@ const Setting = () => {
         functionName: addressMap[type],
         args: [getAddress(address)],
         gas: 400000n, // 管理员操作：统一提高到 400000
-        maxFeePerGas: parseGwei("10"),
-        maxPriorityFeePerGas: parseGwei("2"),
         chainId: walletChainId,
       });
 
@@ -846,8 +826,6 @@ const Setting = () => {
           BigInt(releaseIntervalMinutes) * 1440n,
         ],
         gas: 600000n, // 复杂操作：设置多个锁定释放参数，提高到 600000
-        maxFeePerGas: parseGwei("10"),
-        maxPriorityFeePerGas: parseGwei("2"),
         chainId: walletChainId,
       });
 
@@ -890,8 +868,6 @@ const Setting = () => {
         functionName: "setNodesAmount",
         args: [BigInt(nodeCount)],
         gas: 400000n, // 管理员操作：统一提高到 400000
-        maxFeePerGas: parseGwei("10"),
-        maxPriorityFeePerGas: parseGwei("2"),
         chainId: walletChainId,
       });
 
@@ -943,8 +919,6 @@ const Setting = () => {
         functionName: "withdrawToken",
         args: [withdrawTokenAddress, parseEther(withdrawTokenAmount)],
         gas: 400000n, // 管理员操作：统一提高到 400000
-        maxFeePerGas: parseGwei("10"),
-        maxPriorityFeePerGas: parseGwei("2"),
         chainId: walletChainId,
       });
 
@@ -994,8 +968,6 @@ const Setting = () => {
         functionName: "setSwap",
         args: [idxCount, mixCount],
         gas: 400000n, // 管理员操作：统一提高到 400000
-        maxFeePerGas: parseGwei("10"),
-        maxPriorityFeePerGas: parseGwei("2"),
         chainId: walletChainId,
       });
 
@@ -1038,8 +1010,6 @@ const Setting = () => {
         functionName: "setCommissionWallet",
         args: [serviceChargeAddress],
         gas: 400000n, // 管理员操作：统一提高到 400000
-        maxFeePerGas: parseGwei("10"),
-        maxPriorityFeePerGas: parseGwei("2"),
         chainId: walletChainId,
       });
 
@@ -1102,8 +1072,6 @@ const Setting = () => {
         functionName: "sadminMintChildMachines",
         args: [mintChildMachineAddress, count],
         gas: 400000n, // 管理员操作：统一提高到 400000
-        maxFeePerGas: parseGwei("10"),
-        maxPriorityFeePerGas: parseGwei("2"),
         chainId: walletChainId,
       });
 
@@ -1150,8 +1118,6 @@ const Setting = () => {
         functionName: "setSelluser",
         args: [sellUserAddress, sellUserStatus],
         gas: 400000n, // 管理员操作：统一提高到 400000
-        maxFeePerGas: parseGwei("10"),
-        maxPriorityFeePerGas: parseGwei("2"),
         chainId: walletChainId,
       });
 
@@ -1196,8 +1162,6 @@ const Setting = () => {
         functionName: "addAirdropper",
         args: [airdropperAddress, true],
         gas: 400000n, // 管理员操作：统一提高到 400000
-        maxFeePerGas: parseGwei("10"),
-        maxPriorityFeePerGas: parseGwei("2"),
         chainId: walletChainId,
       });
 
@@ -1241,8 +1205,6 @@ const Setting = () => {
         functionName: "addmachineTransfer",
         args: [machineTransferAddress, true],
         gas: 400000n, // 管理员操作：统一提高到 400000
-        maxFeePerGas: parseGwei("10"),
-        maxPriorityFeePerGas: parseGwei("2"),
         chainId: walletChainId,
       });
 
@@ -1286,8 +1248,6 @@ const Setting = () => {
         functionName: "addStudioMarker",
         args: [studioMarkerAddress, true],
         gas: 400000n, // 管理员操作：统一提高到 400000
-        maxFeePerGas: parseGwei("10"),
-        maxPriorityFeePerGas: parseGwei("2"),
         chainId: walletChainId,
       });
 
@@ -1332,8 +1292,6 @@ const Setting = () => {
         functionName: "transfer",
         args: [MiningMachineSystemLogicExtendAddress, parseEther(addIdxAmount)],
         gas: 400000n, // 管理员操作：统一提高到 400000
-        maxFeePerGas: parseGwei("10"),
-        maxPriorityFeePerGas: parseGwei("2"),
         chainId: walletChainId,
       });
 
@@ -1381,8 +1339,6 @@ const Setting = () => {
         functionName: "withdrawIDX",
         args: [parseEther(withdrawIdxAmount)],
         gas: 400000n, // 管理员操作：统一提高到 400000
-        maxFeePerGas: parseGwei("10"),
-        maxPriorityFeePerGas: parseGwei("2"),
         chainId: walletChainId,
       });
 

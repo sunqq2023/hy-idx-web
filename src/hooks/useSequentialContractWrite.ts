@@ -52,26 +52,50 @@ export function useSequentialContractWrite() {
             `Executing call ${i + 1}/${calls.length} to ${call.functionName}...`,
           );
 
-          const txHash = await writeContractAsync({
+          // 在 Anvil Fork 环境中，使用 legacy 交易类型
+          const isAnvilFork = chain.id === 1056;
+
+          const txParams: any = {
             address: call.address,
             abi: call.abi,
             functionName: call.functionName,
             args: call.args || [],
             value: call.value || BigInt(0),
             chainId: chain.id,
-            gas: call.gas || 500000n, // 使用自定义 gas 或默认 500000
-            maxFeePerGas: parseGwei("10"),
-            maxPriorityFeePerGas: parseGwei("2"),
+            gas: call.gas || 500000n,
+          };
+
+          // Anvil 环境使用 legacy 交易（gasPrice），其他环境使用 EIP-1559（让钱包自动估算）
+          if (isAnvilFork) {
+            txParams.gasPrice = parseGwei("5");
+            // 在 Anvil 环境中，明确设置 type 为 'legacy'
+            txParams.type = "legacy";
+          }
+
+          console.log("Transaction params:", {
+            ...txParams,
+            abi: "[ABI]",
+            args: txParams.args,
           });
+
+          const txHash = await writeContractAsync(txParams);
 
           console.log(
             `Waiting for confirmation of call ${i + 1} (${call.functionName})...`,
           );
-          // 使用重命名后的wagmiConfig，并传递 chainId
-          const receipt = await waitForTransactionReceipt(wagmiConfig, {
-            hash: txHash,
-            chainId: chain.id,
-          });
+          // 使用重命名后的wagmiConfig，并传递 chainId，添加30秒超时
+          const receipt = await Promise.race([
+            waitForTransactionReceipt(wagmiConfig, {
+              hash: txHash,
+              chainId: chain.id,
+            }),
+            new Promise<never>((_, reject) =>
+              setTimeout(
+                () => reject(new Error("交易确认超时（30秒）")),
+                30000,
+              ),
+            ),
+          ]);
 
           if (call.onConfirmed) {
             try {
@@ -148,22 +172,30 @@ export function useSequentialContractWrite() {
         );
 
         // 根据矿机数量动态计算 gas limit
-        const baseGas = 200000n; // 基础 gas（激活需要更多 gas）
-        const perMachineGas = 150000n; // 每台矿机额外的 gas
+        // 优化：提高安全余量，确保交易成功
+        const baseGas = 500000n; // 基础 gas（200000n → 500000n，提高 2.5x）⚠️ 已提高
+        const perMachineGas = 120000n; // 每台矿机额外的 gas（150000n → 120000n，优化后实际更准确）
         const gasLimit = baseGas + perMachineGas * BigInt(machineIds.length);
 
         console.log(`计算的 Gas Limit: ${gasLimit}`);
 
-        txHash = await writeContractAsync({
+        // Anvil 环境使用 legacy 交易
+        const isAnvilFork = chain.id === 1056;
+        const txParams: any = {
           address: contractAddress,
           abi: MiningMachineSystemLogicABI,
           functionName: "batchActivateMachinesWithLP",
           args: [machineIds],
           chainId: chain.id,
           gas: gasLimit,
-          maxFeePerGas: parseGwei("10"),
-          maxPriorityFeePerGas: parseGwei("2"),
-        });
+        };
+
+        if (isAnvilFork) {
+          txParams.gasPrice = parseGwei("5");
+        }
+        // 对于真实网络，不设置 gas price，让钱包自动估算
+
+        txHash = await writeContractAsync(txParams);
 
         console.log(`批量激活交易已发送，哈希: ${txHash}`);
         console.log(`等待交易确认...`);
@@ -259,29 +291,36 @@ export function useSequentialContractWrite() {
         });
 
         // 根据矿机数量动态计算 gas limit
+        // 优化：提高安全余量，确保交易成功
         // IDX 代币的 transferFrom 会触发多次分红转账，需要更多 gas
         // History 合约的 recordFuelFee 也需要较多 gas
         // addRewardForAddressByFuelFee 会追溯15层推荐关系，消耗大量 gas
-        const baseGas = 800000n; // 增加基础 gas（从 500000 提高到 800000）
-        const perMachineGas = 300000n; // 增加每台矿机的 gas（从 200000 提高到 300000）
+        const baseGas = 1000000n; // 基础 gas（800000n → 1000000n，提高 25%）⚠️ 已提高
+        const perMachineGas = 350000n; // 每台矿机额外的 gas（300000n → 350000n，提高 17%）⚠️ 已提高
         const gasLimit = baseGas + perMachineGas * BigInt(machineIds.length);
 
         console.log(`计算的 Gas Limit: ${gasLimit}`);
-        console.log(
-          `🔧 使用 Gas Price: maxFeePerGas=10 gwei, maxPriorityFeePerGas=2 gwei`,
-        );
 
-        txHash = await writeContractAsync({
+        // Anvil 环境使用 legacy 交易
+        const isAnvilFork = chain.id === 1056;
+        const txParams: any = {
           address: contractAddress,
           abi: MiningMachineSystemLogicABI,
           functionName: "batchPayFuel",
           args: [machineIds, monthCount],
           chainId: chain.id,
           gas: gasLimit,
-          // 使用合理的 Gas Price（BSC 推荐 3-5 Gwei，这里设置 10 以确保成功）
-          maxFeePerGas: parseGwei("10"),
-          maxPriorityFeePerGas: parseGwei("2"),
-        });
+        };
+
+        if (isAnvilFork) {
+          txParams.gasPrice = parseGwei("5");
+          console.log(`🔧 Anvil 环境: 使用固定 Gas Price = 5 gwei`);
+        } else {
+          console.log(`🔧 真实网络: 使用钱包自动估算的 Gas Price`);
+        }
+        // 对于真实网络，不设置 gas price，让钱包自动估算
+
+        txHash = await writeContractAsync(txParams);
 
         console.log(`批量添加燃料费交易已发送，哈希: ${txHash}`);
         console.log(`等待交易确认...`);
