@@ -458,6 +458,17 @@ const Machine = ({ isShow }: { isShow: boolean }) => {
         return;
       }
 
+      // 如果选择超过 10 个，给出警告
+      if (selectedMMIds.length > 10) {
+        Toast.show({
+          content: `⚠️ 您选择了 ${selectedMMIds.length} 个母矿机，建议每次不超过 10 个以避免 Gas 不足`,
+          position: "center",
+          duration: 3000,
+        });
+        // 给用户 3 秒时间看到提示
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+      }
+
       const validationResult = {
         validIds: [] as number[],
         invalidIds: [] as string[],
@@ -1140,7 +1151,7 @@ const Machine = ({ isShow }: { isShow: boolean }) => {
       <div className="px-[21px]">
         {claimChildrenCount > 0 && mmIds.length > 0 && (
           <div className="w-full bg-black border border-gray-600 rounded-3xl px-4 py-5">
-            {/* 标题 + 全选按钮 */}
+            {/* 标题 + 快速选择按钮 */}
             <div className="flex items-center justify-between text-[15px] text-white mb-3">
               <span>
                 <span className="text-red text-[16px] font-bold">
@@ -1149,31 +1160,53 @@ const Machine = ({ isShow }: { isShow: boolean }) => {
                 个子矿机待领取
               </span>
 
-              <button
-                className={`text-xs px-3 py-1 transition-colors rounded-full
-                  ${
-                    selectedMMIds.length === mmIds.length
-                      ? "bg-[#895EFF] text-white"
-                      : "bg-white text-black"
-                  }`}
-                style={{
-                  borderRadius: "9999px",
-                  transition: "transform 300ms cubic-bezier(.17,.67,.48,1.64)",
-                }}
-                onClick={(e) => {
-                  setSelectedMMIds(
-                    selectedMMIds.length === mmIds.length ? [] : [...mmIds],
-                  );
+              <div className="flex gap-2">
+                {/* 快速选择按钮 */}
+                {mmIds.length > 10 && (
+                  <button
+                    className="text-xs px-2 py-1 bg-gray-700 text-white rounded-full"
+                    onClick={() => {
+                      const first10 = mmIds.slice(0, 10);
+                      setSelectedMMIds(first10);
+                      Toast.show({
+                        content: "已选择前 10 个母矿机",
+                        position: "center",
+                        duration: 1500,
+                      });
+                    }}
+                  >
+                    选前10个
+                  </button>
+                )}
 
-                  const el = e.currentTarget;
-                  el.style.transform = "scale(1.25)";
-                  setTimeout(() => {
-                    el.style.transform = "scale(1)";
-                  }, 300);
-                }}
-              >
-                {selectedMMIds.length === mmIds.length ? "取消全选" : "全选"}
-              </button>
+                {/* 全选按钮 */}
+                <button
+                  className={`text-xs px-3 py-1 transition-colors rounded-full
+                    ${
+                      selectedMMIds.length === mmIds.length
+                        ? "bg-[#895EFF] text-white"
+                        : "bg-white text-black"
+                    }`}
+                  style={{
+                    borderRadius: "9999px",
+                    transition:
+                      "transform 300ms cubic-bezier(.17,.67,.48,1.64)",
+                  }}
+                  onClick={(e) => {
+                    setSelectedMMIds(
+                      selectedMMIds.length === mmIds.length ? [] : [...mmIds],
+                    );
+
+                    const el = e.currentTarget;
+                    el.style.transform = "scale(1.25)";
+                    setTimeout(() => {
+                      el.style.transform = "scale(1)";
+                    }, 300);
+                  }}
+                >
+                  {selectedMMIds.length === mmIds.length ? "取消全选" : "全选"}
+                </button>
+              </div>
             </div>
 
             {/* 灰色背景滚动容器：紧贴按钮 */}

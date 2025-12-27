@@ -49,14 +49,70 @@ const ClaimMix = () => {
       // 提取需要领取的矿机ID数组
       const machineIds = producedMixList.map((item) => item.id);
 
-      const contractCall = {
-        address: MiningMachineProductionLogicAddress as `0x${string}`,
-        abi: MiningMachineProductionLogicABI,
-        functionName: "claimMixByMachineIds",
-        args: [machineIds], // 传入矿机ID数组
-      };
+      // 分批设置：每批最多 10 个矿机
+      const MAX_BATCH_SIZE = 10;
+      const batches: bigint[][] = [];
 
-      const [result] = await executeSequentialCalls([contractCall]);
+      for (let i = 0; i < machineIds.length; i += MAX_BATCH_SIZE) {
+        batches.push(machineIds.slice(i, i + MAX_BATCH_SIZE));
+      }
+
+      console.log(
+        `需要分 ${batches.length} 批领取，共 ${machineIds.length} 个矿机`,
+      );
+
+      // 如果需要分批，先提示用户
+      if (batches.length > 1) {
+        Toast.show({
+          content: `将分 ${batches.length} 批领取，请耐心等待`,
+          position: "center",
+          duration: 3000,
+        });
+      }
+
+      let totalClaimed = 0;
+
+      // 依次处理每批
+      for (let i = 0; i < batches.length; i++) {
+        const batch = batches[i];
+
+        if (batches.length > 1) {
+          Toast.show({
+            content: `正在领取第 ${i + 1}/${batches.length} 批...`,
+            position: "center",
+            duration: 2000,
+          });
+        }
+
+        const contractCall = {
+          address: MiningMachineProductionLogicAddress as `0x${string}`,
+          abi: MiningMachineProductionLogicABI,
+          functionName: "claimMixByMachineIds",
+          args: [batch],
+        };
+
+        const [result] = await executeSequentialCalls([contractCall]);
+
+        if (!result?.success) {
+          throw new Error(`第 ${i + 1} 批领取失败`);
+        }
+
+        // 累计领取数量
+        try {
+          if (result.data != null) {
+            const data = BigInt(result.data.toString());
+            totalClaimed += Number(formatEther(data));
+          }
+        } catch (e) {
+          console.warn("解析第", i + 1, "批返回值失败:", e);
+        }
+      }
+
+      // 使用累计的总数或备选值
+      const finalClaimed =
+        totalClaimed > 0 ? totalClaimed : mixPointsToBeClaimed;
+
+      const [result] = [{ success: true, data: finalClaimed }]; // 模拟原有的 result 结构
 
       setIsClaimingMIX(false);
 
