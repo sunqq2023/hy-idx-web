@@ -7,8 +7,10 @@
     "dev": "vite --mode development",
     "dev:fork": "vite --mode fork",
     "dev:local": "vite --mode local",
-    "build": "vite build --mode production",
-    "build:fork": "vite build --mode fork",
+    "build": "npm run type-check && vite build --mode production",
+    "build:fork": "npm run type-check && vite build --mode fork",
+    "build:only": "vite build --mode production",
+    "type-check": "tsc --noEmit",
     "lint": "eslint .",
     "preview": "node preview-server.js"
   },

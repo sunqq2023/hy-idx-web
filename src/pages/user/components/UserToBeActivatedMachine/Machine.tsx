@@ -460,13 +460,63 @@ const Machine = ({ isShow }: { isShow: boolean }) => {
 
       // 如果选择超过 10 个，给出警告
       if (selectedMMIds.length > 10) {
-        Toast.show({
-          content: `⚠️ 您选择了 ${selectedMMIds.length} 个母矿机，建议每次不超过 10 个以避免 Gas 不足`,
-          position: "center",
-          duration: 3000,
+        const confirmed = await new Promise<boolean>((resolve) => {
+          Modal.show({
+            bodyStyle: {
+              background: "#ffffff",
+              borderRadius: "20px",
+              padding: "20px",
+            },
+            closeOnMaskClick: false,
+            content: (
+              <div className="text-center">
+                <div className="text-[18px] font-bold mb-4 text-[#333]">
+                  ⚠️ 温馨提示
+                </div>
+                <div className="text-[14px] text-[#666] mb-3 text-left">
+                  <p className="mb-2">
+                    您选择了{" "}
+                    <span className="font-bold text-[#ff6b6b]">
+                      {selectedMMIds.length}
+                    </span>{" "}
+                    个母矿机
+                  </p>
+                  <p className="mb-2 text-[#ff6b6b]">
+                    ⚠️ 建议每次不超过 10 个，以避免 Gas 不足
+                  </p>
+                  <p className="text-[12px] text-[#999] mt-3">
+                    如果继续，可能会因为 Gas 不足导致交易失败
+                  </p>
+                </div>
+                <div className="flex gap-2 mt-4">
+                  <button
+                    className="flex-1 bg-[#f0f0f0] text-[#666] rounded-3xl py-2 text-[14px]"
+                    onClick={() => {
+                      Modal.clear();
+                      resolve(false);
+                    }}
+                  >
+                    重新选择
+                  </button>
+                  <button
+                    className="flex-1 bg-[#ff6b6b] text-white rounded-3xl py-2 text-[14px]"
+                    onClick={() => {
+                      Modal.clear();
+                      resolve(true);
+                    }}
+                  >
+                    继续领取
+                  </button>
+                </div>
+              </div>
+            ),
+          });
         });
-        // 给用户 3 秒时间看到提示
-        await new Promise((resolve) => setTimeout(resolve, 3000));
+
+        if (!confirmed) {
+          setIsClaiming(false);
+          return;
+        }
       }
 
       const validationResult = {
@@ -619,7 +669,93 @@ const Machine = ({ isShow }: { isShow: boolean }) => {
 
     const actualCount = Math.min(count, activatableMachines.length);
 
-    console.log(`根据数量选择矿机: ${actualCount} 台`);
+    // 检查余额是否足够
+    const totalCost = +needToPayIdxAmount * actualCount;
+    const balance = +idxBalance;
+
+    console.log(
+      `根据数量选择矿机: ${actualCount} 台, 需要 ${totalCost} IDX, 余额 ${balance} IDX`,
+    );
+
+    if (balance < totalCost) {
+      // 计算最多能选择多少台
+      const maxAffordable = Math.floor(balance / +needToPayIdxAmount);
+
+      Modal.show({
+        bodyStyle: {
+          background: "#ffffff",
+          borderRadius: "20px",
+          padding: "20px",
+        },
+        closeOnMaskClick: true,
+        content: (
+          <div className="text-center">
+            <div className="text-[18px] font-bold mb-4 text-[#ff6b6b]">
+              ⚠️ IDX 余额不足
+            </div>
+            <div className="text-[14px] text-[#666] mb-3 text-left">
+              <p className="mb-2">
+                想要选择:{" "}
+                <span className="font-bold text-[#7334FE]">{actualCount}</span>{" "}
+                台矿机
+              </p>
+              <p className="mb-2">
+                需要费用:{" "}
+                <span className="font-bold text-[#ff6b6b]">
+                  {totalCost.toFixed(2)}
+                </span>{" "}
+                IDX
+              </p>
+              <p className="mb-2">
+                当前余额:{" "}
+                <span className="font-bold">{balance.toFixed(2)}</span> IDX
+              </p>
+              <p className="text-[#ff6b6b] font-bold mb-2">
+                缺少: {(totalCost - balance).toFixed(2)} IDX
+              </p>
+              <div className="bg-[#f0f0f0] p-3 rounded-lg mt-3">
+                <p className="text-[#7334FE] font-bold">
+                  💡 您最多可以选择 {maxAffordable} 台矿机
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2 mt-4">
+              <button
+                className="flex-1 bg-[#f0f0f0] text-[#666] rounded-3xl py-2 text-[14px]"
+                onClick={() => Modal.clear()}
+              >
+                取消
+              </button>
+              {maxAffordable > 0 && (
+                <button
+                  className="flex-1 bg-[#7334FE] text-white rounded-3xl py-2 text-[14px]"
+                  onClick={() => {
+                    Modal.clear();
+                    setActivateCount(maxAffordable.toString());
+                    // 自动选择最大可负担数量
+                    setMachineList((prevList) => {
+                      return prevList.map((item, index) => {
+                        if (!item.isActivatedStakedLP) {
+                          return {
+                            ...item,
+                            checked: index < maxAffordable,
+                          };
+                        }
+                        return item;
+                      });
+                    });
+                    setFuelList(activatableMachines.slice(0, maxAffordable));
+                  }}
+                >
+                  选择 {maxAffordable} 台
+                </button>
+              )}
+            </div>
+          </div>
+        ),
+      });
+      return;
+    }
 
     setMachineList((prevList) => {
       return prevList.map((item, index) => {
@@ -666,6 +802,69 @@ const Machine = ({ isShow }: { isShow: boolean }) => {
   const handleLeftClick = useCallback(
     (item: MachineInfo) => {
       console.log(`点击选择矿机，ID: ${item.id}，当前状态: ${item.checked}`);
+
+      const isItemChecked = !item.checked;
+
+      // 如果是选中操作，检查余额是否足够
+      if (isItemChecked) {
+        const newCount = fuelList.length + 1;
+        const totalCost = +needToPayIdxAmount * newCount;
+        const balance = +idxBalance;
+
+        console.log(`余额检查: 需要 ${totalCost} IDX, 余额 ${balance} IDX`);
+
+        if (balance < totalCost) {
+          Modal.show({
+            bodyStyle: {
+              background: "#ffffff",
+              borderRadius: "20px",
+              padding: "20px",
+            },
+            closeOnMaskClick: true,
+            content: (
+              <div className="text-center">
+                <div className="text-[18px] font-bold mb-4 text-[#ff6b6b]">
+                  ⚠️ IDX 余额不足
+                </div>
+                <div className="text-[14px] text-[#666] mb-3 text-left">
+                  <p className="mb-2">
+                    已选择:{" "}
+                    <span className="font-bold text-[#7334FE]">
+                      {fuelList.length}
+                    </span>{" "}
+                    台矿机
+                  </p>
+                  <p className="mb-2">
+                    再选择 1 台需要:{" "}
+                    <span className="font-bold text-[#ff6b6b]">
+                      {totalCost.toFixed(2)}
+                    </span>{" "}
+                    IDX
+                  </p>
+                  <p className="mb-2">
+                    当前余额:{" "}
+                    <span className="font-bold">{balance.toFixed(2)}</span> IDX
+                  </p>
+                  <p className="text-[#ff6b6b] font-bold">
+                    缺少: {(totalCost - balance).toFixed(2)} IDX
+                  </p>
+                </div>
+                <div className="text-[12px] text-[#999] mb-4">
+                  请充值 IDX 或减少选择的矿机数量
+                </div>
+                <button
+                  className="w-full bg-[#7334FE] text-white rounded-3xl py-2 text-[14px]"
+                  onClick={() => Modal.clear()}
+                >
+                  知道了
+                </button>
+              </div>
+            ),
+          });
+          return; // 阻止选中
+        }
+      }
+
       setMachineList((prevItems) => {
         const newItems = prevItems.map((e) => {
           if (!e.isActivatedStakedLP) {
@@ -675,7 +874,6 @@ const Machine = ({ isShow }: { isShow: boolean }) => {
           return e;
         });
 
-        const isItemChecked = !item.checked;
         if (isItemChecked) {
           setFuelList([...fuelList, item]);
         } else {
@@ -686,7 +884,7 @@ const Machine = ({ isShow }: { isShow: boolean }) => {
         return newItems;
       });
     },
-    [fuelList],
+    [fuelList, needToPayIdxAmount, idxBalance],
   );
 
   const handleRightClick = (item: MachineInfo) => {
@@ -821,10 +1019,11 @@ const Machine = ({ isShow }: { isShow: boolean }) => {
           MiningMachineSystemLogicAddress,
         );
 
-        // 计算实际需要的金额（这里需要根据具体业务逻辑计算）
-        // 假设每台矿机激活需要30 IDX，这里需要根据实际情况调整
-        const actualAmount = parseEther(String(fuelList.length * 30)); // 需要根据实际业务逻辑调整
-        const smartAllowance = actualAmount * 30n; // 调整为30倍授权
+        // 计算实际需要的金额（使用实际的激活费用）
+        const actualAmount = parseEther(
+          String(+needToPayIdxAmount * fuelList.length),
+        );
+        const smartAllowance = actualAmount * 30n; // 授权30倍，避免频繁授权
 
         console.log("实际需要金额:", formatEther(actualAmount), "IDX");
         console.log("期望智能授权额度:", formatEther(smartAllowance), "IDX");
@@ -1094,21 +1293,47 @@ const Machine = ({ isShow }: { isShow: boolean }) => {
           激活矿机需支付打底池费用!
         </div>
 
-        <div>
-          <div className="flex justify-between">
-            <div className="font-bold text-[14px]">待支付IDX</div>
-            <div className="text-[#FF5050] font-bold text-[16px]">
-              <AdaptiveNumber
-                type={NumberType.BALANCE}
-                value={+needToPayIdxAmount * fuelList.length}
-                decimalSubLen={2}
-                className="ml-2 mr-1.5"
-              />
+        <div className="space-y-2">
+          {/* 费用明细 */}
+          <div className="bg-[#f5f5f5] p-3 rounded-lg space-y-2">
+            <div className="flex justify-between text-[12px]">
+              <span className="text-[#686D6D]">单台费用:</span>
+              <span className="font-bold">
+                <AdaptiveNumber
+                  type={NumberType.BALANCE}
+                  value={+needToPayIdxAmount}
+                  decimalSubLen={2}
+                  className="mr-1"
+                />
+                IDX
+              </span>
+            </div>
+            <div className="flex justify-between text-[12px]">
+              <span className="text-[#686D6D]">矿机数量:</span>
+              <span className="font-bold text-[#7334FE]">
+                {fuelList.length} 台
+              </span>
+            </div>
+            <Divider style={{ margin: "8px 0" }} />
+            <div className="flex justify-between">
+              <div className="font-bold text-[14px]">总费用:</div>
+              <div className="text-[#FF5050] font-bold text-[16px]">
+                <AdaptiveNumber
+                  type={NumberType.BALANCE}
+                  value={+needToPayIdxAmount * fuelList.length}
+                  decimalSubLen={2}
+                  className="ml-2 mr-1.5"
+                />
+              </div>
             </div>
           </div>
-          <div className="flex justify-end text-[12px]">
-            <div className="text-[#686D6D]">钱包余额：</div>
-            <div className="font-bold">
+
+          {/* 余额信息 */}
+          <div className="flex justify-between text-[12px] pt-2">
+            <div className="text-[#686D6D]">钱包余额:</div>
+            <div
+              className={`font-bold ${+idxBalance < +needToPayIdxAmount * fuelList.length ? "text-[#ff6b6b]" : "text-[#7334FE]"}`}
+            >
               <AdaptiveNumber
                 type={NumberType.BALANCE}
                 value={idxBalance}
@@ -1117,6 +1342,15 @@ const Machine = ({ isShow }: { isShow: boolean }) => {
               />
             </div>
           </div>
+
+          {/* 余额不足提示 */}
+          {+idxBalance < +needToPayIdxAmount * fuelList.length && (
+            <div className="bg-[#fff3f3] border border-[#ffccc7] p-2 rounded-lg text-[12px] text-[#ff6b6b]">
+              ⚠️ 余额不足{" "}
+              {(+needToPayIdxAmount * fuelList.length - +idxBalance).toFixed(2)}{" "}
+              IDX
+            </div>
+          )}
         </div>
 
         <Divider />
@@ -1127,7 +1361,7 @@ const Machine = ({ isShow }: { isShow: boolean }) => {
           loading={isPaying}
           disabled={+idxBalance < +needToPayIdxAmount * fuelList.length}
         >
-          {+idxBalance > +needToPayIdxAmount * fuelList.length
+          {+idxBalance >= +needToPayIdxAmount * fuelList.length
             ? "支付费用"
             : "余额不足"}
         </Button>
