@@ -102,7 +102,7 @@ const MakeMotherMiningMachine = () => {
         abi: MiningMachineSystemLogicABI,
         functionName: "setChildMachineTradeConfig",
         args: [PLATFORM_FEE_USD, SELLER_INCOME_USD, activeAndGasFee],
-        gas: 400000n, // 复杂操作：修改多个参数
+        gas: 600000n, // 复杂操作：修改多个参数（与Setting.tsx和工具函数保持一致）
         // 移除硬编码的 gas price，让钱包自动估算
         chainId: CHAIN_ID,
       });
@@ -170,10 +170,52 @@ const MakeMotherMiningMachine = () => {
       ];
 
       // 动态计算 Gas Limit（批量铸造母矿机）
-      // 优化：提高安全余量，确保交易成功
-      const baseGas = 500000n; // 300000n → 500000n (+67%)⚠️ 已提高
-      const perMachineGas = 200000n; // 150000n → 200000n (+33%)⚠️ 已提高
-      const gasLimit = baseGas + BigInt(count) * perMachineGas;
+      // 分析：batchMintMotherMachine 对每个矿机执行以下操作：
+      // 1. 设置分销商信息（一次性）：约20k gas
+      // 2. 设置BatchInfo（一次性）：约50k gas
+      // 3. 循环内（每台矿机）：
+      //    - store.setNextMachineId() - 写入，约5k gas
+      //    - store.setMachine() - 结构体写入，约20k gas
+      //    - store.pushOwnerToMachineId() - 数组push，约20k gas
+      //    - store.setMachineLifecycle() - 结构体写入，约50k-100k gas
+      //    - store.setMotherMachinePrice() - 写入，约5k gas
+      //    - store.incrementBatchMinted() - 写入，约5k gas
+      //    总计每台约 105k-155k gas
+      // 4. 设置分销商用户名（一次性）：约20k gas
+      // 5. history.recordMachineMints（一次性，外部调用）：约50k-100k gas
+      //
+      // 基础开销：函数调用、一次性操作等，约 200k-300k
+      // 考虑到存储操作的复杂性，每台矿机取 200k gas 是合理的
+      const baseGas = 500000n; // 基础开销（函数调用 + 一次性操作）
+      const perMachineGas = 200000n; // 每台矿机的gas（包含所有存储操作）
+      // 计算示例：
+      //   10台 = 2.5M gas
+      //   100台 = 20.5M gas
+      //   125台 = 25.5M gas（超过25M，需要限制）
+      //   150台 = 30.5M gas（超过block gas limit）
+      //
+      // 注意：BSC block gas limit = 30M，为了安全起见，设置上限为 25M
+      const MAX_GAS_LIMIT = 25000000n; // 25M gas limit，留出5M的安全余量
+      const calculatedGasLimit = baseGas + BigInt(count) * perMachineGas;
+
+      // 检查是否超过最大gas limit
+      if (calculatedGasLimit > MAX_GAS_LIMIT) {
+        const maxCount = Math.floor(Number(MAX_GAS_LIMIT - baseGas) / Number(perMachineGas));
+        const errorMsg = `数量过多（${count}台），计算出的 Gas Limit (${calculatedGasLimit.toString()}) 超过安全上限 (${MAX_GAS_LIMIT.toString()})。请分批铸造，每批最多 ${maxCount} 台`;
+        console.error(`❌ ${errorMsg}`);
+        Toast.show({
+          content: errorMsg,
+          position: "center",
+          duration: 5000,
+        });
+        setIsMaking(false);
+        Toast.clear();
+        return; // 提前返回，不发送交易
+      }
+
+      const gasLimit = calculatedGasLimit;
+
+      console.log(`计算的 Gas Limit: ${gasLimit.toString()} (${count} 台，计算值: ${calculatedGasLimit.toString()})`);
 
       // storage
       const hash = await writeContract(config, {
@@ -192,11 +234,32 @@ const MakeMotherMiningMachine = () => {
       });
 
       Toast.clear();
-    } catch (error) {
+    } catch (error: any) {
+      // 增强错误处理
+      let errorMsg = "制作失败";
+      const errorMessage = error?.message?.toLowerCase() || String(error).toLowerCase();
+
+      // 检测 Gas 不足
+      if (
+        errorMessage.includes("out of gas") ||
+        errorMessage.includes("gas required exceeds allowance") ||
+        errorMessage.includes("intrinsic gas too low")
+      ) {
+        errorMsg = `Gas 不足。当前尝试铸造 ${count} 台母矿机，建议减少数量分批铸造（每批建议不超过 100 台）`;
+      }
+      // 检测其他错误
+      else if (errorMessage.includes("用户拒绝") || errorMessage.includes("user rejected")) {
+        errorMsg = "用户取消了交易";
+      }
+      // 其他错误保持原样
+      else {
+        errorMsg = `制作失败: ${error?.message || String(error)}`;
+      }
+
       Toast.show({
-        content: "制作失败",
+        content: errorMsg,
         position: "center",
-        duration: 2000,
+        duration: 4000,
       });
       console.error(error);
     } finally {

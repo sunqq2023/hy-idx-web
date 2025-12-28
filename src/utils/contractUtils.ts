@@ -34,6 +34,9 @@ const GAS_LIMIT_MAP: Record<string, bigint> = {
   cancelOrder: 200000n, // 取消订单（实际 ~100k，余量 2x）⚠️ 新增
   sellToPlatform: 250000n, // 卖给平台（实际 ~120k，余量 2.1x）⚠️ 新增
   cancelListedMachine: 200000n, // 取消挂售（实际 ~100k，余量 2x）⚠️ 新增
+  airdrop: 400000n, // 空投（实际 ~180k，余量 2.2x）⚠️ 新增
+  listChildMachine: 300000n, // 挂售子矿机（实际 ~150k，余量 2x）⚠️ 新增
+  buyListedChildMachine: 500000n, // 购买挂售的子矿机（实际 ~250k，余量 2x）⚠️ 新增
   createInternalOrder: 300000n, // 创建内部订单（实际 ~150k，余量 2x）⚠️ 新增
   synthesizeMachine: 400000n, // 合成矿机（实际 ~200k，余量 2x）⚠️ 新增
   boundUserPhone: 150000n, // 绑定手机号（实际 ~80k，余量 1.9x）⚠️ 新增

@@ -59,29 +59,76 @@ const ClaimMix = () => {
 
       // 显示进度提示
       progressToast = Toast.show({
-        content: `正在领取 ${machineIds.length} 个矿机的 MIX，请在钱包中确认签名`,
+        content: `正在领取 ${machineIds.length} 个矿机的 MIX`,
         position: "center",
         duration: 0, // 持久显示
         icon: "loading",
       });
 
       // 动态计算 Gas Limit
-      // 基于实测：10 台矿机约需 1,400,000 Gas
-      const baseGas = 500000n;
-      const perMachineGas = 150000n;
-      const gasLimit = baseGas + BigInt(machineIds.length) * perMachineGas;
+      // 分析：claimMixByMachineIds 对每个矿机执行以下操作：
+      // 1. getMachine + getMachineLifecycle（SLOAD，在循环中读取）- 约 4k gas
+      // 2. addMixBalance（SSTORE映射累加）- 约 5k gas（累加操作，非首次写入）
+      // 3. setMachineLifecycle（结构体多字段SSTORE，11个字段，多个字段改变）- 约 50k-100k gas
+      // 4. claimMixHistory.push（动态数组push）- 约 20k gas（存储length和元素）
+      // 5. history.recordEarning（外部CALL）- 约 30k-50k gas（包括CALL开销21k和内部操作）
+      // 6. emit MixClaimed（LOG事件）- 约 1k gas
+      // 7. 可能的外部调用 nodeSystem.recordMachineDestroyed - 约 30k gas（如果矿机销毁）
+      // 总计每个矿机约 140k-210k gas，考虑到实际存储操作的复杂性和安全余量，取 400k 更安全
+      //
+      // 基础开销：函数调用（21k）、参数解析、循环初始化、返回值准备等，约 150k-300k
+      // 原设置 baseGas=800000n 过高，导致 perMachineGas=200000n 不足
+      // 优化：降低 baseGas，提高 perMachineGas，确保每台矿机有充足的 gas
+      const baseGas = 300000n; // 函数基础开销
+      const perMachineGas = 400000n; // 每台矿机的gas（包含安全余量）
+      // 计算示例：
+      //   1台 = 700k gas
+      //   10台 = 4.3M gas
+      //   40台 = 16.3M gas（BSC block gas limit = 30M，安全）
+      //   60台 = 24.3M gas（仍在安全范围内）
+      //   70台 = 28.3M gas（接近BSC block gas limit，建议分批）
+      //
+      // 注意：BSC block gas limit = 30M，为了安全起见，设置上限为 25M
+      const MAX_GAS_LIMIT = 25000000n; // 25M gas limit，留出5M的安全余量
+      const calculatedGasLimit =
+        baseGas + BigInt(machineIds.length) * perMachineGas;
+
+      // 检查是否超过最大gas limit
+      if (calculatedGasLimit > MAX_GAS_LIMIT) {
+        const maxMachines = Math.floor(
+          Number(MAX_GAS_LIMIT - baseGas) / Number(perMachineGas),
+        );
+        const errorMsg = `矿机数量过多（${machineIds.length}台），计算出的 Gas Limit (${calculatedGasLimit.toString()}) 超过安全上限 (${MAX_GAS_LIMIT.toString()})。请分批领取，每批最多 ${maxMachines} 台`;
+        console.error(`❌ ${errorMsg}`);
+        Toast.show({
+          content: errorMsg,
+          position: "center",
+          duration: 5000,
+        });
+        setIsClaimingMIX(false);
+        return; // 提前返回，不发送交易
+      }
+
+      const gasLimit = calculatedGasLimit;
 
       console.log(
-        `计算的 Gas Limit: ${gasLimit} (${machineIds.length} 个矿机)`,
+        `计算的 Gas Limit: ${gasLimit.toString()} (${machineIds.length} 个矿机，计算值: ${calculatedGasLimit.toString()})`,
       );
+      console.log(`矿机ID列表:`, machineIds);
 
       const contractCall = {
         address: MiningMachineProductionLogicAddress as `0x${string}`,
         abi: MiningMachineProductionLogicABI,
         functionName: "claimMixByMachineIds",
-        args: [machineIds],
+        args: [machineIds], // 批量函数，传入所有矿机ID数组
         gas: gasLimit, // 使用动态计算的 gas limit
       };
+
+      console.log(`发送合约调用:`, {
+        functionName: contractCall.functionName,
+        machineCount: machineIds.length,
+        gasLimit: gasLimit.toString(),
+      });
 
       const [result] = await executeSequentialCalls([contractCall]);
 
@@ -101,6 +148,14 @@ const ClaimMix = () => {
           // 检测超时错误
           if (errorStr.includes("超时")) {
             errorMsg += ": 交易确认超时，请刷新页面查看交易是否成功";
+          }
+          // 检测 Gas 不足
+          else if (
+            errorStr.includes("out of gas") ||
+            errorStr.includes("gas required exceeds allowance") ||
+            errorStr.includes("intrinsic gas too low")
+          ) {
+            errorMsg += `: Gas 不足。当前尝试领取 ${machineIds.length} 台矿机的 MIX，建议减少数量分批领取（每批建议不超过 50 台）`;
           }
           // 检测执行回退（通常是矿机未激活或没有 MIX）
           else if (errorStr.includes("execution reverted")) {

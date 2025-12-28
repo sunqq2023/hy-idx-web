@@ -566,11 +566,58 @@ const Machine = ({
       console.log("校验通过的母矿机ID:", validationResult.validIds);
 
       // 动态计算 Gas Limit（批量领取子矿机）
-      // 优化：提高安全余量，确保交易成功
-      const baseGas = 250000n; // 150000n → 250000n (+67%)⚠️ 已提高
-      const perMachineGas = 80000n; // 50000n → 80000n (+60%)⚠️ 已提高
-      const gasLimit =
-        baseGas + BigInt(validationResult.validIds.length) * perMachineGas;
+      // 分析：claimChildrenByMachineIds 对每个母矿机执行以下操作：
+      //
+      // 合约常量：
+      //   - MOTHER_PRODUCE_INTERVAL = 1 (分钟) - 每1分钟可以生产1台子矿机
+      //   - MOTHER_LIFETIME = 9 (分钟) - 总生命周期9分钟
+      //   - 最大子矿机数 = 9 / 1 = 9台
+      //
+      // 每台母矿机的gas消耗（最坏情况：产生9台子矿机）：
+      // 1. 验证：约10k-14k gas
+      // 2. 计算可产子矿机数量：约5k gas
+      // 3. _createChildMachines（创建9台子矿机）：
+      //    - 每台子矿机：setMachine(20k) + pushOwnerToMachineId(20k) + setMachineLifecycle(50k-100k) + recordMachineMint(30k)
+      //    - 9台子矿机：9 * 150k = 1.35M gas（最坏情况）
+      // 4. store.setMachineLifecycle()：约50k-100k gas
+      // 5. history.recordEarning()：约30k-50k gas
+      // 6. emit ChildMachinesClaimed()：约1k gas
+      //
+      // 总计每台母矿机（最坏情况）：1.35M + 200k = 1.55M gas
+      // 考虑到实际可能不是每次都产生9台（可能是1-9台），取 1.5M gas 作为安全值
+      //
+      // 注意：原来的200k设置严重不足，无法覆盖实际需求
+      const baseGas = 250000n; // 基础开销（函数调用 + 循环初始化 + 返回值准备）
+      const perMachineGas = 1500000n; // 每台母矿机的gas（从200000n提高到1500000n，覆盖最坏情况9台子矿机）
+      // 计算示例：
+      //   1台母矿机 = 1.75M gas
+      //   10台母矿机 = 15.25M gas
+      //   15台母矿机 = 22.75M gas
+      //   16台母矿机 = 24.25M gas（接近25M上限）
+      //
+      // 注意：BSC block gas limit = 30M，为了安全起见，设置上限为 25M
+      const MAX_GAS_LIMIT = 25000000n; // 25M gas limit，留出5M的安全余量
+      const calculatedGasLimit = baseGas + BigInt(validationResult.validIds.length) * perMachineGas;
+
+      // 检查是否超过最大gas limit
+      if (calculatedGasLimit > MAX_GAS_LIMIT) {
+        const maxMachines = Math.floor(Number(MAX_GAS_LIMIT - baseGas) / Number(perMachineGas));
+        const errorMsg = `母矿机数量过多（${validationResult.validIds.length}台），计算出的 Gas Limit (${calculatedGasLimit.toString()}) 超过安全上限 (${MAX_GAS_LIMIT.toString()})。请分批领取，每批最多 ${maxMachines} 台`;
+        console.error(`❌ ${errorMsg}`);
+        Toast.show({
+          content: errorMsg,
+          position: "center",
+          duration: 5000,
+        });
+        setIsClaiming(false);
+        return; // 提前返回，不发送交易
+      }
+
+      const gasLimit = calculatedGasLimit;
+
+      console.log(
+        `计算的 Gas Limit: ${gasLimit.toString()} (${validationResult.validIds.length} 台母矿机，计算值: ${calculatedGasLimit.toString()})`,
+      );
 
       const hash = await writeContract(config, {
         address: MiningMachineProductionLogicAddress as `0x${string}`,
@@ -597,7 +644,18 @@ const Machine = ({
       console.error("领取子矿机失败:", error);
       let errorMsg = "领取失败: 未知错误";
       if (error instanceof Error) {
-        if (error.message.includes("No machines specified")) {
+        const errorMessage = error.message.toLowerCase();
+
+        // 检测 Gas 不足
+        if (
+          errorMessage.includes("out of gas") ||
+          errorMessage.includes("gas required exceeds allowance") ||
+          errorMessage.includes("intrinsic gas too low")
+        ) {
+          errorMsg = `Gas 不足。当前尝试领取 ${selectedMMIds.length} 台母矿机的子矿机，建议减少数量分批领取（每批建议不超过 100 台）`;
+        }
+        // 检测其他错误
+        else if (error.message.includes("No machines specified")) {
           errorMsg = "领取失败: 未指定母矿机";
         } else if (error.message.includes("Machine not owned")) {
           errorMsg = "领取失败: 不是矿机所有者";
@@ -612,7 +670,7 @@ const Machine = ({
           errorMsg = `领取失败: ${error.message}`;
         }
       }
-      Toast.show({ content: errorMsg, position: "center" });
+      Toast.show({ content: errorMsg, position: "center", duration: 4000 });
     } finally {
       setIsClaiming(false);
     }
@@ -1146,21 +1204,60 @@ const Machine = ({
       }
 
       // 3. 执行批量激活合约调用
-      // 动态计算 Gas Limit（增加安全余量）
-      // 优化：提高安全余量，确保交易成功
-      // 注意：IDX token 是代理合约，需要更多 Gas
-      // 实测：单台激活需要约 330,000 Gas
-      // 修正：每台矿机需要足够的 gas，不能平均分摊
-      const baseGas = 200000n; // 基础合约调用开销
-      const perMachineGas = 400000n; // 每台矿机需要 400k（330k × 1.21 安全余量）
-      const gasLimit = baseGas + BigInt(machineIds.length) * perMachineGas;
+      // 动态计算 Gas Limit
+      // 分析：batchActivateMachinesWithLP 对每个矿机执行以下操作：
+      // 1. 验证循环（每台矿机）：
+      //    - store.machines(machineId) - SLOAD读取，约2k gas
+      //    - store.getMachineLifecycle(machineId) - 结构体读取，多个SLOAD，约8k-12k gas
+      //    - store._isOnSale(machineId) - SLOAD读取，约2k gas
+      //    总计每台验证约 12k-16k gas
+      // 2. IDX转账（一次性，所有矿机共享）：
+      //    - getIDXAmount(lpUsd) - 可能涉及外部调用，约10k-30k gas
+      //    - IERC20.transferFrom（IDX代理合约） - ERC20转账，约50k-100k gas
+      //    总计约 60k-130k gas（所有矿机共享）
+      // 3. 更新循环（每台矿机）：
+      //    - store.getMachineLifecycle(machineId) - SLOAD读取，约8k-12k gas
+      //    - store.setMachineLifecycle(machineId, m) - 结构体写入，多个SSTORE，约50k-100k gas
+      //    总计每台更新约 60k-120k gas
+      // 4. 外部调用（一次性，所有矿机共享）：
+      //    - activeMachineRewards(msg.sender, machineCount) - 外部CALL，至少21k + 内部操作
+      //    总计约 50k-200k gas（取决于实现，所有矿机共享）
+      //
+      // 每台矿机的gas消耗：验证(16k) + 更新(120k) = 约136k gas
+      // 基础开销（所有矿机共享）：函数调用(21k) + IDX转账(130k) + 外部调用(200k) = 约350k gas
+      // 考虑到安全余量和IDX代理合约的复杂性，每台矿机取 400k gas 是合理的
+      //
+      // 注意：BSC block gas limit = 30M，为了安全起见，设置上限为 25M
+      const baseGas = 350000n; // 基础开销（函数调用 + IDX转账 + 外部调用，从200k提高到350k）
+      const perMachineGas = 400000n; // 每台矿机的gas（验证 + 更新状态，包含安全余量）
+      // 计算示例：
+      //   1台 = 750k gas
+      //   10台 = 4.35M gas
+      //   40台 = 16.35M gas（BSC block gas limit = 30M，安全）
+      //   60台 = 24.35M gas（仍在安全范围内）
+      //   70台 = 28.35M gas（接近BSC block gas limit，建议分批）
+      const MAX_GAS_LIMIT = 25000000n; // 25M gas limit，留出5M的安全余量
+      const calculatedGasLimit = baseGas + BigInt(machineIds.length) * perMachineGas;
+
+      // 检查是否超过最大gas limit
+      if (calculatedGasLimit > MAX_GAS_LIMIT) {
+        const maxMachines = Math.floor(Number(MAX_GAS_LIMIT - baseGas) / Number(perMachineGas));
+        const errorMsg = `矿机数量过多（${machineIds.length}台），计算出的 Gas Limit (${calculatedGasLimit.toString()}) 超过安全上限 (${MAX_GAS_LIMIT.toString()})。请分批激活，每批最多 ${maxMachines} 台`;
+        console.error(`❌ ${errorMsg}`);
+        Toast.show({
+          content: errorMsg,
+          position: "center",
+          duration: 5000,
+        });
+        setIsPaying(false);
+        setMaskVisible(false);
+        return; // 提前返回，不发送交易
+      }
+
+      const gasLimit = calculatedGasLimit;
 
       console.log(
-        "计算的 Gas Limit:",
-        gasLimit,
-        "(",
-        machineIds.length,
-        "台矿机)",
+        `计算的 Gas Limit: ${gasLimit.toString()} (${machineIds.length} 台矿机，计算值: ${calculatedGasLimit.toString()})`,
       );
       console.log("发送激活交易...");
 
@@ -1591,8 +1688,13 @@ const Machine = ({
             "激活失败: 钱包有待处理的交易，请先完成或取消钱包中的待处理交易，然后重试";
         }
         // Gas 不足
-        else if (errorMessage.includes("out of gas")) {
-          errorMsg = "激活失败: Gas 不足，请减少选择的矿机数量";
+        else if (
+          errorMessage.includes("out of gas") ||
+          errorMessage.includes("gas required exceeds allowance") ||
+          errorMessage.includes("intrinsic gas too low")
+        ) {
+          const machineCount = fuelList.length; // 使用fuelList.length，因为在错误处理时machineIds可能不在作用域
+          errorMsg = `激活失败: Gas 不足。当前尝试激活 ${machineCount} 台矿机，建议减少数量分批激活（每批建议不超过 50 台）`;
         }
         // 其他错误
         else {

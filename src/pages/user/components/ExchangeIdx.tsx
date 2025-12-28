@@ -294,12 +294,29 @@ const ExchangeIdx = () => {
       );
       setIsClaimingIDX(true);
 
+      // 动态计算 Gas Limit
+      // 分析：claimReleasedIdx 对每个releaseId执行以下操作：
+      // 1. 读取存储：userReleaseInfos[msg.sender][releaseId] - SLOAD，约2k gas
+      // 2. 时间计算：计算时间差和释放比例 - 纯计算，约5k-10k gas
+      // 3. 更新存储：info.releasedAmount = totalReleasable - SSTORE，约5k-20k gas（取决于是否首次写入）
+      // 4. IDX转账：IERC20(store.idxToken()).transfer(msg.sender, newlyReleased)
+      //    - ERC20转账基础开销：21k gas
+      //    - IDX是代理合约，可能涉及代理调用，约30k-80k gas
+      //    - 存储操作（余额更新等）：约20k-40k gas
+      //    总计约70k-140k gas
+      // 5. 事件：emit IdxReleased - 约1k gas
+      //
+      // 每个交易的总计：函数调用(21k) + 参数处理(5k) + 执行(80k-140k) = 约110k-170k gas
+      // 考虑到IDX代理合约的复杂性和安全余量，取 300k gas 是合理的
+      // 原设置 350000n 略高，但考虑到代理合约的不确定性，保持350k也是安全的
+      const perReleaseGas = 350000n; // 每个releaseId的gas（包含IDX转账和存储更新）
+
       const multiContractsCalls = notClaimList.map((item) => ({
         address: MiningMachineProductionLogicAddress as `0x${string}`,
         abi: MiningMachineProductionLogicABI,
         functionName: "claimReleasedIdx",
         args: [item.id],
-        gas: 350000n, // 提取 IDX：涉及 IDX 转账和锁仓记录更新（300000n → 350000n）⚠️ 已提高
+        gas: perReleaseGas, // 每个releaseId的gas limit
         onConfirmed: (receipt: TransactionReceipt, index: number) => {
           // 这里可以执行其他操作，比如更新UI或触发下一个操作
           console.log(`Approval confirmed for call ${index + 1}`);

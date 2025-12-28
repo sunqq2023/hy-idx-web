@@ -291,15 +291,42 @@ export function useSequentialContractWrite() {
         });
 
         // 根据矿机数量动态计算 gas limit
-        // 优化：提高安全余量，确保交易成功
-        // IDX 代币的 transferFrom 会触发多次分红转账，需要更多 gas
-        // History 合约的 recordFuelFee 也需要较多 gas
-        // addRewardForAddressByFuelFee 会追溯15层推荐关系，消耗大量 gas
-        const baseGas = 1000000n; // 基础 gas（800000n → 1000000n，提高 25%）⚠️ 已提高
-        const perMachineGas = 350000n; // 每台矿机额外的 gas（300000n → 350000n，提高 17%）⚠️ 已提高
-        const gasLimit = baseGas + perMachineGas * BigInt(machineIds.length);
+        // 分析：batchPayFuel 对每个矿机执行以下操作：
+        // 1. payFuel 函数（循环内调用）：验证、IDX转账、存储更新、外部调用（addRewardForAddressByFuelFee追溯15层）
+        //    - IDX转账（每台独立）：约50k-100k gas
+        //    - 存储更新：约50k-100k gas
+        //    - addRewardForAddressByFuelFee（追溯15层推荐关系）：约150k-250k gas（最耗gas）
+        //    总计每台约 250k-450k gas
+        //
+        // 基础开销：函数调用、循环初始化等，约 200k-300k
+        // 考虑到addRewardForAddressByFuelFee的复杂性，取更高的安全余量
+        const baseGas = 1000000n; // 基础 gas（函数调用 + 循环开销）
+        const perMachineGas = 350000n; // 每台矿机的gas（包含IDX转账 + 存储更新 + 外部调用）
+        // 计算示例：
+        //   1台 = 1.35M gas
+        //   40台 = 15M gas
+        //   60台 = 22M gas
+        //   70台 = 25.5M gas（接近BSC block gas limit）
+        //
+        // 注意：BSC block gas limit = 30M，为了安全起见，设置上限为 25M
+        const MAX_GAS_LIMIT = 25000000n; // 25M gas limit，留出5M的安全余量
+        const calculatedGasLimit = baseGas + perMachineGas * BigInt(machineIds.length);
 
-        console.log(`计算的 Gas Limit: ${gasLimit}`);
+        // 检查是否超过最大gas limit
+        if (calculatedGasLimit > MAX_GAS_LIMIT) {
+          const maxMachines = Math.floor(Number(MAX_GAS_LIMIT - baseGas) / Number(perMachineGas));
+          const errorMsg = `矿机数量过多（${machineIds.length}台），计算出的 Gas Limit (${calculatedGasLimit.toString()}) 超过安全上限 (${MAX_GAS_LIMIT.toString()})。请分批加注燃料，每批最多 ${maxMachines} 台`;
+          console.error(`❌ ${errorMsg}`);
+          return {
+            success: false,
+            error: errorMsg,
+            functionName: "batchPayFuel",
+          };
+        }
+
+        const gasLimit = calculatedGasLimit;
+
+        console.log(`计算的 Gas Limit: ${gasLimit.toString()} (${machineIds.length} 台矿机，计算值: ${calculatedGasLimit.toString()})`);
 
         // Anvil 环境使用 legacy 交易
         const isAnvilFork = chain.id === 1056;
@@ -372,12 +399,26 @@ export function useSequentialContractWrite() {
           }
         }
 
+        // 增强错误处理
+        let errorMessage = isUserRejected ? "用户取消操作" : String(error);
+        const errorStr = errorMessage.toLowerCase();
+
+        // 检测 Gas 不足
+        if (
+          !isUserRejected &&
+          (errorStr.includes("out of gas") ||
+           errorStr.includes("gas required exceeds allowance") ||
+           errorStr.includes("intrinsic gas too low"))
+        ) {
+          errorMessage = `Gas 不足。当前尝试为 ${machineIds.length} 台矿机加注燃料，建议减少数量分批操作（每批建议不超过 40 台）`;
+        }
+
         console.error(
-          `批量添加燃料费失败: ${isUserRejected ? "用户已取消" : error}`,
+          `批量添加燃料费失败: ${isUserRejected ? "用户已取消" : errorMessage}`,
         );
         return {
           success: false,
-          error: isUserRejected ? "用户取消操作" : error,
+          error: errorMessage,
           functionName: "batchPayFuel",
           txHash,
         };
