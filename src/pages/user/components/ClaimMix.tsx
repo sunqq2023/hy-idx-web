@@ -4,7 +4,7 @@ import { MiningMachineProductionLogicABI } from "@/constants";
 import { useChainConfig } from "@/hooks/useChainConfig";
 import { MachineInfo } from "@/constants/types";
 import { useSequentialContractWrite } from "@/hooks/useSequentialContractWrite";
-import { Button, Divider, Modal, Toast } from "antd-mobile";
+import { Button, Divider, Modal, Toast, ProgressBar } from "antd-mobile";
 import { memo, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { FixedSizeList as List } from "react-window";
@@ -24,6 +24,11 @@ const ClaimMix = () => {
   const navigate = useNavigate();
   const [listHeight, setListHeight] = useState(0);
   const listContainerRef = useRef<HTMLDivElement>(null);
+  const [claimProgress, setClaimProgress] = useState({
+    current: 0,
+    total: 0,
+    percent: 0,
+  });
 
   const MiningMachineProductionLogicAddress =
     chainConfig.PRODUCTION_LOGIC_ADDRESS as `0x${string}`;
@@ -54,18 +59,35 @@ const ClaimMix = () => {
 
       // 提取需要领取的矿机ID数组
       const machineIds = producedMixList.map((item: MachineInfo) => item.id);
+      const totalMachines = machineIds.length;
 
-      console.log(`准备一次性领取 ${machineIds.length} 个矿机的 MIX`);
+      console.log(`准备分批领取 ${totalMachines} 个矿机的 MIX`);
+
+      // 分批配置：每批最多60台
+      const BATCH_SIZE = 60;
+      const batches: number[][] = [];
+      for (let i = 0; i < machineIds.length; i += BATCH_SIZE) {
+        batches.push(machineIds.slice(i, i + BATCH_SIZE));
+      }
+
+      console.log(`总共 ${totalMachines} 台矿机，分为 ${batches.length} 批，每批最多 ${BATCH_SIZE} 台`);
+
+      // 初始化进度
+      setClaimProgress({
+        current: 0,
+        total: batches.length,
+        percent: 0,
+      });
 
       // 显示进度提示
       progressToast = Toast.show({
-        content: `正在领取 ${machineIds.length} 个矿机的 MIX`,
+        content: `正在领取 ${totalMachines} 个矿机的 MIX (0/${batches.length})`,
         position: "center",
         duration: 0, // 持久显示
         icon: "loading",
       });
 
-      // 动态计算 Gas Limit
+      // Gas Limit 计算（每批60台）
       // 分析：claimMixByMachineIds 对每个矿机执行以下操作：
       // 1. getMachine + getMachineLifecycle（SLOAD，在循环中读取）- 约 4k gas
       // 2. addMixBalance（SSTORE映射累加）- 约 5k gas（累加操作，非首次写入）
@@ -75,137 +97,157 @@ const ClaimMix = () => {
       // 6. emit MixClaimed（LOG事件）- 约 1k gas
       // 7. 可能的外部调用 nodeSystem.recordMachineDestroyed - 约 30k gas（如果矿机销毁）
       // 总计每个矿机约 140k-210k gas，考虑到实际存储操作的复杂性和安全余量，取 400k 更安全
-      //
-      // 基础开销：函数调用（21k）、参数解析、循环初始化、返回值准备等，约 150k-300k
-      // 原设置 baseGas=800000n 过高，导致 perMachineGas=200000n 不足
-      // 优化：降低 baseGas，提高 perMachineGas，确保每台矿机有充足的 gas
       const baseGas = 300000n; // 函数基础开销
       const perMachineGas = 400000n; // 每台矿机的gas（包含安全余量）
-      // 计算示例：
-      //   1台 = 700k gas
-      //   10台 = 4.3M gas
-      //   40台 = 16.3M gas（BSC block gas limit = 30M，安全）
-      //   60台 = 24.3M gas（仍在安全范围内）
-      //   70台 = 28.3M gas（接近BSC block gas limit，建议分批）
-      //
-      // 注意：BSC block gas limit = 30M，为了安全起见，设置上限为 25M
-      const MAX_GAS_LIMIT = 25000000n; // 25M gas limit，留出5M的安全余量
-      const calculatedGasLimit =
-        baseGas + BigInt(machineIds.length) * perMachineGas;
+      // 每批60台的 gas limit = 300k + 60 * 400k = 24.3M gas（安全，低于25M上限）
+      const MAX_GAS_LIMIT = 25000000n; // 25M gas limit，留出安全余量
 
-      // 检查是否超过最大gas limit
-      if (calculatedGasLimit > MAX_GAS_LIMIT) {
-        const maxMachines = Math.floor(
-          Number(MAX_GAS_LIMIT - baseGas) / Number(perMachineGas),
+      const errors: string[] = [];
+
+      // 逐批领取
+      for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+        const batch = batches[batchIndex];
+        const batchGasLimit = baseGas + BigInt(batch.length) * perMachineGas;
+
+        // 检查是否超过最大gas limit（理论上不应该，因为每批最多60台）
+        if (batchGasLimit > MAX_GAS_LIMIT) {
+          const errorMsg = `第 ${batchIndex + 1} 批矿机数量过多（${batch.length}台），计算出的 Gas Limit (${batchGasLimit.toString()}) 超过安全上限 (${MAX_GAS_LIMIT.toString()})`;
+          console.error(`❌ ${errorMsg}`);
+          errors.push(errorMsg);
+          continue; // 跳过这一批
+        }
+
+        console.log(
+          `第 ${batchIndex + 1}/${batches.length} 批：${batch.length} 台矿机，Gas Limit: ${batchGasLimit.toString()}`,
         );
-        const errorMsg = `矿机数量过多（${machineIds.length}台），计算出的 Gas Limit (${calculatedGasLimit.toString()}) 超过安全上限 (${MAX_GAS_LIMIT.toString()})。请分批领取，每批最多 ${maxMachines} 台`;
-        console.error(`❌ ${errorMsg}`);
-        Toast.show({
-          content: errorMsg,
-          position: "center",
-          duration: 5000,
+
+        // 更新进度（在执行前更新，显示当前正在执行的批次）
+        const currentPercent = Math.round(
+          ((batchIndex + 1) / batches.length) * 100,
+        );
+        setClaimProgress({
+          current: batchIndex + 1,
+          total: batches.length,
+          percent: currentPercent,
         });
-        setIsClaimingMIX(false);
-        return; // 提前返回，不发送交易
+
+        // 更新 Toast 内容
+        if (progressToast) {
+          progressToast.close();
+        }
+        progressToast = Toast.show({
+          content: `正在领取第 ${batchIndex + 1}/${batches.length} 批 (${batch.length} 台矿机)`,
+          position: "center",
+          duration: 0,
+          icon: "loading",
+        });
+
+        try {
+          const contractCall = {
+            address: MiningMachineProductionLogicAddress as `0x${string}`,
+            abi: MiningMachineProductionLogicABI,
+            functionName: "claimMixByMachineIds",
+            args: [batch],
+            gas: batchGasLimit,
+          };
+
+          const [result] = await executeSequentialCalls([contractCall]);
+
+          if (!result?.success) {
+            const errorStr = String(result?.error || "未知错误");
+            const errorStrLower = errorStr.toLowerCase();
+            console.error(`第 ${batchIndex + 1} 批领取失败:`, result);
+
+            // 如果是用户取消或余额不足，直接停止
+            if (
+              errorStrLower.includes("user rejected") ||
+              errorStrLower.includes("user denied") ||
+              errorStrLower.includes("insufficient funds")
+            ) {
+              throw new Error(errorStr);
+            }
+
+            // 网络错误
+            if (
+              errorStrLower.includes("failed to fetch") ||
+              errorStrLower.includes("network request failed") ||
+              errorStrLower.includes("rpc request failed") ||
+              errorStrLower.includes("fetch failed")
+            ) {
+              errors.push(`第 ${batchIndex + 1} 批失败: 网络连接失败，请检查网络连接后重试`);
+              // 网络错误时稍作延迟再继续
+              await new Promise((resolve) => setTimeout(resolve, 2000));
+              continue;
+            }
+
+            // 其他错误继续下一批
+            errors.push(`第 ${batchIndex + 1} 批失败: ${errorStr}`);
+            continue;
+          }
+
+          console.log(`✅ 第 ${batchIndex + 1} 批领取成功`);
+        } catch (error: unknown) {
+          const errorStr = String(
+            (error instanceof Error ? error.message : error) || "",
+          ).toLowerCase();
+
+          // 用户取消或余额不足，直接停止
+          if (
+            errorStr.includes("user rejected") ||
+            errorStr.includes("user denied") ||
+            errorStr.includes("insufficient funds")
+          ) {
+            throw error;
+          }
+
+          // 网络错误（Failed to fetch, RPC 调用失败等）
+          if (
+            errorStr.includes("failed to fetch") ||
+            errorStr.includes("network request failed") ||
+            errorStr.includes("rpc request failed") ||
+            errorStr.includes("fetch failed")
+          ) {
+            errors.push(`第 ${batchIndex + 1} 批失败: 网络连接失败，请检查网络连接后重试`);
+            console.error(`第 ${batchIndex + 1} 批领取失败（网络错误）:`, error);
+            // 网络错误时稍作延迟再继续，给网络恢复时间
+            await new Promise((resolve) => setTimeout(resolve, 2000));
+            continue;
+          }
+
+          // 其他错误记录但继续
+          errors.push(`第 ${batchIndex + 1} 批失败: ${errorStr}`);
+          console.error(`第 ${batchIndex + 1} 批领取失败:`, error);
+        }
+
+        // 批次之间稍作延迟，避免 RPC 压力过大
+        if (batchIndex < batches.length - 1) {
+          await new Promise((resolve) => setTimeout(resolve, 500));
+        }
       }
 
-      const gasLimit = calculatedGasLimit;
+      // 关闭进度提示
+      if (progressToast) {
+        progressToast.close();
+      }
 
-      console.log(
-        `计算的 Gas Limit: ${gasLimit.toString()} (${machineIds.length} 个矿机，计算值: ${calculatedGasLimit.toString()})`,
-      );
-      console.log(`矿机ID列表:`, machineIds);
-
-      const contractCall = {
-        address: MiningMachineProductionLogicAddress as `0x${string}`,
-        abi: MiningMachineProductionLogicABI,
-        functionName: "claimMixByMachineIds",
-        args: [machineIds], // 批量函数，传入所有矿机ID数组
-        gas: gasLimit, // 使用动态计算的 gas limit
-      };
-
-      console.log(`发送合约调用:`, {
-        functionName: contractCall.functionName,
-        machineCount: machineIds.length,
-        gasLimit: gasLimit.toString(),
+      // 重置进度
+      setClaimProgress({
+        current: 0,
+        total: 0,
+        percent: 0,
       });
 
-      const [result] = await executeSequentialCalls([contractCall]);
-
-      // 关闭进度提示
-      if (progressToast) {
-        progressToast.close();
-      }
-
-      if (!result?.success) {
-        console.error(`领取失败，详细信息:`, result);
-
-        // 提供更详细的错误信息
-        let errorMsg = "领取失败";
-        if (result && "error" in result) {
-          const errorStr = String(result.error).toLowerCase();
-
-          // 检测超时错误
-          if (errorStr.includes("超时")) {
-            errorMsg += ": 交易确认超时，请刷新页面查看交易是否成功";
-          }
-          // 检测 Gas 不足
-          else if (
-            errorStr.includes("out of gas") ||
-            errorStr.includes("gas required exceeds allowance") ||
-            errorStr.includes("intrinsic gas too low")
-          ) {
-            errorMsg += `: Gas 不足。当前尝试领取 ${machineIds.length} 台矿机的 MIX，建议减少数量分批领取（每批建议不超过 50 台）`;
-          }
-          // 检测执行回退（通常是矿机未激活或没有 MIX）
-          else if (errorStr.includes("execution reverted")) {
-            errorMsg +=
-              ": 矿机未激活或没有可领取的 MIX，请确认矿机已激活并加燃料";
-          }
-          // 检测 BNB 余额不足
-          else if (
-            errorStr.includes("exceeds the balance") ||
-            errorStr.includes("insufficient funds for gas")
-          ) {
-            errorMsg += ": BNB 余额不足，请充值 BNB";
-          }
-          // 用户拒绝签名
-          else if (
-            errorStr.includes("user rejected") ||
-            errorStr.includes("user denied")
-          ) {
-            errorMsg += ": 用户取消了交易";
-          }
-          // 没有可领取的 MIX
-          else if (errorStr.includes("no mix to claim")) {
-            errorMsg += ": 没有可领取的 MIX";
-          }
-          // 其他错误
-          else {
-            errorMsg += `: ${result.error}`;
-          }
-        }
-
-        throw new Error(errorMsg);
-      }
-
-      // 获取领取的数量
-      let totalClaimed = mixPointsToBeClaimed;
-      try {
-        if (result && "data" in result && result.data != null) {
-          const data = BigInt(result.data.toString());
-          totalClaimed = Number(formatEther(data));
-        }
-      } catch (e) {
-        console.warn("解析返回值失败:", e);
-      }
-
-      // 关闭进度提示
-      if (progressToast) {
-        progressToast.close();
-      }
-
       setIsClaimingMIX(false);
+
+      // 如果有错误，显示警告
+      if (errors.length > 0) {
+        console.warn("部分批次领取失败:", errors);
+        Toast.show({
+          content: `部分领取失败，已成功领取 ${batches.length - errors.length}/${batches.length} 批`,
+          position: "center",
+          duration: 4000,
+        });
+      }
 
       // 显示成功提示
       Modal.show({
@@ -223,14 +265,31 @@ const ClaimMix = () => {
             <div className="text-[#B195FF]">提示</div>
             <div>
               <div className="mb-4">
-                你已成功提取所有MIX收益：
-                <AdaptiveNumber
-                  type={NumberType.BALANCE}
-                  value={totalClaimed}
-                  decimalSubLen={2}
-                  className="font-bold text-[15px]"
-                />
-                ，已存入你的钱包中。
+                {errors.length === 0 ? (
+                  <>
+                    你已成功提取所有MIX收益：
+                    <AdaptiveNumber
+                      type={NumberType.BALANCE}
+                      value={mixPointsToBeClaimed}
+                      decimalSubLen={2}
+                      className="font-bold text-[15px]"
+                    />
+                    ，已存入你的钱包中。
+                  </>
+                ) : (
+                  <>
+                    部分领取完成：
+                    <AdaptiveNumber
+                      type={NumberType.BALANCE}
+                      value={mixPointsToBeClaimed}
+                      decimalSubLen={2}
+                      className="font-bold text-[15px]"
+                    />
+                    <div className="mt-2 text-[12px] text-yellow-400">
+                      注意：有 {errors.length} 批领取失败，已成功领取 {batches.length - errors.length}/{batches.length} 批，请稍后重试失败批次
+                    </div>
+                  </>
+                )}
               </div>
               <button
                 className="w-full bg-[#895EFF] rounded-3xl text-white py-2"
@@ -250,6 +309,13 @@ const ClaimMix = () => {
         progressToast.close();
       }
 
+      // 重置进度
+      setClaimProgress({
+        current: 0,
+        total: 0,
+        percent: 0,
+      });
+
       setIsClaimingMIX(false);
 
       // 显示错误提示
@@ -257,12 +323,21 @@ const ClaimMix = () => {
       if (error instanceof Error) {
         const errorMessage = error.message.toLowerCase();
 
-        // 检测执行回退（矿机未激活或没有 MIX）
+        // 检测网络错误
         if (
+          errorMessage.includes("failed to fetch") ||
+          errorMessage.includes("network request failed") ||
+          errorMessage.includes("rpc request failed") ||
+          errorMessage.includes("fetch failed")
+        ) {
+          errorMsg = "领取失败: 网络连接失败，请检查网络连接或稍后重试";
+        }
+        // 检测执行回退（矿机未激活或没有 MIX）
+        else if (
           errorMessage.includes("矿机未激活") ||
           errorMessage.includes("没有可领取")
         ) {
-          errorMsg = error.message; // 使用已经格式化的错误消息
+          errorMsg = error.message;
         }
         // 检测 BNB 余额不足
         else if (
@@ -362,8 +437,24 @@ const ClaimMix = () => {
             onClick={handleClaimMix}
             className="w-full !bg-[#7334FE] !rounded-2xl !py-2 !my-3  !items-center  !p-0 !text-white !border-none !text-[15px]"
           >
-            提取到钱包
+            {isClaimingMIX
+              ? `领取中 (${claimProgress.current}/${claimProgress.total})`
+              : "提取到钱包"}
           </Button>
+          {isClaimingMIX && claimProgress.total > 0 && (
+            <div className="px-4 pb-2">
+              <ProgressBar
+                percent={claimProgress.percent}
+                className="w-full"
+                style={{
+                  "--fill-color": "#7334FE",
+                }}
+              />
+              <div className="text-white text-[12px] text-center mt-1">
+                {claimProgress.current}/{claimProgress.total} 批
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

@@ -9,7 +9,7 @@ import { useChainConfig } from "@/hooks/useChainConfig";
 import { useChainId, useAccount } from "wagmi";
 import { MachineInfo } from "@/constants/types";
 import { useSequentialContractWrite } from "@/hooks/useSequentialContractWrite";
-import { Button, Divider, Modal, Toast } from "antd-mobile";
+import { Button, Divider, Modal, ProgressBar, Toast } from "antd-mobile";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FixedSizeList as List } from "react-window";
@@ -70,6 +70,11 @@ const ExchangeIdx = () => {
   const listContainerRef = useRef<HTMLDivElement>(null);
 
   const [isClaimingIDX, setIsClaimingIDX] = useState(false);
+  const [claimProgress, setClaimProgress] = useState({
+    current: 0,
+    total: 0,
+    percent: 0,
+  });
 
   const handleQuery = useCallback(async () => {
     try {
@@ -287,12 +292,41 @@ const ExchangeIdx = () => {
   };
 
   const handleClaimIDX = async () => {
+    let progressToast: ReturnType<typeof Toast.show> | null = null;
+
     try {
-      // console.log(123, machineList.filter(item => item.totalAmount !== item.releasedAmount))
       const notClaimList = machineList.filter(
         (item) => item.releasableAmount > 0,
       );
+
+      if (notClaimList.length === 0) {
+        Toast.show({
+          content: "没有可领取的 IDX",
+          position: "center",
+          duration: 2000,
+        });
+        return;
+      }
+
       setIsClaimingIDX(true);
+
+      const totalReleases = notClaimList.length;
+      console.log(`准备领取 ${totalReleases} 个 releaseId 的 IDX`);
+
+      // 初始化进度
+      setClaimProgress({
+        current: 0,
+        total: totalReleases,
+        percent: 0,
+      });
+
+      // 显示进度提示
+      progressToast = Toast.show({
+        content: `正在领取 ${totalReleases} 个 IDX (0/${totalReleases})`,
+        position: "center",
+        duration: 0, // 持久显示
+        icon: "loading",
+      });
 
       // 动态计算 Gas Limit
       // 分析：claimReleasedIdx 对每个releaseId执行以下操作：
@@ -307,23 +341,55 @@ const ExchangeIdx = () => {
       // 5. 事件：emit IdxReleased - 约1k gas
       //
       // 每个交易的总计：函数调用(21k) + 参数处理(5k) + 执行(80k-140k) = 约110k-170k gas
-      // 考虑到IDX代理合约的复杂性和安全余量，取 300k gas 是合理的
-      // 原设置 350000n 略高，但考虑到代理合约的不确定性，保持350k也是安全的
+      // 考虑到IDX代理合约的复杂性和安全余量，取 350k gas 是合理的
       const perReleaseGas = 350000n; // 每个releaseId的gas（包含IDX转账和存储更新）
 
-      const multiContractsCalls = notClaimList.map((item) => ({
+      const multiContractsCalls = notClaimList.map((item, index) => ({
         address: MiningMachineProductionLogicAddress as `0x${string}`,
         abi: MiningMachineProductionLogicABI,
         functionName: "claimReleasedIdx",
         args: [item.id],
         gas: perReleaseGas, // 每个releaseId的gas limit
-        onConfirmed: (receipt: TransactionReceipt, index: number) => {
-          // 这里可以执行其他操作，比如更新UI或触发下一个操作
-          console.log(`Approval confirmed for call ${index + 1}`);
+        onConfirmed: (receipt: TransactionReceipt, callIndex: number) => {
+          // 更新进度
+          const currentPercent = Math.round(
+            ((callIndex + 1) / totalReleases) * 100,
+          );
+          setClaimProgress({
+            current: callIndex + 1,
+            total: totalReleases,
+            percent: currentPercent,
+          });
+
+          // 更新 Toast 内容
+          if (progressToast) {
+            progressToast.close();
+          }
+          progressToast = Toast.show({
+            content: `正在领取第 ${callIndex + 1}/${totalReleases} 个 IDX`,
+            position: "center",
+            duration: 0,
+            icon: "loading",
+          });
+
+          console.log(`✅ 第 ${callIndex + 1}/${totalReleases} 个 IDX 领取成功`);
         },
       }));
 
       const res = await executeSequentialCalls(multiContractsCalls);
+
+      // 关闭进度提示
+      if (progressToast) {
+        progressToast.close();
+      }
+
+      // 重置进度
+      setClaimProgress({
+        current: 0,
+        total: 0,
+        percent: 0,
+      });
+
       setIsClaimingIDX(false);
       const extractedIdxAmount = res.reduce((acc, cur, index) => {
         if (cur.success) {
@@ -371,8 +437,61 @@ const ExchangeIdx = () => {
         });
       }
     } catch (error) {
-      console.error(error);
+      console.error("领取IDX失败:", error);
+
+      // 关闭进度提示（如果存在）
+      if (progressToast) {
+        progressToast.close();
+      }
+
+      // 重置进度
+      setClaimProgress({
+        current: 0,
+        total: 0,
+        percent: 0,
+      });
+
       setIsClaimingIDX(false);
+
+      // 显示错误提示
+      let errorMsg = "领取失败: 未知错误";
+      if (error instanceof Error) {
+        const errorMessage = error.message.toLowerCase();
+
+        // 检测网络错误
+        if (
+          errorMessage.includes("failed to fetch") ||
+          errorMessage.includes("network request failed") ||
+          errorMessage.includes("rpc request failed") ||
+          errorMessage.includes("fetch failed")
+        ) {
+          errorMsg = "领取失败: 网络连接失败，请检查网络连接或稍后重试";
+        }
+        // 用户拒绝签名
+        else if (
+          errorMessage.includes("user rejected") ||
+          errorMessage.includes("user denied")
+        ) {
+          errorMsg = "领取失败: 用户取消了交易";
+        }
+        // BNB 余额不足
+        else if (
+          errorMessage.includes("exceeds the balance of the account") ||
+          errorMessage.includes("insufficient funds for gas")
+        ) {
+          errorMsg = "领取失败: BNB 余额不足，请充值 BNB 用于支付 Gas 费";
+        }
+        // 其他错误
+        else {
+          errorMsg = `领取失败: ${error.message}`;
+        }
+      }
+
+      Toast.show({
+        content: errorMsg,
+        position: "center",
+        duration: 4000,
+      });
     }
   };
   const handlBack = () => {
@@ -480,8 +599,24 @@ const ExchangeIdx = () => {
             onClick={handleClaimIDX}
             className="w-full !py-2 !bg-[#7334FE] !rounded-2xl !text-[14px]  !mb-2 !flex !items-center !justify-center  !text-white !border-none"
           >
-            提取到钱包
+            {isClaimingIDX
+              ? `领取中 (${claimProgress.current}/${claimProgress.total})`
+              : "提取到钱包"}
           </Button>
+          {isClaimingIDX && claimProgress.total > 0 && (
+            <div className="px-2 pb-2">
+              <ProgressBar
+                percent={claimProgress.percent}
+                className="w-full"
+                style={{
+                  "--fill-color": "#7334FE",
+                }}
+              />
+              <div className="text-[12px] text-center mt-1 text-gray-600">
+                {claimProgress.current}/{claimProgress.total} 个
+              </div>
+            </div>
+          )}
 
           <div className="flex mt-4">
             <div className="flex-1 flex flex-col items-end">

@@ -42,6 +42,26 @@ const AddFuel = () => {
   const { executeSequentialCalls, batchPayFuel } = useSequentialContractWrite();
   const { writeContractAsync } = useWriteContract();
   const [maskCount, setMaskCount] = useState(1); // 批量操作只有1笔交易
+
+  // 实时检查加注燃料的 gas limit
+  useEffect(() => {
+    if (!pageData || pageData.length === 0) return;
+
+    const baseGas = 1000000n;
+    const perMachineGas = 350000n;
+    const MAX_GAS_LIMIT = 25000000n;
+    const calculatedGasLimit = baseGas + BigInt(pageData.length) * perMachineGas;
+
+    if (calculatedGasLimit > MAX_GAS_LIMIT) {
+      const maxMachines = Math.floor(Number(MAX_GAS_LIMIT - baseGas) / Number(perMachineGas));
+      Toast.show({
+        content: `一次最多只能为 ${maxMachines} 台矿机加注燃料，当前选择了 ${pageData.length} 台，请减少数量后重试`,
+        position: "center",
+        duration: 3000,
+      });
+    }
+  }, [pageData?.length]);
+
   const handlBack = () => {
     navigate("/user");
   };

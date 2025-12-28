@@ -47,6 +47,25 @@ const MakeMotherMiningMachine = () => {
   const [feeLoading, setFeeLoading] = useState(false);
   const { writeContractAsync } = useWriteContract();
 
+  // 实时检查铸造母矿机的 gas limit
+  useEffect(() => {
+    if (!count || count === "" || isNaN(Number(count)) || Number(count) <= 0) return;
+
+    const baseGas = 500000n;
+    const perMachineGas = 200000n;
+    const MAX_GAS_LIMIT = 25000000n;
+    const calculatedGasLimit = baseGas + BigInt(Number(count)) * perMachineGas;
+
+    if (calculatedGasLimit > MAX_GAS_LIMIT) {
+      const maxCount = Math.floor(Number(MAX_GAS_LIMIT - baseGas) / Number(perMachineGas));
+      Toast.show({
+        content: `一次最多只能铸造 ${maxCount} 台母矿机，当前输入了 ${count} 台，请减少数量后重试`,
+        position: "center",
+        duration: 3000,
+      });
+    }
+  }, [count]);
+
   const queryActiveAndGasFee = async () => {
     try {
       const contracts = [
@@ -201,7 +220,7 @@ const MakeMotherMiningMachine = () => {
       // 检查是否超过最大gas limit
       if (calculatedGasLimit > MAX_GAS_LIMIT) {
         const maxCount = Math.floor(Number(MAX_GAS_LIMIT - baseGas) / Number(perMachineGas));
-        const errorMsg = `数量过多（${count}台），计算出的 Gas Limit (${calculatedGasLimit.toString()}) 超过安全上限 (${MAX_GAS_LIMIT.toString()})。请分批铸造，每批最多 ${maxCount} 台`;
+        const errorMsg = `一次最多只能铸造 ${maxCount} 台母矿机，当前选择了 ${count} 台，请减少数量后重试`;
         console.error(`❌ ${errorMsg}`);
         Toast.show({
           content: errorMsg,

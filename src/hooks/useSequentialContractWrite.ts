@@ -88,6 +88,7 @@ export function useSequentialContractWrite() {
             waitForTransactionReceipt(wagmiConfig, {
               hash: txHash,
               chainId: chain.id,
+              confirmations: isAnvilFork ? 1 : 2, // Anvil 只需要 1 个确认
             }),
             new Promise<never>((_, reject) =>
               setTimeout(
@@ -310,12 +311,15 @@ export function useSequentialContractWrite() {
         //
         // 注意：BSC block gas limit = 30M，为了安全起见，设置上限为 25M
         const MAX_GAS_LIMIT = 25000000n; // 25M gas limit，留出5M的安全余量
-        const calculatedGasLimit = baseGas + perMachineGas * BigInt(machineIds.length);
+        const calculatedGasLimit =
+          baseGas + perMachineGas * BigInt(machineIds.length);
 
         // 检查是否超过最大gas limit
         if (calculatedGasLimit > MAX_GAS_LIMIT) {
-          const maxMachines = Math.floor(Number(MAX_GAS_LIMIT - baseGas) / Number(perMachineGas));
-          const errorMsg = `矿机数量过多（${machineIds.length}台），计算出的 Gas Limit (${calculatedGasLimit.toString()}) 超过安全上限 (${MAX_GAS_LIMIT.toString()})。请分批加注燃料，每批最多 ${maxMachines} 台`;
+          const maxMachines = Math.floor(
+            Number(MAX_GAS_LIMIT - baseGas) / Number(perMachineGas),
+          );
+          const errorMsg = `一次最多只能为 ${maxMachines} 台矿机加注燃料，当前选择了 ${machineIds.length} 台，请减少数量后重试`;
           console.error(`❌ ${errorMsg}`);
           return {
             success: false,
@@ -326,7 +330,9 @@ export function useSequentialContractWrite() {
 
         const gasLimit = calculatedGasLimit;
 
-        console.log(`计算的 Gas Limit: ${gasLimit.toString()} (${machineIds.length} 台矿机，计算值: ${calculatedGasLimit.toString()})`);
+        console.log(
+          `计算的 Gas Limit: ${gasLimit.toString()} (${machineIds.length} 台矿机，计算值: ${calculatedGasLimit.toString()})`,
+        );
 
         // Anvil 环境使用 legacy 交易
         const isAnvilFork = chain.id === 1056;
@@ -407,8 +413,8 @@ export function useSequentialContractWrite() {
         if (
           !isUserRejected &&
           (errorStr.includes("out of gas") ||
-           errorStr.includes("gas required exceeds allowance") ||
-           errorStr.includes("intrinsic gas too low"))
+            errorStr.includes("gas required exceeds allowance") ||
+            errorStr.includes("intrinsic gas too low"))
         ) {
           errorMessage = `Gas 不足。当前尝试为 ${machineIds.length} 台矿机加注燃料，建议减少数量分批操作（每批建议不超过 40 台）`;
         }

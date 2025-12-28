@@ -602,7 +602,7 @@ const Machine = ({
       // 检查是否超过最大gas limit
       if (calculatedGasLimit > MAX_GAS_LIMIT) {
         const maxMachines = Math.floor(Number(MAX_GAS_LIMIT - baseGas) / Number(perMachineGas));
-        const errorMsg = `母矿机数量过多（${validationResult.validIds.length}台），计算出的 Gas Limit (${calculatedGasLimit.toString()}) 超过安全上限 (${MAX_GAS_LIMIT.toString()})。请分批领取，每批最多 ${maxMachines} 台`;
+        const errorMsg = `一次最多只能领取 ${maxMachines} 台母矿机的子矿机，当前选择了 ${validationResult.validIds.length} 台，请减少数量后重试`;
         console.error(`❌ ${errorMsg}`);
         Toast.show({
           content: errorMsg,
@@ -844,6 +844,44 @@ const Machine = ({
     ) : (
       <div className="border border-[#a5a4a4] w-[1rem] h-[1rem] rounded-[50%]" />
     );
+
+  // 实时检查激活矿机的 gas limit
+  useEffect(() => {
+    if (fuelList.length === 0) return;
+
+    const baseGas = 350000n;
+    const perMachineGas = 400000n;
+    const MAX_GAS_LIMIT = 25000000n;
+    const calculatedGasLimit = baseGas + BigInt(fuelList.length) * perMachineGas;
+
+    if (calculatedGasLimit > MAX_GAS_LIMIT) {
+      const maxMachines = Math.floor(Number(MAX_GAS_LIMIT - baseGas) / Number(perMachineGas));
+      Toast.show({
+        content: `一次最多只能激活 ${maxMachines} 台矿机，当前选择了 ${fuelList.length} 台，请减少数量后重试`,
+        position: "center",
+        duration: 3000,
+      });
+    }
+  }, [fuelList.length]);
+
+  // 实时检查领取子矿机的 gas limit
+  useEffect(() => {
+    if (selectedMMIds.length === 0) return;
+
+    const baseGas = 250000n;
+    const perMachineGas = 1500000n;
+    const MAX_GAS_LIMIT = 25000000n;
+    const calculatedGasLimit = baseGas + BigInt(selectedMMIds.length) * perMachineGas;
+
+    if (calculatedGasLimit > MAX_GAS_LIMIT) {
+      const maxMachines = Math.floor(Number(MAX_GAS_LIMIT - baseGas) / Number(perMachineGas));
+      Toast.show({
+        content: `一次最多只能领取 ${maxMachines} 台母矿机的子矿机，当前选择了 ${selectedMMIds.length} 台，请减少数量后重试`,
+        position: "center",
+        duration: 3000,
+      });
+    }
+  }, [selectedMMIds.length]);
 
   // 动态计算高度
   useEffect(() => {
@@ -1242,7 +1280,7 @@ const Machine = ({
       // 检查是否超过最大gas limit
       if (calculatedGasLimit > MAX_GAS_LIMIT) {
         const maxMachines = Math.floor(Number(MAX_GAS_LIMIT - baseGas) / Number(perMachineGas));
-        const errorMsg = `矿机数量过多（${machineIds.length}台），计算出的 Gas Limit (${calculatedGasLimit.toString()}) 超过安全上限 (${MAX_GAS_LIMIT.toString()})。请分批激活，每批最多 ${maxMachines} 台`;
+        const errorMsg = `一次最多只能激活 ${maxMachines} 台矿机，当前选择了 ${machineIds.length} 台，请减少数量后重试`;
         console.error(`❌ ${errorMsg}`);
         Toast.show({
           content: errorMsg,
