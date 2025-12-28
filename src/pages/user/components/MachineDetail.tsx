@@ -91,53 +91,117 @@ const MachineDetail = () => {
     }
   }, [idxPriceLoading, idxPrice]);
 
-  const handleShutdown = () => {
-    // 显示确认对话框
-    Dialog.confirm({
-      content: "是否关停矿机",
-      onConfirm: async () => {
-        // 用户确认后执行的逻辑
-        try {
-          // 调用合约的关停方法
-          const hash = await writeContract(config, {
-            address: MiningMachineSystemLogicAddress, // 合约地址
-            abi: MiningMachineSystemLogicABI, // 合约ABI
-            functionName: "deactivateLP", // 关停对应的合约函数
-            args: [pageData.id], // 传入当前矿机ID作为参数
-            gas: 250000n, // 关停矿机（200000n → 250000n）⚠️ 已提高
-          });
+  const handleShutdown = async () => {
+    try {
+      // 先实时检查矿机状态
+      const lifecycle = await readContract(config, {
+        address: MiningMachineSystemStorageAddress,
+        abi: MiningMachineSystemStorageABI,
+        functionName: "getMachineLifecycle",
+        args: [BigInt(pageData.id)],
+        chainId,
+      });
 
-          // 等待交易上链确认
-          const receipt = await waitForTransactionReceipt(config, {
-            hash,
-            chainId,
-          });
+      const isActivated =
+        (lifecycle as any).isActivatedStakedLP ?? lifecycle[4];
+      const isDestroyed = (lifecycle as any).destroyed ?? lifecycle[7];
 
-          // 确保交易成功
-          if (receipt.status === "success") {
-            // 操作成功后的反馈
+      // 检查矿机状态
+      if (isDestroyed) {
+        Toast.show({
+          content: "该矿机已被销毁，无法关停",
+          position: "center",
+          duration: 3000,
+        });
+        return;
+      }
+
+      if (!isActivated) {
+        Toast.show({
+          content: "该矿机未激活，无需关停",
+          position: "center",
+          duration: 3000,
+        });
+        return;
+      }
+
+      // 状态正常，显示确认对话框
+      Dialog.confirm({
+        content: "是否关停矿机",
+        onConfirm: async () => {
+          try {
+            // 调用合约的关停方法
+            // 分析：deactivateLP 函数执行以下操作：
+            // 1. getMachineLifecycle（读取）- 约 10k-20k gas
+            // 2. setMachineLifecycle（写入多个字段）- 约 50k-100k gas
+            // 3. getIDXAmount（可能涉及外部调用）- 约 10k-50k gas
+            // 4. IERC20.transfer（IDX 转账）- 约 50k-100k gas
+            // 5. setStakedLPAmount（写入）- 约 5k-20k gas
+            // 总计约 125k-290k gas，考虑到安全余量，设置为 400k 更安全
+            const hash = await writeContract(config, {
+              address: MiningMachineSystemLogicAddress,
+              abi: MiningMachineSystemLogicABI,
+              functionName: "deactivateLP",
+              args: [pageData.id],
+              gas: 400000n, // 关停矿机（从 250000n 提高到 400000n，提供足够的安全余量）⚠️ 已提高
+            });
+
+            // 等待交易上链确认
+            const receipt = await waitForTransactionReceipt(config, {
+              hash,
+              chainId,
+            });
+
+            // 确保交易成功
+            if (receipt.status === "success") {
+              Toast.show({
+                content: "关停成功",
+                position: "center",
+              });
+              navigate("/user", {
+                state: { needRefresh: true },
+                replace: true,
+              });
+            } else {
+              throw new Error("交易未成功确认");
+            }
+          } catch (error: any) {
+            console.error("关停矿机失败:", error);
+
+            let errorMessage = "关停失败";
+            const errorString = String(
+              error?.message || error || "",
+            ).toLowerCase();
+
+            if (
+              errorString.includes("user rejected") ||
+              errorString.includes("user denied")
+            ) {
+              errorMessage = "用户取消了交易";
+            } else if (errorString.includes("insufficient funds")) {
+              errorMessage = "余额不足，无法支付 Gas 费";
+            } else if (errorString.includes("execution reverted")) {
+              errorMessage = "关停失败：矿机状态不符合要求";
+            } else if (errorString.includes("out of gas")) {
+              errorMessage = "关停失败：Gas 不足";
+            }
+
             Toast.show({
-              content: "关停成功",
+              content: errorMessage,
               position: "center",
+              duration: 5000,
             });
-            // 返回主页面并携带刷新信号
-            navigate("/user", {
-              state: { needRefresh: true },
-              replace: true, // 替换历史记录，避免回退问题
-            });
-          } else {
-            throw new Error("交易未成功确认");
           }
-        } catch (error) {
-          // 操作失败后的反馈
-          Toast.show({
-            content: "关停失败",
-            position: "center",
-          });
-          console.error(error);
-        }
-      },
-    });
+        },
+      });
+    } catch (error) {
+      console.error("检查矿机状态失败:", error);
+      Toast.show({
+        content: "无法获取矿机状态，请稍后重试",
+        position: "center",
+        duration: 3000,
+      });
+    }
   };
 
   const [isPaying, setIsPaying] = useState(false);
