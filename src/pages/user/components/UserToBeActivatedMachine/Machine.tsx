@@ -58,6 +58,7 @@ import EmptyComp from "@/components/EmptyComp";
 import { useVisibleMachineQuery } from "@/hooks/useVisibleMachineQuery";
 import { useMachineDataCache } from "@/hooks/useMachineDataCache";
 import MachineRefreshButton from "@/components/MachineRefreshButton";
+import { generateCode } from "@/utils/helper";
 
 const Machine = ({
   isShow,
@@ -104,6 +105,7 @@ const Machine = ({
   const [isQuerying, setIsQuerying] = useState(false); // 添加查询状态检查
   const queryTimeoutRef = useRef<NodeJS.Timeout | null>(null); // 防抖定时器
   const hasTriggeredVisibleUpdate = useRef(false); // 防止重复触发可见区域更新
+  const recentlyActivatedMachineIds = useRef<number[]>([]); // 保存最近激活的矿机ID，用于刷新时跳过
 
   // 矿机查询hook
   const {
@@ -115,6 +117,9 @@ const Machine = ({
   } = useVisibleMachineQuery(allMachineIds, {
     debounceDelay: 1000,
   });
+
+  // 缓存管理
+  const { clearMachineCache } = useMachineDataCache();
 
   const isReadyToActivateListLength = useMemo(() => {
     return machineList.filter((item) => !item.isActivatedStakedLP).length || 0;
@@ -187,150 +192,198 @@ const Machine = ({
   }, [userAddress, initializeQuery]); // 移除isQuerying依赖避免循环
 
   // 处理可见区域数据更新
-  const handleVisibleDataUpdate = useCallback(async () => {
-    console.log(
-      "handleVisibleDataUpdate 被调用, allMachineIds.length:",
-      allMachineIds.length,
-    );
-    if (allMachineIds.length === 0) return;
-
-    try {
-      // 查询所有矿机，而不仅仅是可见区域的
-      console.log("查询所有矿机数据:", allMachineIds);
-      const machineDataMap = await queryMachines(allMachineIds);
-
-      // 如果查询失败，不更新状态
-      if (!machineDataMap || machineDataMap.size === 0) {
-        console.warn("查询矿机数据失败，跳过状态更新");
-        return;
-      }
-
-      // 更新矿机列表
-      const updatedMachines = Array.from(machineDataMap.values());
-      console.log("=== 矿机数据详细分析 ===");
-      console.log("查询到的矿机数据:", updatedMachines);
+  const handleVisibleDataUpdate = useCallback(
+    async (skipMachineIds: number[] = []) => {
       console.log(
-        "矿机详细状态:",
-        updatedMachines.map((m) => ({
-          id: m.id,
-          mtype: m.mtype,
-          isOnSale: m.isOnSale,
-          isActivatedStakedLP: m.isActivatedStakedLP,
-          activatedAt: m.activatedAt,
-          createTime: m.createTime,
-          expiredAt: m.expiredAt,
-          destroyed: m.destroyed,
-        })),
+        "handleVisibleDataUpdate 被调用, allMachineIds.length:",
+        allMachineIds.length,
+        "skipMachineIds:",
+        skipMachineIds,
       );
+      if (allMachineIds.length === 0) return;
 
-      // 分析矿机类型分布
-      const motherMachines = updatedMachines.filter((m) => m.mtype === 1);
-      const childMachines = updatedMachines.filter((m) => m.mtype === 2);
-      console.log(
-        "母矿机数量:",
-        motherMachines.length,
-        "ID:",
-        motherMachines.map((m) => m.id),
-      );
-      console.log(
-        "子矿机数量:",
-        childMachines.length,
-        "ID:",
-        childMachines.map((m) => m.id),
-      );
+      try {
+        // 查询所有矿机，而不仅仅是可见区域的
+        console.log("查询所有矿机数据:", allMachineIds);
+        const machineDataMap = await queryMachines(allMachineIds);
 
-      // 分析子矿机状态
-      const activatedChildren = childMachines.filter(
-        (m) => m.isActivatedStakedLP,
-      );
-      const unactivatedChildren = childMachines.filter(
-        (m) => !m.isActivatedStakedLP,
-      );
-      const onSaleChildren = childMachines.filter((m) => m.isOnSale);
-      const notOnSaleChildren = childMachines.filter((m) => !m.isOnSale);
+        // 如果查询失败，不更新状态
+        if (!machineDataMap || machineDataMap.size === 0) {
+          console.warn("查询矿机数据失败，跳过状态更新");
+          return;
+        }
 
-      console.log(
-        "已激活子矿机:",
-        activatedChildren.length,
-        "ID:",
-        activatedChildren.map((m) => m.id),
-      );
-      console.log(
-        "未激活子矿机:",
-        unactivatedChildren.length,
-        "ID:",
-        unactivatedChildren.map((m) => m.id),
-      );
-      console.log(
-        "在售子矿机:",
-        onSaleChildren.length,
-        "ID:",
-        onSaleChildren.map((m) => m.id),
-      );
-      console.log(
-        "未在售子矿机:",
-        notOnSaleChildren.length,
-        "ID:",
-        notOnSaleChildren.map((m) => m.id),
-      );
+        // 更新矿机列表
+        const updatedMachines = Array.from(machineDataMap.values());
+        console.log("=== 矿机数据详细分析 ===");
+        console.log("查询到的矿机数据:", updatedMachines);
+        console.log(
+          "矿机详细状态:",
+          updatedMachines.map((m) => ({
+            id: m.id,
+            mtype: m.mtype,
+            isOnSale: m.isOnSale,
+            isActivatedStakedLP: m.isActivatedStakedLP,
+            activatedAt: m.activatedAt,
+            createTime: m.createTime,
+            expiredAt: m.expiredAt,
+            destroyed: m.destroyed,
+          })),
+        );
 
-      setAllMachines((prev) => {
-        const newMachines = [...prev];
-        updatedMachines.forEach((machine) => {
-          const index = newMachines.findIndex((m) => m.id === machine.id);
-          if (index >= 0) {
-            newMachines[index] = machine;
-          } else {
-            newMachines.push(machine);
-          }
+        // 分析矿机类型分布
+        const motherMachines = updatedMachines.filter((m) => m.mtype === 1);
+        const childMachines = updatedMachines.filter((m) => m.mtype === 2);
+        console.log(
+          "母矿机数量:",
+          motherMachines.length,
+          "ID:",
+          motherMachines.map((m) => m.id),
+        );
+        console.log(
+          "子矿机数量:",
+          childMachines.length,
+          "ID:",
+          childMachines.map((m) => m.id),
+        );
+
+        // 分析子矿机状态
+        const activatedChildren = childMachines.filter(
+          (m) => m.isActivatedStakedLP,
+        );
+        const unactivatedChildren = childMachines.filter(
+          (m) => !m.isActivatedStakedLP,
+        );
+        const onSaleChildren = childMachines.filter((m) => m.isOnSale);
+        const notOnSaleChildren = childMachines.filter((m) => !m.isOnSale);
+
+        console.log(
+          "已激活子矿机:",
+          activatedChildren.length,
+          "ID:",
+          activatedChildren.map((m) => m.id),
+        );
+        console.log(
+          "未激活子矿机:",
+          unactivatedChildren.length,
+          "ID:",
+          unactivatedChildren.map((m) => m.id),
+        );
+        console.log(
+          "在售子矿机:",
+          onSaleChildren.length,
+          "ID:",
+          onSaleChildren.map((m) => m.id),
+        );
+        console.log(
+          "未在售子矿机:",
+          notOnSaleChildren.length,
+          "ID:",
+          notOnSaleChildren.map((m) => m.id),
+        );
+
+        // 更新 allMachines：优先使用查询到的最新数据
+        // 注意：如果某个矿机在 updatedMachines 中，说明它被重新查询了，应该使用最新数据
+        // 如果不在 updatedMachines 中，说明它没有被查询（可能因为缓存有效），保留旧数据
+        setAllMachines((prev) => {
+          const newMachines = new Map<number, any>();
+
+          // 先添加查询到的最新数据（这些数据是最新的，优先使用）
+          updatedMachines.forEach((machine) => {
+            // 如果这个矿机在 skipMachineIds 中，强制标记为已激活
+            if (skipMachineIds.includes(machine.id)) {
+              console.log(
+                `在 allMachines 更新时强制标记矿机 ${machine.id} 为已激活`,
+              );
+              newMachines.set(machine.id, {
+                ...machine,
+                isActivatedStakedLP: true,
+              });
+            } else {
+              newMachines.set(machine.id, machine);
+            }
+          });
+
+          // 对于 allMachineIds 中存在但 updatedMachines 中没有的矿机，保留旧数据
+          // 这样可以避免丢失数据，但已激活的矿机应该已经被查询到了（因为缓存已清除）
+          allMachineIds.forEach((id) => {
+            if (!newMachines.has(id)) {
+              const oldMachine = prev.find((m) => m.id === id);
+              if (oldMachine) {
+                // 如果这个矿机在 skipMachineIds 中，强制标记为已激活
+                if (skipMachineIds.includes(id)) {
+                  console.log(
+                    `在 allMachines 更新时强制标记旧矿机 ${id} 为已激活`,
+                  );
+                  newMachines.set(id, {
+                    ...oldMachine,
+                    isActivatedStakedLP: true,
+                  });
+                } else {
+                  newMachines.set(id, oldMachine);
+                }
+              }
+            }
+          });
+
+          return Array.from(newMachines.values());
         });
-        return newMachines;
-      });
 
-      // 筛选子矿机用于显示
-      console.log("筛选出的子矿机:", childMachines);
+        // 筛选子矿机用于显示
+        console.log("筛选出的子矿机:", childMachines);
 
-      const finalChildList = childMachines
-        .filter((m) => {
-          const isNotOnSale = !m.isOnSale;
-          const isNotActivated = !m.isActivatedStakedLP;
-          console.log(
-            `矿机 ${m.id} 筛选条件: isOnSale=${m.isOnSale}(${isNotOnSale}), isActivatedStakedLP=${m.isActivatedStakedLP}(${isNotActivated})`,
-          );
-          return isNotOnSale && isNotActivated;
-        })
-        .sort((a, b) => a.activatedAt - b.activatedAt);
+        // 如果有 skipMachineIds，强制将这些矿机标记为已激活（即使区块链数据还没更新）
+        const childMachinesWithSkip = childMachines.map((m) => {
+          if (skipMachineIds.includes(m.id)) {
+            console.log(`强制跳过矿机 ${m.id}（刚激活，区块链数据可能未更新）`);
+            return { ...m, isActivatedStakedLP: true };
+          }
+          return m;
+        });
 
-      console.log("=== 最终显示逻辑分析 ===");
-      console.log("筛选条件: !isOnSale && !isActivatedStakedLP");
-      console.log("符合条件的子矿机:", finalChildList);
-      console.log("最终显示数量:", finalChildList.length);
-      console.log(
-        "应该显示的矿机ID:",
-        finalChildList.map((m) => m.id),
-      );
-      setMachineList(finalChildList);
+        const finalChildList = childMachinesWithSkip
+          .filter((m) => {
+            const isNotOnSale = !m.isOnSale;
+            const isNotActivated = !m.isActivatedStakedLP;
+            console.log(
+              `矿机 ${m.id} 筛选条件: isOnSale=${m.isOnSale}(${isNotOnSale}), isActivatedStakedLP=${m.isActivatedStakedLP}(${isNotActivated})`,
+            );
+            return isNotOnSale && isNotActivated;
+          })
+          .sort((a, b) => a.activatedAt - b.activatedAt);
 
-      // 更新母矿机ID列表
-      const activatedMotherMachines = updatedMachines.filter(
-        (m) => m.mtype === 1 && m.isActivatedStakedLP,
-      );
-      const claimableMotherMachines = activatedMotherMachines.filter(
-        (m) => (m.claimableChildren || 0) > 0,
-      );
-      const mmIds = claimableMotherMachines.map((m) => m.id);
-      setMMIds(mmIds);
+        console.log("=== 最终显示逻辑分析 ===");
+        console.log("筛选条件: !isOnSale && !isActivatedStakedLP");
+        console.log("符合条件的子矿机:", finalChildList);
+        console.log("最终显示数量:", finalChildList.length);
+        console.log(
+          "应该显示的矿机ID:",
+          finalChildList.map((m) => m.id),
+        );
+        setMachineList(finalChildList);
 
-      // 计算可领取子矿机总数
-      const totalClaimable = claimableMotherMachines.reduce(
-        (sum, m) => sum + (m.claimableChildren || 0),
-        0,
-      );
-      setclaimChildrenCount(totalClaimable);
-    } catch (error) {
-      console.error("更新可见区域数据失败:", error);
-    }
-  }, [allMachineIds, queryMachines]);
+        // 更新母矿机ID列表
+        const activatedMotherMachines = updatedMachines.filter(
+          (m) => m.mtype === 1 && m.isActivatedStakedLP,
+        );
+        const claimableMotherMachines = activatedMotherMachines.filter(
+          (m) => (m.claimableChildren || 0) > 0,
+        );
+        const mmIds = claimableMotherMachines.map((m) => m.id);
+        setMMIds(mmIds);
+
+        // 计算可领取子矿机总数
+        const totalClaimable = claimableMotherMachines.reduce(
+          (sum, m) => sum + (m.claimableChildren || 0),
+          0,
+        );
+        setclaimChildrenCount(totalClaimable);
+      } catch (error) {
+        console.error("更新可见区域数据失败:", error);
+      }
+    },
+    [allMachineIds, queryMachines, clearMachineCache],
+  );
 
   // 监听 allMachineIds 变化，自动初始化查询
   useEffect(() => {
@@ -344,7 +397,8 @@ const Machine = ({
   useEffect(() => {
     if (queryInitialized && !isQuerying && !hasTriggeredVisibleUpdate.current) {
       hasTriggeredVisibleUpdate.current = true;
-      handleVisibleDataUpdate();
+      // 使用 recentlyActivatedMachineIds 来跳过最近激活的矿机
+      handleVisibleDataUpdate(recentlyActivatedMachineIds.current);
     }
   }, [queryInitialized, isQuerying, handleVisibleDataUpdate]);
 
@@ -597,11 +651,14 @@ const Machine = ({
       //
       // 注意：BSC block gas limit = 30M，为了安全起见，设置上限为 25M
       const MAX_GAS_LIMIT = 25000000n; // 25M gas limit，留出5M的安全余量
-      const calculatedGasLimit = baseGas + BigInt(validationResult.validIds.length) * perMachineGas;
+      const calculatedGasLimit =
+        baseGas + BigInt(validationResult.validIds.length) * perMachineGas;
 
       // 检查是否超过最大gas limit
       if (calculatedGasLimit > MAX_GAS_LIMIT) {
-        const maxMachines = Math.floor(Number(MAX_GAS_LIMIT - baseGas) / Number(perMachineGas));
+        const maxMachines = Math.floor(
+          Number(MAX_GAS_LIMIT - baseGas) / Number(perMachineGas),
+        );
         const errorMsg = `一次最多只能领取 ${maxMachines} 台母矿机的子矿机，当前选择了 ${validationResult.validIds.length} 台，请减少数量后重试`;
         console.error(`❌ ${errorMsg}`);
         Toast.show({
@@ -852,10 +909,13 @@ const Machine = ({
     const baseGas = 350000n;
     const perMachineGas = 400000n;
     const MAX_GAS_LIMIT = 25000000n;
-    const calculatedGasLimit = baseGas + BigInt(fuelList.length) * perMachineGas;
+    const calculatedGasLimit =
+      baseGas + BigInt(fuelList.length) * perMachineGas;
 
     if (calculatedGasLimit > MAX_GAS_LIMIT) {
-      const maxMachines = Math.floor(Number(MAX_GAS_LIMIT - baseGas) / Number(perMachineGas));
+      const maxMachines = Math.floor(
+        Number(MAX_GAS_LIMIT - baseGas) / Number(perMachineGas),
+      );
       Toast.show({
         content: `一次最多只能激活 ${maxMachines} 台矿机，当前选择了 ${fuelList.length} 台，请减少数量后重试`,
         position: "center",
@@ -871,10 +931,13 @@ const Machine = ({
     const baseGas = 250000n;
     const perMachineGas = 1500000n;
     const MAX_GAS_LIMIT = 25000000n;
-    const calculatedGasLimit = baseGas + BigInt(selectedMMIds.length) * perMachineGas;
+    const calculatedGasLimit =
+      baseGas + BigInt(selectedMMIds.length) * perMachineGas;
 
     if (calculatedGasLimit > MAX_GAS_LIMIT) {
-      const maxMachines = Math.floor(Number(MAX_GAS_LIMIT - baseGas) / Number(perMachineGas));
+      const maxMachines = Math.floor(
+        Number(MAX_GAS_LIMIT - baseGas) / Number(perMachineGas),
+      );
       Toast.show({
         content: `一次最多只能领取 ${maxMachines} 台母矿机的子矿机，当前选择了 ${selectedMMIds.length} 台，请减少数量后重试`,
         position: "center",
@@ -1224,7 +1287,9 @@ const Machine = ({
           });
 
           if (isActivated) {
-            throw new Error(`矿机 ${machineId} 已经激活，请刷新页面后重试`);
+            throw new Error(
+              `矿机 ${machineId} 已经激活，无需重复激活。请刷新页面查看最新状态。`,
+            );
           }
           if (isDestroyed) {
             throw new Error(`矿机 ${machineId} 已销毁，无法激活`);
@@ -1263,23 +1328,26 @@ const Machine = ({
       //
       // 每台矿机的gas消耗：验证(16k) + 更新(120k) = 约136k gas
       // 基础开销（所有矿机共享）：函数调用(21k) + IDX转账(130k) + 外部调用(200k) = 约350k gas
-      // 考虑到安全余量和IDX代理合约的复杂性，每台矿机取 400k gas 是合理的
+      // 考虑到安全余量和IDX代理合约的复杂性，每台矿机取 450k gas（从400k提高到450k，增加约6.7%安全余量）
       //
       // 注意：BSC block gas limit = 30M，为了安全起见，设置上限为 25M
-      const baseGas = 350000n; // 基础开销（函数调用 + IDX转账 + 外部调用，从200k提高到350k）
-      const perMachineGas = 400000n; // 每台矿机的gas（验证 + 更新状态，包含安全余量）
+      const baseGas = 350000n; // 基础开销（函数调用 + IDX转账 + 外部调用）
+      const perMachineGas = 450000n; // 每台矿机的gas（验证 + 更新状态，包含安全余量，从400k提高到450k）
       // 计算示例：
-      //   1台 = 750k gas
-      //   10台 = 4.35M gas
-      //   40台 = 16.35M gas（BSC block gas limit = 30M，安全）
-      //   60台 = 24.35M gas（仍在安全范围内）
-      //   70台 = 28.35M gas（接近BSC block gas limit，建议分批）
+      //   1台 = 800k gas（从750k提高到800k，增加50k安全余量）
+      //   10台 = 4.85M gas（从4.35M提高到4.85M）
+      //   40台 = 18.35M gas（从16.35M提高到18.35M，BSC block gas limit = 30M，安全）
+      //   60台 = 27.35M gas（从24.35M提高到27.35M，仍在安全范围内）
+      //   70台 = 31.85M gas（超过25M上限，会提示分批）
       const MAX_GAS_LIMIT = 25000000n; // 25M gas limit，留出5M的安全余量
-      const calculatedGasLimit = baseGas + BigInt(machineIds.length) * perMachineGas;
+      const calculatedGasLimit =
+        baseGas + BigInt(machineIds.length) * perMachineGas;
 
       // 检查是否超过最大gas limit
       if (calculatedGasLimit > MAX_GAS_LIMIT) {
-        const maxMachines = Math.floor(Number(MAX_GAS_LIMIT - baseGas) / Number(perMachineGas));
+        const maxMachines = Math.floor(
+          Number(MAX_GAS_LIMIT - baseGas) / Number(perMachineGas),
+        );
         const errorMsg = `一次最多只能激活 ${maxMachines} 台矿机，当前选择了 ${machineIds.length} 台，请减少数量后重试`;
         console.error(`❌ ${errorMsg}`);
         Toast.show({
@@ -1620,30 +1688,95 @@ const Machine = ({
         });
         console.log("刷新矿机列表");
 
-        // 等待 2 秒后刷新，确保区块链数据已更新
-        setTimeout(async () => {
-          console.log("延迟刷新矿机列表");
+        // 立即从 fuelList 中移除已激活的矿机，防止重复激活
+        const activatedMachineIds = machineIds.map((id) => Number(id));
+        console.log("从选中列表中移除已激活的矿机:", activatedMachineIds);
 
-          // 重新查询矿机ID列表
-          try {
-            const res = await readContract(config, {
-              address: MiningMachineSystemStorageAddress,
-              abi: MiningMachineSystemStorageABI,
-              functionName: "getOwnerToMachineIds",
-              args: [userAddress],
-            });
+        // 保存到 ref，供后续刷新时使用
+        recentlyActivatedMachineIds.current = activatedMachineIds;
+        console.log(
+          "已保存激活的矿机ID到 ref:",
+          recentlyActivatedMachineIds.current,
+        );
 
-            const machineIds = (res as bigint[]).map((id) => Number(id));
-            console.log("刷新后的矿机ID列表:", machineIds);
-            setAllMachineIds(machineIds);
+        setFuelList((prevList) =>
+          prevList.filter((item) => !activatedMachineIds.includes(item.id)),
+        );
 
-            // 强制重新初始化查询
-            if (machineIds.length > 0) {
-              await initializeQuery();
-              await handleVisibleDataUpdate();
+        // 立即从 machineList 中移除已激活的矿机（因为它们不应该显示在待激活列表中）
+        // 同时清除这些矿机的缓存，强制重新查询
+        activatedMachineIds.forEach((machineId) => {
+          clearMachineCache(machineId);
+        });
+
+        setMachineList((prevList) => {
+          const filtered = prevList.filter(
+            (item) => !activatedMachineIds.includes(item.id),
+          );
+          console.log(
+            `从列表中移除 ${activatedMachineIds.length} 台已激活的矿机，剩余 ${filtered.length} 台`,
+          );
+          return filtered;
+        });
+
+        // 立即更新 allMachines，将已激活的矿机标记为已激活
+        setAllMachines((prevList) =>
+          prevList.map((item) => {
+            if (activatedMachineIds.includes(item.id)) {
+              console.log(`立即标记矿机 ${item.id} 为已激活`);
+              return { ...item, isActivatedStakedLP: true, checked: false };
             }
+            return item;
+          }),
+        );
+
+        // 关闭弹窗和遮罩
+        setActivateCount("");
+        setOpen(false);
+        setMaskVisible(false);
+
+        // 等待 5 秒后刷新，确保区块链数据已更新（从2秒增加到5秒）
+        setTimeout(async () => {
+          console.log("延迟刷新子矿机列表");
+
+          try {
+            // 先清除所有已激活矿机的缓存，强制重新查询
+            activatedMachineIds.forEach((machineId) => {
+              clearMachineCache(machineId);
+            });
+            console.log(
+              `已清除 ${activatedMachineIds.length} 台已激活矿机的缓存`,
+            );
+
+            // 使用 handleQuery 完整刷新矿机列表
+            await handleQuery();
+            console.log("✅ 矿机ID列表刷新完成");
+
+            // 等待一下，确保 allMachineIds 已更新，并且 initializeQuery 完成
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+
+            // 强制刷新可见区域数据，确保子矿机状态更新
+            // 传递已激活矿机ID，让 handleVisibleDataUpdate 强制清除缓存并重新查询
+            // handleVisibleDataUpdate 会自动更新 machineList，所以不需要再手动更新
+            await handleVisibleDataUpdate(activatedMachineIds);
+            console.log("✅ 子矿机数据刷新完成（machineList 已自动更新）");
+
+            // 清除 ref，避免影响后续的正常刷新
+            recentlyActivatedMachineIds.current = [];
+            console.log("已清除 recentlyActivatedMachineIds ref");
           } catch (error) {
             console.error("刷新矿机列表失败:", error);
+            // 如果 handleQuery 失败，尝试直接调用 handleVisibleDataUpdate
+            try {
+              // 清除已激活矿机的缓存
+              activatedMachineIds.forEach((machineId) => {
+                clearMachineCache(machineId);
+              });
+              await handleVisibleDataUpdate(activatedMachineIds);
+              console.log("✅ 使用备用刷新方法完成");
+            } catch (fallbackError) {
+              console.error("备用刷新方法也失败:", fallbackError);
+            }
           }
 
           // 通知父组件刷新
@@ -1651,12 +1784,7 @@ const Machine = ({
             console.log("通知父组件刷新数据");
             onRefresh();
           }
-        }, 2000);
-
-        setFuelList([]);
-        setActivateCount("");
-        setOpen(false);
-        setMaskVisible(false);
+        }, 5000);
       } catch (receiptError) {
         // 如果交易已发送但确认失败，抛出包含 hash 的错误
         if (hash) {
@@ -1699,10 +1827,84 @@ const Machine = ({
               "激活失败: IDX 余额不足或授权不足，请检查 IDX 余额和授权状态";
           } else if (
             errorMessage.includes("already activated") ||
-            errorMessage.includes("m")
+            errorMessage.includes("m") ||
+            errorMessage.includes("矿机状态异常") ||
+            errorMessage.includes("已激活") ||
+            errorMessage.includes("已销毁") ||
+            errorMessage.includes("正在出售")
           ) {
-            errorMsg =
-              "激活失败: 矿机状态异常（可能已激活、已销毁或正在出售），请刷新页面后重试";
+            // 如果错误消息已经包含诊断信息，直接使用
+            if (
+              errorMessage.includes("诊断信息") ||
+              errorMessage.includes("矿机")
+            ) {
+              errorMsg = error.message;
+            } else {
+              // 否则执行诊断并显示详细信息
+              try {
+                const machineIds = fuelList.map((item) => item.id);
+                let diagnosticInfo = `激活失败: 矿机状态异常\n\n`;
+
+                // 检查每台矿机的状态
+                for (const machineId of machineIds) {
+                  try {
+                    const lifecycle = await readContract(config, {
+                      address: MiningMachineSystemStorageAddress,
+                      abi: MiningMachineSystemStorageABI,
+                      functionName: "getMachineLifecycle",
+                      args: [BigInt(machineId)],
+                      chainId,
+                    });
+
+                    const isActivated =
+                      (lifecycle as any).isActivatedStakedLP ?? lifecycle[4];
+                    const isDestroyed =
+                      (lifecycle as any).destroyed ?? lifecycle[5];
+                    const isOnSale = await readContract(config, {
+                      address: MiningMachineSystemStorageAddress,
+                      abi: MiningMachineSystemStorageABI,
+                      functionName: "_isOnSale",
+                      args: [BigInt(machineId)],
+                      chainId,
+                    });
+
+                    const statusList: string[] = [];
+                    if (isActivated) statusList.push("已激活");
+                    if (isDestroyed) statusList.push("已销毁");
+                    if (isOnSale) statusList.push("正在出售");
+
+                    // 使用 generateCode 格式化矿机ID，与UI显示一致
+                    const machineCode = generateCode(machineId);
+
+                    if (statusList.length > 0) {
+                      diagnosticInfo += `矿机 #${machineCode}: ${statusList.join("、")}\n`;
+
+                      // 如果是"已激活"状态，添加特别提示
+                      if (isActivated) {
+                        diagnosticInfo += `  → 该矿机已成功激活，无需重复操作\n`;
+                      }
+                    } else {
+                      diagnosticInfo += `矿机 #${machineCode}: 状态正常\n`;
+                    }
+                  } catch (diagError) {
+                    console.warn(
+                      `检查矿机 ${machineId} 状态时出错:`,
+                      diagError,
+                    );
+                    const machineCode = generateCode(machineId);
+                    diagnosticInfo += `矿机 #${machineCode}: 无法检查状态\n`;
+                  }
+                }
+
+                diagnosticInfo += `\n建议：请刷新页面查看最新状态`;
+                errorMsg = diagnosticInfo;
+              } catch (diagError) {
+                console.warn("执行诊断时出错:", diagError);
+                // 如果诊断失败，使用通用错误消息
+                errorMsg =
+                  "激活失败: 矿机状态异常（可能已激活、已销毁或正在出售）。如果矿机已成功激活，请刷新页面查看最新状态。";
+              }
+            }
           } else {
             const hashStr = hash
               ? `交易哈希: ${hash}`
@@ -1740,11 +1942,42 @@ const Machine = ({
         }
       }
 
-      Toast.show({
-        content: errorMsg,
-        position: "center",
-        duration: 4000,
-      });
+      // 如果错误消息包含诊断信息（多行），使用 Modal 显示
+      if (errorMsg.includes("矿机 #") || errorMsg.includes("\n")) {
+        Modal.show({
+          bodyStyle: {
+            background: "#ffffff",
+            borderRadius: "20px",
+            padding: "20px",
+            maxHeight: "70vh",
+            overflow: "auto",
+          },
+          showCloseButton: true,
+          closeOnMaskClick: true,
+          content: (
+            <div className="text-[14px]">
+              <div className="text-[18px] font-bold mb-4 text-[#333]">
+                激活失败
+              </div>
+              <div className="text-[14px] text-[#666] whitespace-pre-line">
+                {errorMsg}
+              </div>
+              <button
+                className="w-full bg-[#7334FE] text-white rounded-3xl py-2 mt-4 text-[14px]"
+                onClick={() => Modal.clear()}
+              >
+                确认
+              </button>
+            </div>
+          ),
+        });
+      } else {
+        Toast.show({
+          content: errorMsg,
+          position: "center",
+          duration: 4000,
+        });
+      }
       // 错误时不关闭弹窗和mask
     } finally {
       setIsPaying(false);
@@ -1982,11 +2215,15 @@ const Machine = ({
           onClick={handlePay}
           className="!bg-black !rounded-3xl !text-white flex justify-center !py-4 !px-6 w-full !text-[16px] !h-auto"
           loading={isPaying}
-          disabled={+idxBalance < +needToPayIdxAmount * fuelList.length}
+          disabled={
+            isPaying || +idxBalance < +needToPayIdxAmount * fuelList.length
+          }
         >
-          {+idxBalance >= +needToPayIdxAmount * fuelList.length
-            ? "支付费用"
-            : "余额不足"}
+          {isPaying
+            ? "激活中..."
+            : +idxBalance >= +needToPayIdxAmount * fuelList.length
+              ? "支付费用"
+              : "余额不足"}
         </Button>
       </div>
     ),

@@ -173,12 +173,36 @@ export function useSequentialContractWrite() {
         );
 
         // 根据矿机数量动态计算 gas limit
-        // 优化：提高安全余量，确保交易成功
-        const baseGas = 500000n; // 基础 gas（200000n → 500000n，提高 2.5x）⚠️ 已提高
-        const perMachineGas = 120000n; // 每台矿机额外的 gas（150000n → 120000n，优化后实际更准确）
-        const gasLimit = baseGas + perMachineGas * BigInt(machineIds.length);
+        // 与 Machine.tsx 保持一致，确保有足够的安全余量
+        // 分析：batchActivateMachinesWithLP 对每个矿机执行以下操作：
+        // 1. 验证循环（每台矿机）：约 12k-16k gas
+        // 2. IDX转账（一次性，所有矿机共享）：约 60k-130k gas
+        // 3. 更新循环（每台矿机）：约 60k-120k gas
+        // 4. 外部调用（一次性，所有矿机共享）：约 50k-200k gas
+        // 每台矿机的gas消耗：验证(16k) + 更新(120k) = 约136k gas
+        // 基础开销（所有矿机共享）：函数调用(21k) + IDX转账(130k) + 外部调用(200k) = 约350k gas
+        // 考虑到安全余量和IDX代理合约的复杂性，每台矿机取 450k gas（从400k提高到450k，增加约6.7%安全余量）
+        const baseGas = 350000n; // 基础开销（函数调用 + IDX转账 + 外部调用）
+        const perMachineGas = 450000n; // 每台矿机的gas（验证 + 更新状态，包含安全余量，从400k提高到450k）
+        const MAX_GAS_LIMIT = 25000000n; // 25M gas limit，留出5M的安全余量（BSC block gas limit = 30M）
+        const calculatedGasLimit = baseGas + perMachineGas * BigInt(machineIds.length);
 
-        console.log(`计算的 Gas Limit: ${gasLimit}`);
+        // 检查是否超过最大gas limit
+        if (calculatedGasLimit > MAX_GAS_LIMIT) {
+          const maxMachines = Math.floor(
+            Number(MAX_GAS_LIMIT - baseGas) / Number(perMachineGas),
+          );
+          const errorMsg = `一次最多只能激活 ${maxMachines} 台矿机，当前选择了 ${machineIds.length} 台，请减少数量后重试`;
+          console.error(`❌ ${errorMsg}`);
+          return {
+            success: false,
+            error: errorMsg,
+            functionName: "batchActivateMachinesWithLP",
+          };
+        }
+
+        const gasLimit = calculatedGasLimit;
+        console.log(`计算的 Gas Limit: ${gasLimit} (${machineIds.length} 台矿机)`);
 
         // Anvil 环境使用 legacy 交易
         const isAnvilFork = chain.id === 1056;
