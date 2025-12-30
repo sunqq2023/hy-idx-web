@@ -172,20 +172,47 @@ export function useSequentialContractWrite() {
           `开始批量激活矿机，共 ${machineIds.length} 台，函数: batchActivateMachinesWithLP`,
         );
 
-        // 根据矿机数量动态计算 gas limit
+        // 根据矿机数量动态计算 gas limit（按最复杂奖励过程计算）
         // 与 Machine.tsx 保持一致，确保有足够的安全余量
+        //
+        // 基于实际失败交易数据优化（tx: 0x7836f22e...）：
+        // - 场景：激活1台矿机，已激活30台（触发里程碑），11层推荐人（使用前5层）
+        // - Gas Used: 792,438 (Gas Limit: 800,000 导致失败)
+        //
         // 分析：batchActivateMachinesWithLP 对每个矿机执行以下操作：
         // 1. 验证循环（每台矿机）：约 12k-16k gas
         // 2. IDX转账（一次性，所有矿机共享）：约 60k-130k gas
         // 3. 更新循环（每台矿机）：约 60k-120k gas
-        // 4. 外部调用（一次性，所有矿机共享）：约 50k-200k gas
-        // 每台矿机的gas消耗：验证(16k) + 更新(120k) = 约136k gas
-        // 基础开销（所有矿机共享）：函数调用(21k) + IDX转账(130k) + 外部调用(200k) = 约350k gas
-        // 考虑到安全余量和IDX代理合约的复杂性，每台矿机取 450k gas（从400k提高到450k，增加约6.7%安全余量）
-        const baseGas = 350000n; // 基础开销（函数调用 + IDX转账 + 外部调用）
-        const perMachineGas = 450000n; // 每台矿机的gas（验证 + 更新状态，包含安全余量，从400k提高到450k）
-        const MAX_GAS_LIMIT = 25000000n; // 25M gas limit，留出5M的安全余量（BSC block gas limit = 30M）
-        const calculatedGasLimit = baseGas + perMachineGas * BigInt(machineIds.length);
+        // 4. 激活奖励（最复杂情况 - 触发里程碑 + 5层推荐人）：
+        //    - 实际消耗：792,438 gas（1台，最复杂场景）
+        //    - 其中激活奖励占：~642,000 gas
+        //    - 基础操作占：~150,000 gas
+        //
+        // 每台矿机的gas消耗（普通场景，不触发奖励）：
+        //   - 验证(16k) + 更新(120k) = 约136k gas
+        //
+        // 基础开销（所有矿机共享，最复杂场景）：
+        //   - 函数调用：21k gas
+        //   - IDX转账：70k gas
+        //   - 激活奖励（最复杂）：642k gas
+        //   - 其他：59k gas
+        //   - 总计：792k gas
+        //
+        // 安全余量（基于实际失败数据）：
+        //   - 基础开销增加 39%：792k * 1.39 = 1,100k
+        //   - 每台矿机增加 61%：93k * 1.61 = 150k
+        //
+        // 计算示例（含安全余量）：
+        //   1台（最复杂）= 1,100k + 150k = 1,250k = 1.25M gas (安全余量 58%)
+        //   10台（普通） = 1,100k + 1,500k = 2,600k = 2.6M gas (安全余量 148%)
+        //   50台 = 1,100k + 7,500k = 8,600k = 8.6M gas
+        //   100台 = 1,100k + 15,000k = 16,100k = 16.1M gas
+        //   159台 = 1,100k + 23,850k = 24,950k = 24.95M gas（接近上限）
+        const baseGas = 1100000n; // 基础开销（基于实际失败数据 792k + 39%安全余量）
+        const perMachineGas = 150000n; // 每台矿机的gas（验证 + 更新状态 + 61%安全余量）
+        const MAX_GAS_LIMIT = 25000000n; // 25M gas limit，留出5M的安全余量（BSC block gas limit = 140M）
+        const calculatedGasLimit =
+          baseGas + perMachineGas * BigInt(machineIds.length);
 
         // 检查是否超过最大gas limit
         if (calculatedGasLimit > MAX_GAS_LIMIT) {
@@ -202,7 +229,9 @@ export function useSequentialContractWrite() {
         }
 
         const gasLimit = calculatedGasLimit;
-        console.log(`计算的 Gas Limit: ${gasLimit} (${machineIds.length} 台矿机)`);
+        console.log(
+          `计算的 Gas Limit: ${gasLimit} (${machineIds.length} 台矿机)`,
+        );
 
         // Anvil 环境使用 legacy 交易
         const isAnvilFork = chain.id === 1056;
@@ -315,25 +344,38 @@ export function useSequentialContractWrite() {
           rpcUrl: chain.rpcUrls?.default?.http?.[0],
         });
 
-        // 根据矿机数量动态计算 gas limit
+        // 根据矿机数量动态计算 gas limit（按最复杂情况计算）
+        //
         // 分析：batchPayFuel 对每个矿机执行以下操作：
-        // 1. payFuel 函数（循环内调用）：验证、IDX转账、存储更新、外部调用（addRewardForAddressByFuelFee追溯15层）
-        //    - IDX转账（每台独立）：约50k-100k gas
-        //    - 存储更新：约50k-100k gas
-        //    - addRewardForAddressByFuelFee（追溯15层推荐关系）：约150k-250k gas（最耗gas）
-        //    总计每台约 250k-450k gas
+        // 1. payFuel 函数（循环内调用）：验证、IDX转账、存储更新、外部调用
+        //    - 验证（修饰符）: ~11,000 gas
+        //    - 验证子矿机: ~3,000 gas
+        //    - 读取生命周期: ~800 gas
+        //    - 计算燃料费用: ~12,000 gas
+        //    - IDX转账（每台独立）: ~60,000 gas
+        //    - 更新生命周期: ~25,000 gas
+        //    - 记录历史: ~30,000 gas
+        //    - addRewardForAddressByFuelFee（追溯15层推荐关系）:
+        //      * 查询推荐链: ~31,500 gas
+        //      * 遍历前5层: 5 × 40,000 = 200,000 gas
+        //      小计: ~231,500 gas
+        //    总计每台约 373,400 gas
         //
-        // 基础开销：函数调用、循环初始化等，约 200k-300k
-        // 考虑到addRewardForAddressByFuelFee的复杂性，取更高的安全余量
-        const baseGas = 1000000n; // 基础 gas（函数调用 + 循环开销）
-        const perMachineGas = 350000n; // 每台矿机的gas（包含IDX转账 + 存储更新 + 外部调用）
+        // 基础开销: 函数调用、循环初始化等，约 100k
+        // 安全余量: 每台 373k × 1.34 = 500k (34% 安全余量)
+        //
         // 计算示例：
-        //   1台 = 1.35M gas
-        //   40台 = 15M gas
-        //   60台 = 22M gas
-        //   70台 = 25.5M gas（接近BSC block gas limit）
+        //   1台 = 100k + 500k = 600k (安全余量 61%)
+        //   10台 = 100k + 5M = 5.1M (安全余量 30%)
+        //   49台 = 100k + 24.5M = 24.6M (接近上限)
+        const baseGas = 100000n; // 基础 gas（函数调用 + 循环开销）
+        const perMachineGas = 500000n; // 每台矿机的gas（包含IDX转账 + 存储更新 + 推荐人奖励 + 34%安全余量）
+        // 计算示例：
+        //   1台 = 650k gas
+        //   10台 = 4.7M gas
+        //   55台 = 24.95M gas（接近上限）
         //
-        // 注意：BSC block gas limit = 30M，为了安全起见，设置上限为 25M
+        // 注意：BSC block gas limit = 140M，为了安全起见，设置上限为 25M
         const MAX_GAS_LIMIT = 25000000n; // 25M gas limit，留出5M的安全余量
         const calculatedGasLimit =
           baseGas + perMachineGas * BigInt(machineIds.length);

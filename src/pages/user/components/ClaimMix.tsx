@@ -63,14 +63,16 @@ const ClaimMix = () => {
 
       console.log(`准备分批领取 ${totalMachines} 个矿机的 MIX`);
 
-      // 分批配置：每批最多60台
-      const BATCH_SIZE = 60;
+      // 分批配置：每批最多30台（优化：从60改为30，降低Gas消耗和超时风险）
+      const BATCH_SIZE = 30;
       const batches: number[][] = [];
       for (let i = 0; i < machineIds.length; i += BATCH_SIZE) {
         batches.push(machineIds.slice(i, i + BATCH_SIZE));
       }
 
-      console.log(`总共 ${totalMachines} 台矿机，分为 ${batches.length} 批，每批最多 ${BATCH_SIZE} 台`);
+      console.log(
+        `总共 ${totalMachines} 台矿机，分为 ${batches.length} 批，每批最多 ${BATCH_SIZE} 台`,
+      );
 
       // 初始化进度
       setClaimProgress({
@@ -87,7 +89,7 @@ const ClaimMix = () => {
         icon: "loading",
       });
 
-      // Gas Limit 计算（每批60台）
+      // Gas Limit 计算（每批30台，优化后更安全）
       // 分析：claimMixByMachineIds 对每个矿机执行以下操作：
       // 1. getMachine + getMachineLifecycle（SLOAD，在循环中读取）- 约 4k gas
       // 2. addMixBalance（SSTORE映射累加）- 约 5k gas（累加操作，非首次写入）
@@ -96,10 +98,11 @@ const ClaimMix = () => {
       // 5. history.recordEarning（外部CALL）- 约 30k-50k gas（包括CALL开销21k和内部操作）
       // 6. emit MixClaimed（LOG事件）- 约 1k gas
       // 7. 可能的外部调用 nodeSystem.recordMachineDestroyed - 约 30k gas（如果矿机销毁）
-      // 总计每个矿机约 140k-210k gas，考虑到实际存储操作的复杂性和安全余量，取 400k 更安全
-      const baseGas = 300000n; // 函数基础开销
-      const perMachineGas = 400000n; // 每台矿机的gas（包含安全余量）
-      // 每批60台的 gas limit = 300k + 60 * 400k = 24.3M gas（安全，低于25M上限）
+      // 总计每个矿机约 140k-210k gas，考虑到实际存储操作的复杂性和安全余量，取 350k
+      const baseGas = 200000n; // 函数基础开销
+      const perMachineGas = 350000n; // 每台矿机的gas（包含安全余量）
+      // 每批30台的 gas limit = 200k + 30 × 350k = 10.7M gas（安全，远低于25M上限）
+      // 即使全部矿机需要销毁：10.7M + 30 × 50k = 12.2M gas（仍然安全）
       const MAX_GAS_LIMIT = 25000000n; // 25M gas limit，留出安全余量
 
       const errors: string[] = [];
@@ -174,7 +177,9 @@ const ClaimMix = () => {
               errorStrLower.includes("rpc request failed") ||
               errorStrLower.includes("fetch failed")
             ) {
-              errors.push(`第 ${batchIndex + 1} 批失败: 网络连接失败，请检查网络连接后重试`);
+              errors.push(
+                `第 ${batchIndex + 1} 批失败: 网络连接失败，请检查网络连接后重试`,
+              );
               // 网络错误时稍作延迟再继续
               await new Promise((resolve) => setTimeout(resolve, 2000));
               continue;
@@ -207,8 +212,13 @@ const ClaimMix = () => {
             errorStr.includes("rpc request failed") ||
             errorStr.includes("fetch failed")
           ) {
-            errors.push(`第 ${batchIndex + 1} 批失败: 网络连接失败，请检查网络连接后重试`);
-            console.error(`第 ${batchIndex + 1} 批领取失败（网络错误）:`, error);
+            errors.push(
+              `第 ${batchIndex + 1} 批失败: 网络连接失败，请检查网络连接后重试`,
+            );
+            console.error(
+              `第 ${batchIndex + 1} 批领取失败（网络错误）:`,
+              error,
+            );
             // 网络错误时稍作延迟再继续，给网络恢复时间
             await new Promise((resolve) => setTimeout(resolve, 2000));
             continue;
@@ -219,9 +229,9 @@ const ClaimMix = () => {
           console.error(`第 ${batchIndex + 1} 批领取失败:`, error);
         }
 
-        // 批次之间稍作延迟，避免 RPC 压力过大
+        // 批次之间稍作延迟，避免 RPC 压力过大（优化：从500ms增加到1000ms）
         if (batchIndex < batches.length - 1) {
-          await new Promise((resolve) => setTimeout(resolve, 500));
+          await new Promise((resolve) => setTimeout(resolve, 1000));
         }
       }
 
@@ -286,7 +296,9 @@ const ClaimMix = () => {
                       className="font-bold text-[15px]"
                     />
                     <div className="mt-2 text-[12px] text-yellow-400">
-                      注意：有 {errors.length} 批领取失败，已成功领取 {batches.length - errors.length}/{batches.length} 批，请稍后重试失败批次
+                      注意：有 {errors.length} 批领取失败，已成功领取{" "}
+                      {batches.length - errors.length}/{batches.length}{" "}
+                      批，请稍后重试失败批次
                     </div>
                   </>
                 )}

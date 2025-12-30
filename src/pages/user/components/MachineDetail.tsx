@@ -225,7 +225,7 @@ const MachineDetail = () => {
         abi: MiningMachineSystemLogicABI,
         functionName: "batchActivateMachinesWithLP",
         args: [[pageData.id]],
-        gas: 400000n, // 激活矿机操作（300000n → 400000n）⚠️ 已提高
+        gas: 1400000n, // 单台激活 = 基础 Gas (1.2M) + 每台 Gas (200k)，包含最复杂奖励过程 + 30%安全余量
       });
 
       const receipt = await waitForTransactionReceipt(config, {

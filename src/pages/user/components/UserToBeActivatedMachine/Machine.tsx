@@ -1307,38 +1307,58 @@ const Machine = ({
       }
 
       // 3. 执行批量激活合约调用
-      // 动态计算 Gas Limit
+      // 动态计算 Gas Limit（按最复杂奖励过程计算）
+      //
+      // 基于实际失败交易数据优化（tx: 0x7836f22e...）：
+      // - 场景：激活1台矿机，已激活30台（触发里程碑），11层推荐人（使用前5层）
+      // - Gas Used: 792,438 (Gas Limit: 800,000 导致失败)
+      //
       // 分析：batchActivateMachinesWithLP 对每个矿机执行以下操作：
       // 1. 验证循环（每台矿机）：
       //    - store.machines(machineId) - SLOAD读取，约2k gas
       //    - store.getMachineLifecycle(machineId) - 结构体读取，多个SLOAD，约8k-12k gas
       //    - store._isOnSale(machineId) - SLOAD读取，约2k gas
       //    总计每台验证约 12k-16k gas
+      //
       // 2. IDX转账（一次性，所有矿机共享）：
       //    - getIDXAmount(lpUsd) - 可能涉及外部调用，约10k-30k gas
       //    - IERC20.transferFrom（IDX代理合约） - ERC20转账，约50k-100k gas
       //    总计约 60k-130k gas（所有矿机共享）
+      //
       // 3. 更新循环（每台矿机）：
       //    - store.getMachineLifecycle(machineId) - SLOAD读取，约8k-12k gas
       //    - store.setMachineLifecycle(machineId, m) - 结构体写入，多个SSTORE，约50k-100k gas
       //    总计每台更新约 60k-120k gas
-      // 4. 外部调用（一次性，所有矿机共享）：
-      //    - activeMachineRewards(msg.sender, machineCount) - 外部CALL，至少21k + 内部操作
-      //    总计约 50k-200k gas（取决于实现，所有矿机共享）
       //
-      // 每台矿机的gas消耗：验证(16k) + 更新(120k) = 约136k gas
-      // 基础开销（所有矿机共享）：函数调用(21k) + IDX转账(130k) + 外部调用(200k) = 约350k gas
-      // 考虑到安全余量和IDX代理合约的复杂性，每台矿机取 450k gas（从400k提高到450k，增加约6.7%安全余量）
+      // 4. 激活奖励（最复杂情况 - 触发里程碑 + 5层推荐人）：
+      //    - 实际消耗：792,438 gas（1台，最复杂场景）
+      //    - 其中激活奖励占：~642,000 gas
+      //    - 基础操作占：~150,000 gas
       //
-      // 注意：BSC block gas limit = 30M，为了安全起见，设置上限为 25M
-      const baseGas = 350000n; // 基础开销（函数调用 + IDX转账 + 外部调用）
-      const perMachineGas = 450000n; // 每台矿机的gas（验证 + 更新状态，包含安全余量，从400k提高到450k）
-      // 计算示例：
-      //   1台 = 800k gas（从750k提高到800k，增加50k安全余量）
-      //   10台 = 4.85M gas（从4.35M提高到4.85M）
-      //   40台 = 18.35M gas（从16.35M提高到18.35M，BSC block gas limit = 30M，安全）
-      //   60台 = 27.35M gas（从24.35M提高到27.35M，仍在安全范围内）
-      //   70台 = 31.85M gas（超过25M上限，会提示分批）
+      // 每台矿机的gas消耗（普通场景，不触发奖励）：
+      //   - 验证(16k) + 更新(120k) = 约136k gas
+      //
+      // 基础开销（所有矿机共享，最复杂场景）：
+      //   - 函数调用：21k gas
+      //   - IDX转账：70k gas
+      //   - 激活奖励（最复杂）：642k gas
+      //   - 其他：59k gas
+      //   - 总计：792k gas
+      //
+      // 安全余量（基于实际失败数据）：
+      //   - 基础开销增加 39%：792k * 1.39 = 1,100k
+      //   - 每台矿机增加 61%：93k * 1.61 = 150k
+      //
+      // 计算示例（含安全余量）：
+      //   1台（最复杂）= 1,100k + 150k = 1,250k = 1.25M gas (安全余量 58%)
+      //   10台（普通） = 1,100k + 1,500k = 2,600k = 2.6M gas (安全余量 148%)
+      //   50台 = 1,100k + 7,500k = 8,600k = 8.6M gas
+      //   100台 = 1,100k + 15,000k = 16,100k = 16.1M gas
+      //   159台 = 1,100k + 23,850k = 24,950k = 24.95M gas（接近上限）
+      //
+      // BSC block gas limit = 140M，为了安全起见，设置上限为 25M
+      const baseGas = 1100000n; // 基础开销（基于实际失败数据 792k + 39%安全余量）
+      const perMachineGas = 150000n; // 每台矿机的gas（验证 + 更新状态 + 61%安全余量）
       const MAX_GAS_LIMIT = 25000000n; // 25M gas limit，留出5M的安全余量
       const calculatedGasLimit =
         baseGas + BigInt(machineIds.length) * perMachineGas;

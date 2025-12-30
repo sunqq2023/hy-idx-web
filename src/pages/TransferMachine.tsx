@@ -117,7 +117,25 @@ const TransferMachine = () => {
       // 优化：提高安全余量，确保交易成功
       const baseGas = 250000n; // 150000n → 250000n (+67%)⚠️ 已提高
       const perMachineGas = 80000n; // 50000n → 80000n (+60%)⚠️ 已提高
-      const gasLimit = baseGas + BigInt(ids.length) * perMachineGas;
+      const MAX_GAS_LIMIT = 25000000n; // 25M gas limit，留出5M的安全余量
+      const calculatedGasLimit = baseGas + BigInt(ids.length) * perMachineGas;
+
+      // 检查是否超过最大gas limit
+      if (calculatedGasLimit > MAX_GAS_LIMIT) {
+        const maxMachines = Math.floor(
+          Number(MAX_GAS_LIMIT - baseGas) / Number(perMachineGas),
+        );
+        Toast.clear();
+        Toast.show({
+          content: `一次最多只能转移 ${maxMachines} 台矿机，当前选择了 ${ids.length} 台，请减少数量后重试`,
+          position: "center",
+          duration: 5000,
+        });
+        setTransferLoading(false);
+        return;
+      }
+
+      const gasLimit = calculatedGasLimit;
 
       const res = await writeContract(config, {
         address: MiningMachineSystemLogicAddress,

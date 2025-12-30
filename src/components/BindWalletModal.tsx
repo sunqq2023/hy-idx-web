@@ -36,7 +36,7 @@ export const BindWalletModal = ({
             <span className="font-medium text-white">{mallAccount}</span>
             <br />
             <span className="mt-2 block">
-              正在申请绑定你的钱包地址, 请确实是否是你本人发起, 若不是, 请拒绝;
+              正在申请绑定你的钱包地址, 请确认是否是你本人发起, 若不是, 请拒绝;
               若是, 请同意!
             </span>
           </div>
