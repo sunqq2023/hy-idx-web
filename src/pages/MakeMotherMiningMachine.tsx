@@ -9,11 +9,7 @@ import {
 } from "@wagmi/core";
 import config from "@/proviers/config";
 import { useNavigate } from "react-router-dom";
-import {
-  MiningMachineSystemLogicABI,
-  MiningMachineSystemStorageABI,
-  CHAIN_ID,
-} from "@/constants";
+import { MiningMachineSystemLogicABI } from "@/constants";
 import { useChainConfig } from "@/hooks/useChainConfig";
 import { useChainId, useAccount, useWriteContract } from "wagmi";
 import { formatEther, parseGwei } from "viem";
@@ -126,7 +122,7 @@ const MakeMotherMiningMachine = () => {
         args: [PLATFORM_FEE_USD, SELLER_INCOME_USD, activeAndGasFee],
         gas: 600000n, // 复杂操作：修改多个参数（与Setting.tsx和工具函数保持一致）
         // 移除硬编码的 gas price，让钱包自动估算
-        chainId: CHAIN_ID,
+        chainId: chainId,
       });
 
       await waitForTransactionReceipt(config, {
@@ -251,7 +247,7 @@ const MakeMotherMiningMachine = () => {
         args,
         gas: gasLimit, // 动态计算 gas limit
         // 移除硬编码的 gas price，让钱包自动估算
-        chainId: CHAIN_ID,
+        chainId: chainId,
       });
 
       await waitForTransactionReceipt(config, {
@@ -323,24 +319,6 @@ const MakeMotherMiningMachine = () => {
   useEffect(() => {
     getUsdtToIdxRate();
   }, []);
-
-  // const getIsSalePerson = useCallback(async () => {
-  //   try {
-  //     const result = await readContract(config, {
-  //       address: MiningMachineSystemStorageAddress,
-  //       abi: MiningMachineSystemStorageABI,
-  //       functionName: 'isMotherMachineDistributor',
-  //       args: [address]
-  //     })
-  //     console.log('test', result)
-  //   } catch (error) {
-  //     console.log(error)
-  //   }
-  // }, [address])
-
-  // useEffect(() => {
-  //   getIsSalePerson()
-  // }, [getIsSalePerson])
 
   return (
     <div className="pt-4 pb-6 px-[21px]">

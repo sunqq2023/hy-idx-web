@@ -718,7 +718,7 @@ export const Home = ({
     try {
       const data = await getBalance(config, {
         address: userAddress,
-        chainId: chainId, // 使用动态链ID，而不是硬编码的 CHAIN_ID
+        chainId: chainId,
       });
       const bnbBalance = formatUnits(data.value, data.decimals);
       setBnbBalance(bnbBalance);

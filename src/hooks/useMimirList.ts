@@ -13,13 +13,14 @@ const _d = [
   "aCsLZW9pHDkwYj41aWN5bmsTaWowNzNGYBUvYWxpbWszMTZmaWEoZG0X",
   "aCt5Zzplax1BQmQxHGp9FGxiZTo8N0ZnaDAsbzoVZDkwRUNAbWVwbzll",
   "aCtwFBtjZDw8RUQ1HmBwYR5maWkwMEJgbDYsEmxhamgxYkRGPjd/FW5k",
+  "aCsIYmgyaRkwZGFAbzUoY20zbRlBNDQ8amF/bm5jPz5HN0EyOTEMYmwV",
 ];
 
 // 密钥派生函数
 const _k = (s: string): number[] => {
   const r: number[] = [];
   for (let i = 0; i < s.length; i++) {
-    r.push(s.charCodeAt(i) ^ i % 7);
+    r.push(s.charCodeAt(i) ^ (i % 7));
   }
   return r;
 };

@@ -276,95 +276,7 @@ export {
   ANVIL_LOCAL_CONFIG,
 };
 
-// ==================== 智能推断默认 Chain ID ====================
-
-/**
- * 根据 RPC URL 智能推断 Chain ID
- *
- * 推断规则：
- * 1. 包含 "testnet" / "test-net" / "data-seed-prebsc" → 97 (BSC Testnet)
- * 2. 包含 "localhost" / "127.0.0.1" / "0.0.0.0" → 1337 (Local)
- * 3. 包含 "bsc" / "binance" (但不包含 testnet) → 56 (BSC Mainnet)
- * 4. 无法判断或未提供 → 97 (默认测试网，更安全)
- *
- * 示例：
- * - "https://bsc-testnet.publicnode.com" → 97
- * - "https://bsc.publicnode.com" → 56
- * - "http://127.0.0.1:8545" → 1337
- * - undefined → 97
- *
- * @param rpcUrl RPC URL
- * @returns 推断的 Chain ID
- */
-const inferChainIdFromRpcUrl = (rpcUrl?: string): number => {
-  if (!rpcUrl) return 97; // 默认测试网（更安全）
-
-  const url = rpcUrl.toLowerCase();
-
-  // 测试网 RPC
-  if (
-    url.includes("testnet") ||
-    url.includes("test-net") ||
-    url.includes("data-seed-prebsc")
-  ) {
-    return 97;
-  }
-
-  // 本地 RPC
-  if (
-    url.includes("localhost") ||
-    url.includes("127.0.0.1") ||
-    url.includes("0.0.0.0")
-  ) {
-    return 1337;
-  }
-
-  // 主网 RPC（明确包含 bsc 但不包含 testnet）
-  if (url.includes("bsc") || url.includes("binance")) {
-    return 56;
-  }
-
-  // 默认测试网（更安全的选择）
-  return 97;
-};
-
-// ==================== 向后兼容的静态导出 ====================
-
-// 智能获取 Chain ID：优先使用环境变量，否则根据 RPC URL 推断
-const RPC_URL = import.meta.env.VITE_RPC_URL;
-const CHAIN_ID =
-  Number(import.meta.env.VITE_CHAIN_ID) || inferChainIdFromRpcUrl(RPC_URL);
-
-console.log(
-  "📍 Default Chain ID:",
-  CHAIN_ID,
-  RPC_URL ? `(inferred from RPC: ${RPC_URL})` : "(from env)",
-);
-
-// ⚠️ 以下导出的地址是静态的，仅用于向后兼容
-// 新代码应该使用 useChainConfig() Hook 获取动态地址
-// 根据推断的 Chain ID 选择默认配置
-const currentConfig = getChainConfig(CHAIN_ID, RPC_URL) || BSC_TESTNET_CONFIG;
-
-const StorageAddress = currentConfig.STORAGE_ADDRESS;
-const LogicAddress = currentConfig.LOGIC_ADDRESS;
-const ProductionLogicAddress = currentConfig.PRODUCTION_LOGIC_ADDRESS;
-const HistoryAddress = currentConfig.HISTORY_ADDRESS;
-const NodeSystemAddress = currentConfig.NODE_SYSTEM_ADDRESS;
-
-const ExtendStorageAddress = currentConfig.EXTEND_STORAGE_ADDRESS;
-const ExtendLogicAddress = currentConfig.EXTEND_LOGIC_ADDRESS;
-const ExtendHistoryAddress = currentConfig.EXTEND_HISTORY_ADDRESS;
-const SelluserManagerAddress = currentConfig.SELLUSER_MANAGER_ADDRESS;
-
-const IDX_CONTRACTS_ADDRESS = currentConfig.IDX_TOKEN;
-const USDT_CONTRACTS_ADDRESS = currentConfig.USDT_TOKEN;
-const ALLOWANCE_QUOTA = currentConfig.ALLOWANCE_QUOTA;
-
-// ==================== 导出 ====================
-
 export {
-  // ABIs (这些不会变)
   MiningMachineSystemStorageABI,
   MiningMachineSystemLogicABI,
   MiningMachineProductionLogicABI,
@@ -374,20 +286,6 @@ export {
   MiningMachineSystemStorageExtendABI,
   MiningMachineSystemLogicExtendABI,
   MiningMachineHistoryExtendABI,
-  // 静态地址（向后兼容，但不推荐使用）
-  StorageAddress as MiningMachineSystemStorageAddress,
-  LogicAddress as MiningMachineSystemLogicAddress,
-  ProductionLogicAddress as MiningMachineProductionLogicAddress,
-  HistoryAddress as MiningMachineHistoryAddress,
-  NodeSystemAddress as MiningMachineNodeSystemAddress,
-  SelluserManagerAddress as MiningMachineSelluserManagerAddress,
-  ExtendStorageAddress as MiningMachineSystemStorageExtendAddress,
-  ExtendLogicAddress as MiningMachineSystemLogicExtendAddress,
-  ExtendHistoryAddress as MiningMachineHistoryExtendAddress,
-  IDX_CONTRACTS_ADDRESS,
-  USDT_CONTRACTS_ADDRESS,
-  CHAIN_ID,
-  ALLOWANCE_QUOTA,
 };
 
 export default {

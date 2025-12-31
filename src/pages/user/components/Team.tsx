@@ -10,7 +10,6 @@ import {
   MiningMachineSystemLogicExtendABI,
   MiningMachineSystemStorageExtendABI,
   MiningMachineHistoryExtendABI,
-  CHAIN_ID,
 } from "@/constants";
 import { useChainConfig } from "@/hooks/useChainConfig";
 import {
@@ -48,7 +47,7 @@ interface RawPowerRecord {
 }
 
 export const Team = () => {
-  const { address: userAddress } = useAccount();
+  const { address: userAddress, chainId } = useAccount();
   const chainConfig = useChainConfig();
 
   // 使用动态地址，而不是静态导出的地址
@@ -624,9 +623,22 @@ export const Team = () => {
 
       console.log("提现交易已发送，哈希:", hash);
 
-      const receipt = await waitForTransactionReceipt(config, {
-        hash,
-        chainId: CHAIN_ID,
+      // 等待交易确认，设置 2 分钟超时
+      const receipt = await Promise.race([
+        waitForTransactionReceipt(config, {
+          hash,
+          chainId: chainId,
+        }),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("TIMEOUT")), 120000),
+        ),
+      ]).catch((error) => {
+        if (error.message === "TIMEOUT") {
+          console.warn("交易确认超时，但交易已发送到链上:", hash);
+          // 超时但交易已发送，视为成功
+          return { status: "success", blockNumber: 0n };
+        }
+        throw error;
       });
 
       console.log("提现交易已确认，区块号:", receipt.blockNumber);
@@ -816,7 +828,7 @@ export const Team = () => {
 
       await waitForTransactionReceipt(config, {
         hash,
-        chainId: CHAIN_ID,
+        chainId: chainId,
       });
 
       Toast.show({
@@ -892,7 +904,7 @@ export const Team = () => {
 
       await waitForTransactionReceipt(config, {
         hash,
-        chainId: CHAIN_ID,
+        chainId: chainId,
       });
 
       Toast.show({
@@ -955,7 +967,7 @@ export const Team = () => {
 
       await waitForTransactionReceipt(config, {
         hash,
-        chainId: CHAIN_ID,
+        chainId: chainId,
       });
 
       Toast.show({
