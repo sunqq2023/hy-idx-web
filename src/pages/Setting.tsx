@@ -6,7 +6,6 @@ import {
   SelluserManagerABI,
   MiningMachineSystemStorageExtendABI,
   MiningMachineSystemLogicExtendABI,
-  CHAIN_ID,
 } from "@/constants";
 import { useChainConfig } from "@/hooks/useChainConfig";
 import { validateAddressFnMap } from "@/utils/validateAddress";
@@ -17,9 +16,10 @@ import {
   waitForTransactionReceipt,
   multicall,
   readContract,
+  getBalance,
 } from "@wagmi/core";
 import config from "@/proviers/config";
-import { parseEther, erc20Abi, formatEther, getAddress, parseGwei } from "viem";
+import { parseEther, erc20Abi, formatEther, getAddress } from "viem";
 
 const Setting = () => {
   const { address: currentWalletAddress, chainId: walletChainId } =
@@ -157,8 +157,29 @@ const Setting = () => {
     useState(false); // 减少 MIX 中状态
   const [isTransferringMix, setIsTransferringMix] = useState(false); // 转移 MIX 中状态
   const [operatorMixBalance, setOperatorMixBalance] = useState("0"); // 操作员 MIX 余额
+  const [operatorBnbBalance, setOperatorBnbBalance] = useState("0"); // 操作员 BNB 余额
   const [isLoadingOperatorBalance, setIsLoadingOperatorBalance] =
     useState(false); // 加载操作员余额状态
+
+  // LogicExtend 升级相关状态
+  // 旧 LogicExtend 合约地址（主网）
+  const OLD_LOGIC_EXTEND_ADDRESS =
+    "0xEd935db4871D140799C07b86330c6b1B52A7bC1F" as `0x${string}`;
+
+  const [activeMachineRewardsEnabled, setActiveMachineRewardsEnabled] =
+    useState<boolean | null>(null); // 激活奖励开关状态
+  const [isLoadingRewardsEnabled, setIsLoadingRewardsEnabled] = useState(false); // 加载开关状态
+  const [isSettingRewardsEnabled, setIsSettingRewardsEnabled] = useState(false); // 设置开关中状态
+
+  const [isAuthorizingStorageExtend, setIsAuthorizingStorageExtend] =
+    useState(false); // 授权 StorageExtend 中状态
+  const [isUpdatingLogicAddress, setIsUpdatingLogicAddress] = useState(false); // 更新 Logic 地址中状态
+  const [isWithdrawingOldIdx, setIsWithdrawingOldIdx] = useState(false); // 提取旧合约 IDX 中状态
+  const [oldLogicExtendIdxBalance, setOldLogicExtendIdxBalance] = useState("0"); // 旧合约 IDX 余额
+  const [isLoadingOldIdxBalance, setIsLoadingOldIdxBalance] = useState(false); // 加载旧合约余额状态
+  const [adminIdxBalance, setAdminIdxBalance] = useState("0"); // 管理员地址 IDX 余额
+  const [isLoadingAdminIdxBalance, setIsLoadingAdminIdxBalance] =
+    useState(false); // 加载管理员余额状态
 
   const handleModifyAdmin = async () => {
     const isValid = validateAddressFnMap?.["EVM"]?.(adminAddress);
@@ -436,19 +457,29 @@ const Setting = () => {
 
   // ===== MIX 操作函数 =====
 
-  // 查询操作员 MIX 余额
+  // 查询操作员 MIX 余额和 BNB 余额
   const fetchOperatorMixBalance = async () => {
     try {
       setIsLoadingOperatorBalance(true);
-      const balance = await readContract(config, {
+
+      // 查询 MIX 余额
+      const mixBalance = await readContract(config, {
         address: MiningMachineNodeSystemAddress as `0x${string}`,
         abi: MiningMachineNodeSystemABI,
         functionName: "getUserMixBalance",
         args: [chainConfig.MIX_OPERATOR_ADDRESS as `0x${string}`],
       });
 
-      const formattedBalance = formatEther(balance);
-      setOperatorMixBalance(formattedBalance);
+      const formattedMixBalance = formatEther(mixBalance);
+      setOperatorMixBalance(formattedMixBalance);
+
+      // 查询 BNB 余额
+      const bnbBalance = await getBalance(config, {
+        address: chainConfig.MIX_OPERATOR_ADDRESS as `0x${string}`,
+      });
+
+      const formattedBnbBalance = formatEther(bnbBalance.value);
+      setOperatorBnbBalance(formattedBnbBalance);
     } catch (error) {
       console.error("获取操作员余额失败:", error);
       Toast.show({
@@ -621,11 +652,324 @@ const Setting = () => {
     }
   };
 
+  // ===== LogicExtend 升级相关函数 =====
+
+  // 查询激活奖励开关状态
+  const fetchActiveMachineRewardsEnabled = async () => {
+    try {
+      setIsLoadingRewardsEnabled(true);
+      const enabled = await readContract(config, {
+        address: MiningMachineSystemLogicExtendAddress,
+        abi: MiningMachineSystemLogicExtendABI,
+        functionName: "activeMachineRewardsEnabled",
+        args: [],
+      });
+      setActiveMachineRewardsEnabled(enabled as boolean);
+    } catch (error) {
+      console.error("获取激活奖励开关状态失败:", error);
+      Toast.show({
+        content: "获取激活奖励开关状态失败",
+        position: "center",
+      });
+    } finally {
+      setIsLoadingRewardsEnabled(false);
+    }
+  };
+
+  // 设置激活奖励开关
+  const handleSetActiveMachineRewardsEnabled = async (enabled: boolean) => {
+    try {
+      setIsSettingRewardsEnabled(true);
+      const hash = await writeContractAsync({
+        address: MiningMachineSystemLogicExtendAddress,
+        abi: MiningMachineSystemLogicExtendABI,
+        functionName: "setActiveMachineRewardsEnabled",
+        args: [enabled],
+        gas: 400000n,
+        chainId: walletChainId,
+      });
+
+      await waitForTransactionReceipt(config, {
+        hash,
+        chainId: walletChainId,
+      });
+      Toast.show({
+        content: enabled ? "已开启激活奖励" : "已关闭激活奖励",
+        position: "center",
+      });
+      // 刷新状态
+      fetchActiveMachineRewardsEnabled();
+    } catch (error) {
+      Toast.show({
+        content: "设置失败",
+        position: "center",
+      });
+      console.error("设置激活奖励开关失败:", error);
+    } finally {
+      setIsSettingRewardsEnabled(false);
+    }
+  };
+
+  // 步骤 2: 授权 StorageExtend
+  const handleAuthorizeStorageExtend = async () => {
+    try {
+      setIsAuthorizingStorageExtend(true);
+      const hash = await writeContractAsync({
+        address: MiningMachineSystemStorageExtendAddress,
+        abi: MiningMachineSystemStorageExtendABI,
+        functionName: "setAuthorizedCaller",
+        args: [MiningMachineSystemLogicExtendAddress, true],
+        gas: 400000n,
+        chainId: walletChainId,
+      });
+
+      await waitForTransactionReceipt(config, {
+        hash,
+        chainId: walletChainId,
+      });
+      Toast.show({
+        content: "授权成功",
+        position: "center",
+      });
+    } catch (error) {
+      Toast.show({
+        content: "授权失败",
+        position: "center",
+      });
+      console.error("授权 StorageExtend 失败:", error);
+    } finally {
+      setIsAuthorizingStorageExtend(false);
+    }
+  };
+
+  // 步骤 3: 更新 Logic 地址
+  const handleUpdateLogicAddress = async () => {
+    try {
+      setIsUpdatingLogicAddress(true);
+      const hash = await writeContractAsync({
+        address: MiningMachineSystemLogicAddress,
+        abi: MiningMachineSystemLogicABI,
+        functionName: "setExtendLogic",
+        args: [MiningMachineSystemLogicExtendAddress],
+        gas: 400000n,
+        chainId: walletChainId,
+      });
+
+      await waitForTransactionReceipt(config, {
+        hash,
+        chainId: walletChainId,
+      });
+      Toast.show({
+        content: "更新成功",
+        position: "center",
+      });
+    } catch (error) {
+      Toast.show({
+        content: "更新失败",
+        position: "center",
+      });
+      console.error("更新 Logic 地址失败:", error);
+    } finally {
+      setIsUpdatingLogicAddress(false);
+    }
+  };
+
+  // 查询旧合约 IDX 余额
+  const fetchOldLogicExtendIdxBalance = async () => {
+    try {
+      setIsLoadingOldIdxBalance(true);
+      const balance = await readContract(config, {
+        address: IDX_CONTRACTS_ADDRESS,
+        abi: erc20Abi,
+        functionName: "balanceOf",
+        args: [OLD_LOGIC_EXTEND_ADDRESS],
+      });
+      const formattedBalance = formatEther(balance);
+      setOldLogicExtendIdxBalance(formattedBalance);
+    } catch (error) {
+      console.error("获取旧合约 IDX 余额失败:", error);
+      Toast.show({
+        content: "获取旧合约 IDX 余额失败",
+        position: "center",
+      });
+    } finally {
+      setIsLoadingOldIdxBalance(false);
+    }
+  };
+
+  // 查询管理员地址 IDX 余额
+  const fetchAdminIdxBalance = async () => {
+    if (!currentWalletAddress) return;
+
+    try {
+      setIsLoadingAdminIdxBalance(true);
+      const balance = await readContract(config, {
+        address: IDX_CONTRACTS_ADDRESS,
+        abi: erc20Abi,
+        functionName: "balanceOf",
+        args: [currentWalletAddress],
+      });
+      const formattedBalance = formatEther(balance);
+      setAdminIdxBalance(formattedBalance);
+    } catch (error) {
+      console.error("获取管理员 IDX 余额失败:", error);
+      Toast.show({
+        content: "获取管理员 IDX 余额失败",
+        position: "center",
+      });
+    } finally {
+      setIsLoadingAdminIdxBalance(false);
+    }
+  };
+
+  // 步骤 4: 从旧合约提取 IDX 到管理员
+  const handleWithdrawOldIdx = async () => {
+    try {
+      setIsWithdrawingOldIdx(true);
+
+      // 先查询余额
+      const balance = await readContract(config, {
+        address: IDX_CONTRACTS_ADDRESS,
+        abi: erc20Abi,
+        functionName: "balanceOf",
+        args: [OLD_LOGIC_EXTEND_ADDRESS],
+      });
+
+      if (balance === 0n) {
+        Toast.show({
+          content: "旧合约无 IDX 余额",
+          position: "center",
+        });
+        return;
+      }
+
+      // 从旧合约提取 IDX
+      const hash = await writeContractAsync({
+        address: OLD_LOGIC_EXTEND_ADDRESS,
+        abi: MiningMachineSystemLogicExtendABI,
+        functionName: "withdrawIDX",
+        args: [balance],
+        gas: 400000n,
+        chainId: walletChainId,
+      });
+
+      await waitForTransactionReceipt(config, {
+        hash,
+        chainId: walletChainId,
+      });
+      Toast.show({
+        content: "IDX 已提取到管理员地址",
+        position: "center",
+      });
+      // 刷新余额
+      fetchOldLogicExtendIdxBalance();
+      fetchAdminIdxBalance(); // 刷新管理员余额
+    } catch (error) {
+      Toast.show({
+        content: "提取失败",
+        position: "center",
+      });
+      console.error("提取旧合约 IDX 失败:", error);
+    } finally {
+      setIsWithdrawingOldIdx(false);
+    }
+  };
+
+  // 步骤 5: 转移 IDX 到新合约（新增）
+  const [isTransferringIdxToNew, setIsTransferringIdxToNew] = useState(false);
+
+  // 直接从管理员地址转移所有 IDX 到新合约
+  const handleTransferAllIdxToNewContract = async () => {
+    try {
+      if (!currentWalletAddress) {
+        Toast.show({
+          content: "请先连接钱包",
+          position: "center",
+        });
+        return;
+      }
+
+      setIsTransferringIdxToNew(true);
+
+      // 查询管理员地址的 IDX 余额
+      const adminBalance = await readContract(config, {
+        address: IDX_CONTRACTS_ADDRESS,
+        abi: erc20Abi,
+        functionName: "balanceOf",
+        args: [currentWalletAddress],
+      });
+
+      if (adminBalance === 0n) {
+        Toast.show({
+          content: "管理员地址无 IDX 余额",
+          position: "center",
+          duration: 3000,
+        });
+        return;
+      }
+
+      // 从管理员地址转账所有 IDX 到新 LogicExtend 合约
+      const hash = await writeContractAsync({
+        address: IDX_CONTRACTS_ADDRESS,
+        abi: erc20Abi,
+        functionName: "transfer",
+        args: [MiningMachineSystemLogicExtendAddress, adminBalance],
+        gas: 400000n,
+        chainId: walletChainId,
+      });
+
+      await waitForTransactionReceipt(config, {
+        hash,
+        chainId: walletChainId,
+      });
+
+      const formattedAmount = formatEther(adminBalance);
+      Toast.show({
+        content: `成功转移 ${formattedAmount} IDX 到新合约`,
+        position: "center",
+        duration: 3000,
+      });
+
+      // 刷新余额
+      fetchRewardPoolBalance();
+      fetchAdminIdxBalance();
+    } catch (error) {
+      console.error("转移 IDX 失败:", error);
+
+      let errorMsg = "转移失败";
+      if (error instanceof Error) {
+        const errorMessage = error.message.toLowerCase();
+
+        if (
+          errorMessage.includes("user rejected") ||
+          errorMessage.includes("user denied")
+        ) {
+          errorMsg = "用户取消了交易";
+        } else if (errorMessage.includes("insufficient funds")) {
+          errorMsg = "BNB 余额不足，无法支付 gas 费";
+        } else {
+          errorMsg = `转移失败: ${error.message}`;
+        }
+      }
+
+      Toast.show({
+        content: errorMsg,
+        position: "center",
+        duration: 3000,
+      });
+    } finally {
+      setIsTransferringIdxToNew(false);
+    }
+  };
+
   useEffect(() => {
     queryActiveAndGasFee();
     fetchRewardPoolBalance();
     fetchOperatorMixBalance();
     queryPowerLimits();
+    fetchActiveMachineRewardsEnabled();
+    fetchOldLogicExtendIdxBalance();
+    fetchAdminIdxBalance(); // 查询管理员余额
   }, []);
 
   const handleChangeMachineProduct = async () => {
@@ -2121,10 +2465,24 @@ const Setting = () => {
           <div className="bg-white p-3 rounded-2xl mt-2 flex flex-col gap-1">
             <h2 className="mb-2 font-bold">给操作员添加 MIX</h2>
 
-            {/* 显示操作员余额 */}
+            {/* 显示操作员 BNB 余额 */}
+            <div className="mb-2 p-2 bg-[#fff3cd] rounded-xl border border-[#ffc107]">
+              <div className="text-[12px] text-gray-600 mb-1">
+                操作员 BNB 余额:
+              </div>
+              <div className="text-[14px] font-bold text-[#ff6b00]">
+                {isLoadingOperatorBalance ? (
+                  <div className="animate-pulse">加载中...</div>
+                ) : (
+                  `${operatorBnbBalance} BNB`
+                )}
+              </div>
+            </div>
+
+            {/* 显示操作员 MIX 余额 */}
             <div className="mb-2 p-2 bg-[#f3f3f3] rounded-xl">
               <div className="text-[12px] text-gray-600 mb-1">
-                操作员当前余额:
+                操作员 MIX 余额:
               </div>
               <div className="text-[14px] font-bold text-[#895EFE]">
                 {isLoadingOperatorBalance ? (
@@ -2259,6 +2617,50 @@ const Setting = () => {
             >
               转移 MIX
             </Button>
+          </div>
+
+          {/* ===== LogicExtend 升级管理 ===== */}
+
+          {/* 激活奖励开关（放在最前面） */}
+          <div className="bg-white p-3 rounded-2xl mt-2 flex flex-col gap-1">
+            <h2 className="mb-2 font-bold">激活矿机奖励开关</h2>
+            <div className="mb-2 p-2 bg-[#f3f3f3] rounded-xl">
+              <div className="text-[12px] text-gray-600 mb-1">当前状态:</div>
+              <div className="text-[14px] font-bold text-[#895EFE]">
+                {isLoadingRewardsEnabled ? (
+                  <div className="animate-pulse">加载中...</div>
+                ) : activeMachineRewardsEnabled === null ? (
+                  "未知"
+                ) : activeMachineRewardsEnabled ? (
+                  "✅ 已开启"
+                ) : (
+                  "❌ 已关闭"
+                )}
+              </div>
+            </div>
+            <Button
+              className={`!text-white !rounded-3xl !py-1 !w-full ${
+                activeMachineRewardsEnabled ? "!bg-red-600" : "!bg-green-600"
+              }`}
+              style={{
+                fontSize: "13px",
+              }}
+              loading={isSettingRewardsEnabled}
+              onClick={() =>
+                handleSetActiveMachineRewardsEnabled(
+                  !activeMachineRewardsEnabled,
+                )
+              }
+              disabled={activeMachineRewardsEnabled === null}
+            >
+              {activeMachineRewardsEnabled ? "关闭奖励" : "开启奖励"}
+            </Button>
+            <div className="text-[11px] text-gray-500 mt-1">
+              新合约地址: {MiningMachineSystemLogicExtendAddress}
+            </div>
+            <div className="text-[11px] text-gray-500 mt-1">
+              💡 提示：可以随时开启/关闭激活奖励
+            </div>
           </div>
         </div>
       )}

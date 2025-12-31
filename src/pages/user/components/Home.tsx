@@ -805,6 +805,14 @@ export const Home = ({
 
   const toggleSelectAll = () => {
     setMachineList((prevList) => {
+      // 计算 gas limit 限制
+      const baseGas = 100000n;
+      const perMachineGas = 1200000n;
+      const MAX_GAS_LIMIT = 25000000n;
+      const maxMachines = Math.floor(
+        Number(MAX_GAS_LIMIT - baseGas) / Number(perMachineGas),
+      );
+
       const newList = prevList.map((item) => {
         // 只允许选择已激活的子矿机
         if (item.mtype === 2 && item.isActivatedStakedLP) {
@@ -821,6 +829,31 @@ export const Home = ({
         const activatedChildMachines = newList.filter(
           (item) => item.mtype === 2 && item.isActivatedStakedLP,
         );
+
+        // 检查是否超过 gas limit
+        if (activatedChildMachines.length > maxMachines) {
+          Toast.show({
+            content: `一次最多只能为 ${maxMachines} 台矿机加注燃料，已自动选择前 ${maxMachines} 台`,
+            position: "center",
+            duration: 3000,
+          });
+
+          // 只选择前 maxMachines 台
+          const limitedMachines = activatedChildMachines.slice(0, maxMachines);
+          setFuelList(limitedMachines);
+
+          // 更新选中状态
+          return prevList.map((item) => {
+            if (item.mtype === 2 && item.isActivatedStakedLP) {
+              const isInLimitedList = limitedMachines.some(
+                (m) => m.id === item.id,
+              );
+              return { ...item, checked: isInLimitedList };
+            }
+            return item;
+          });
+        }
+
         setFuelList(activatedChildMachines);
       } else {
         setFuelList([]);
@@ -841,6 +874,25 @@ export const Home = ({
 
         const isItemChecked = !item.checked;
         if (isItemChecked) {
+          // 检查 gas limit 限制
+          const baseGas = 100000n;
+          const perMachineGas = 1200000n;
+          const MAX_GAS_LIMIT = 25000000n;
+          const maxMachines = Math.floor(
+            Number(MAX_GAS_LIMIT - baseGas) / Number(perMachineGas),
+          );
+
+          const newCount = fuelList.length + 1;
+          if (newCount > maxMachines) {
+            Toast.show({
+              content: `一次最多只能为 ${maxMachines} 台矿机加注燃料，请先取消其他选择`,
+              position: "center",
+              duration: 3000,
+            });
+            // 恢复选中状态
+            return prevItems;
+          }
+
           if (allStatus) {
             const activatedChildMachines = machineList.filter(
               (m) => m.mtype === 2 && m.isActivatedStakedLP,
@@ -1096,6 +1148,25 @@ export const Home = ({
         content: "请选择要添加燃料的矿机",
         position: "center",
         duration: 2000,
+      });
+      return;
+    }
+
+    // 检查 gas limit 限制
+    const baseGas = 100000n;
+    const perMachineGas = 1200000n; // 每台矿机需要的 gas（追溯15层推荐人）
+    const MAX_GAS_LIMIT = 25000000n;
+    const calculatedGasLimit =
+      baseGas + BigInt(fuelList.length) * perMachineGas;
+    const maxMachines = Math.floor(
+      Number(MAX_GAS_LIMIT - baseGas) / Number(perMachineGas),
+    );
+
+    if (calculatedGasLimit > MAX_GAS_LIMIT) {
+      Toast.show({
+        content: `一次最多只能为 ${maxMachines} 台矿机加注燃料，当前选择了 ${fuelList.length} 台，请减少选择数量`,
+        position: "center",
+        duration: 3000,
       });
       return;
     }

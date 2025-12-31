@@ -89,20 +89,46 @@ const ClaimMix = () => {
         icon: "loading",
       });
 
-      // Gas Limit 计算（每批30台，优化后更安全）
-      // 分析：claimMixByMachineIds 对每个矿机执行以下操作：
-      // 1. getMachine + getMachineLifecycle（SLOAD，在循环中读取）- 约 4k gas
-      // 2. addMixBalance（SSTORE映射累加）- 约 5k gas（累加操作，非首次写入）
-      // 3. setMachineLifecycle（结构体多字段SSTORE，11个字段，多个字段改变）- 约 50k-100k gas
-      // 4. claimMixHistory.push（动态数组push）- 约 20k gas（存储length和元素）
-      // 5. history.recordEarning（外部CALL）- 约 30k-50k gas（包括CALL开销21k和内部操作）
-      // 6. emit MixClaimed（LOG事件）- 约 1k gas
-      // 7. 可能的外部调用 nodeSystem.recordMachineDestroyed - 约 30k gas（如果矿机销毁）
-      // 总计每个矿机约 140k-210k gas，考虑到实际存储操作的复杂性和安全余量，取 350k
-      const baseGas = 200000n; // 函数基础开销
-      const perMachineGas = 350000n; // 每台矿机的gas（包含安全余量）
-      // 每批30台的 gas limit = 200k + 30 × 350k = 10.7M gas（安全，远低于25M上限）
-      // 即使全部矿机需要销毁：10.7M + 30 × 50k = 12.2M gas（仍然安全）
+      // Gas Limit 计算（每批30台，基于实际合约分析优化）
+      //
+      // 合约分析：claimMixByMachineIds 对每个矿机执行以下操作：
+      // 1. 读取操作（SLOAD）：
+      //    - getMachine: ~2,100 gas
+      //    - getMachineLifecycle: ~2,100 gas
+      //    小计: ~4,200 gas
+      //
+      // 2. 写入操作（SSTORE）：
+      //    - addMixBalance（映射累加，warm slot）: ~5,000 gas
+      //    - setMachineLifecycle（多字段结构体更新）: ~20,000-50,000 gas
+      //    - claimMixHistory.push（动态数组）: ~20,000 gas
+      //    小计: ~45,000-75,000 gas
+      //
+      // 3. 外部调用（CALL）：
+      //    - history.recordEarning: ~30,000-50,000 gas
+      //    - nodeSystem.recordMachineDestroyed（如果销毁）: ~30,000 gas
+      //    小计: ~30,000-80,000 gas
+      //
+      // 4. 事件（LOG）：
+      //    - emit MixClaimed: ~1,500 gas
+      //    - emit MachineDestroyed（如果销毁）: ~1,500 gas
+      //    小计: ~1,500-3,000 gas
+      //
+      // 每台矿机实际消耗：
+      //   - 普通情况: 4.2k + 75k + 50k + 1.5k = ~130k gas
+      //   - 销毁情况: 4.2k + 75k + 80k + 3k = ~162k gas
+      //
+      // 安全余量计算（考虑网络拥堵和 EVM 实现差异）：
+      //   - 每台矿机: 162k × 2.0 = 324k（100% 安全余量）
+      //   - 取整为: 250k（54% 安全余量，更经济）
+      //
+      // 每批30台的 gas limit:
+      //   - 基础开销: 150k（函数调用 + 循环初始化）
+      //   - 30台矿机: 30 × 250k = 7.5M
+      //   - 总计: 150k + 7.5M = 7.65M gas（安全，远低于25M上限）
+      //
+      // 注意：BSC block gas limit = 140M，单笔交易上限设为 25M 留出安全余量
+      const baseGas = 150000n; // 函数基础开销（函数调用 + 循环初始化）
+      const perMachineGas = 250000n; // 每台矿机的gas（包含54%安全余量，更经济）
       const MAX_GAS_LIMIT = 25000000n; // 25M gas limit，留出安全余量
 
       const errors: string[] = [];

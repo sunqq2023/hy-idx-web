@@ -76,6 +76,19 @@ const MiningMachineSystemLogicExtendABI = [
   },
   {
     type: "function",
+    name: "activeMachineRewardsEnabled",
+    inputs: [],
+    outputs: [
+      {
+        name: "",
+        type: "bool",
+        internalType: "bool",
+      },
+    ],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
     name: "addFriend",
     inputs: [
       {
@@ -359,6 +372,19 @@ const MiningMachineSystemLogicExtendABI = [
         name: "_limit",
         type: "uint256",
         internalType: "uint256",
+      },
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "setActiveMachineRewardsEnabled",
+    inputs: [
+      {
+        name: "_enabled",
+        type: "bool",
+        internalType: "bool",
       },
     ],
     outputs: [],

@@ -26,7 +26,8 @@ const GAS_LIMIT_MAP: Record<string, bigint> = {
   // 矿机操作
   activateMachine: 400000n, // 激活单台矿机（实际 ~180k，余量 2.2x）⚠️ 新增
   deactivateMachine: 400000n, // 关停矿机（实际 ~125k-290k，余量 1.4x-3.2x，从 250k 提高到 400k 确保安全）⚠️ 已提高
-  addFuel: 400000n, // 添加燃料（实际 ~200k，余量 2x）⚠️ 新增
+  addFuel: 1200000n, // 添加燃料 - 新逻辑追溯15层推荐人（实际最坏 ~760k，余量 1.58x = 58%安全余量）⚠️ 已更新
+  batchPayFuel: 1200000n, // 批量添加燃料 - 基础 gas（实际最坏 ~760k/台，余量 1.58x = 58%安全余量）⚠️ 新增
   convertMIXtoIDX: 600000n, // 兑换 IDX（实际 ~280k，余量 2.1x）⚠️ 新增
   claimReleasedIdx: 350000n, // 提取释放的 IDX（实际 ~150k，余量 2.3x）⚠️ 新增
   claimMixReward: 350000n, // 领取 MIX 奖励（实际 ~180k，余量 1.9x）⚠️ 新增
