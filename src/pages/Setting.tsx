@@ -2465,12 +2465,17 @@ const Setting = () => {
           <div className="bg-white p-3 rounded-2xl mt-2 flex flex-col gap-1">
             <h2 className="mb-2 font-bold">给操作员添加 MIX</h2>
 
+            {/* 显示操作员地址 */}
+            <div className="mb-2 p-2 bg-blue-50 rounded-xl border border-blue-200">
+              <div className="text-[12px] text-blue-500 mb-1">
+                地址: {chainConfig.MIX_OPERATOR_ADDRESS}
+              </div>
+            </div>
+
             {/* 显示操作员 BNB 余额 */}
             <div className="mb-2 p-2 bg-[#fff3cd] rounded-xl border border-[#ffc107]">
-              <div className="text-[12px] text-gray-600 mb-1">
-                操作员 BNB 余额:
-              </div>
-              <div className="text-[14px] font-bold text-[#ff6b00]">
+              <div className="text-[12px] text-yellow-600 mb-1">
+                BNB 余额:{" "}
                 {isLoadingOperatorBalance ? (
                   <div className="animate-pulse">加载中...</div>
                 ) : (
@@ -2481,10 +2486,8 @@ const Setting = () => {
 
             {/* 显示操作员 MIX 余额 */}
             <div className="mb-2 p-2 bg-[#f3f3f3] rounded-xl">
-              <div className="text-[12px] text-gray-600 mb-1">
-                操作员 MIX 余额:
-              </div>
-              <div className="text-[14px] font-bold text-[#895EFE]">
+              <div className="text-[12px] text-purple-600 mb-1">
+                MIX 余额:{" "}
                 {isLoadingOperatorBalance ? (
                   <div className="animate-pulse">加载中...</div>
                 ) : (
@@ -2655,12 +2658,6 @@ const Setting = () => {
             >
               {activeMachineRewardsEnabled ? "关闭奖励" : "开启奖励"}
             </Button>
-            <div className="text-[11px] text-gray-500 mt-1">
-              新合约地址: {MiningMachineSystemLogicExtendAddress}
-            </div>
-            <div className="text-[11px] text-gray-500 mt-1">
-              💡 提示：可以随时开启/关闭激活奖励
-            </div>
           </div>
         </div>
       )}
