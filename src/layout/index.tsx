@@ -36,8 +36,8 @@ const RootLayout = () => {
         error instanceof Error
           ? error.message
           : typeof error === "string"
-          ? error
-          : String(error);
+            ? error
+            : String(error);
       if (
         errorMessage.includes("returned no data") ||
         errorMessage.includes("does not have the function") ||
@@ -45,7 +45,7 @@ const RootLayout = () => {
       ) {
         console.warn(
           `⚠️ Contract ${chainConfig.STORAGE_ADDRESS} may not be deployed or function 'sadmin' not available:`,
-          errorMessage
+          errorMessage,
         );
         setAdminAddress(null);
       } else {
@@ -90,8 +90,8 @@ const RootLayout = () => {
         error instanceof Error
           ? error.message
           : typeof error === "string"
-          ? error
-          : String(error);
+            ? error
+            : String(error);
       if (
         errorMessage.includes("returned no data") ||
         errorMessage.includes("does not have the function") ||
@@ -99,7 +99,7 @@ const RootLayout = () => {
       ) {
         console.warn(
           `⚠️ Contract ${chainConfig.STORAGE_ADDRESS} may not be deployed or function 'platformWallet' not available:`,
-          errorMessage
+          errorMessage,
         );
         setPlatformWalletAddress(null);
       } else {
@@ -132,8 +132,8 @@ const RootLayout = () => {
         error instanceof Error
           ? error.message
           : typeof error === "string"
-          ? error
-          : String(error);
+            ? error
+            : String(error);
       if (
         errorMessage.includes("returned no data") ||
         errorMessage.includes("does not have the function") ||
@@ -141,7 +141,7 @@ const RootLayout = () => {
       ) {
         console.warn(
           `⚠️ Contract ${chainConfig.STORAGE_ADDRESS} may not be deployed or function 'isMotherMachineDistributor' not available:`,
-          errorMessage
+          errorMessage,
         );
         setIsSalePerson(false);
       } else {
@@ -220,7 +220,7 @@ const RootLayout = () => {
                 lineHeight: 1.6,
               }}
             >
-              当前系统正在进行合约升级与数据迁移，期间暂不提供操作服务。请稍后再试或关注官方公告获取最新进展。
+              当前系统正在进行合约升级与数据迁移，大约需要30-60分钟，期间暂不提供操作服务，请稍后再试。
             </p>
           </div>
         ) : (

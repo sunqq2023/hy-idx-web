@@ -6,6 +6,7 @@ import {
   SelluserManagerABI,
   MiningMachineSystemStorageExtendABI,
   MiningMachineSystemLogicExtendABI,
+  MiningMachineHistoryExtendABI,
 } from "@/constants";
 import { useChainConfig } from "@/hooks/useChainConfig";
 import { validateAddressFnMap } from "@/utils/validateAddress";
@@ -164,7 +165,7 @@ const Setting = () => {
   // LogicExtend 升级相关状态
   // 旧 LogicExtend 合约地址（主网）
   const OLD_LOGIC_EXTEND_ADDRESS =
-    "0xEd935db4871D140799C07b86330c6b1B52A7bC1F" as `0x${string}`;
+    "0x1AAE73285d2bc36fe25e9b935f3a8f8E8f5776d0" as `0x${string}`;
 
   const [activeMachineRewardsEnabled, setActiveMachineRewardsEnabled] =
     useState<boolean | null>(null); // 激活奖励开关状态
@@ -173,6 +174,8 @@ const Setting = () => {
 
   const [isAuthorizingStorageExtend, setIsAuthorizingStorageExtend] =
     useState(false); // 授权 StorageExtend 中状态
+  const [isAuthorizingHistoryExtend, setIsAuthorizingHistoryExtend] =
+    useState(false); // 授权 HistoryExtend 中状态
   const [isUpdatingLogicAddress, setIsUpdatingLogicAddress] = useState(false); // 更新 Logic 地址中状态
   const [isWithdrawingOldIdx, setIsWithdrawingOldIdx] = useState(false); // 提取旧合约 IDX 中状态
   const [oldLogicExtendIdxBalance, setOldLogicExtendIdxBalance] = useState("0"); // 旧合约 IDX 余额
@@ -742,7 +745,39 @@ const Setting = () => {
     }
   };
 
-  // 步骤 3: 更新 Logic 地址
+  // 步骤 3: 授权 HistoryExtend
+  const handleAuthorizeHistoryExtend = async () => {
+    try {
+      setIsAuthorizingHistoryExtend(true);
+      const hash = await writeContractAsync({
+        address: chainConfig.EXTEND_HISTORY_ADDRESS as `0x${string}`,
+        abi: MiningMachineHistoryExtendABI,
+        functionName: "setAuthorizedCaller",
+        args: [MiningMachineSystemLogicExtendAddress, true],
+        gas: 400000n,
+        chainId: walletChainId,
+      });
+
+      await waitForTransactionReceipt(config, {
+        hash,
+        chainId: walletChainId,
+      });
+      Toast.show({
+        content: "授权成功",
+        position: "center",
+      });
+    } catch (error) {
+      Toast.show({
+        content: "授权失败",
+        position: "center",
+      });
+      console.error("授权 HistoryExtend 失败:", error);
+    } finally {
+      setIsAuthorizingHistoryExtend(false);
+    }
+  };
+
+  // 步骤 1: 更新 Logic 地址（原步骤3，现在是步骤1）
   const handleUpdateLogicAddress = async () => {
     try {
       setIsUpdatingLogicAddress(true);
@@ -2658,6 +2693,136 @@ const Setting = () => {
             >
               {activeMachineRewardsEnabled ? "关闭奖励" : "开启奖励"}
             </Button>
+          </div>
+
+          {/* ===== LogicExtend 合约升级操作 ===== */}
+          <div className="bg-white p-3 rounded-2xl mt-2 flex flex-col gap-1">
+            <h2 className="mb-2 font-bold text-red-600">
+              LogicExtend 合约升级操作
+            </h2>
+            <div className="text-[11px] text-gray-500 mb-2 p-2 bg-yellow-50 rounded-xl border border-yellow-200">
+              ⚠️ 警告：以下操作仅在合约升级时使用，请按顺序执行！
+            </div>
+
+            {/* 步骤 1: 更新 Logic 合约配置 */}
+            <div className="mb-3 p-2 bg-blue-50 rounded-xl border border-blue-200">
+              <h3 className="text-[13px] font-bold mb-2 text-blue-700">
+                步骤 1: 更新 Logic 合约配置
+              </h3>
+              <div className="text-[11px] text-gray-600 mb-2">
+                当前新 LogicExtend 地址:{" "}
+                <span className="font-mono text-[10px]">
+                  {MiningMachineSystemLogicExtendAddress}
+                </span>
+              </div>
+              <Button
+                className="!bg-blue-600 !text-white !rounded-3xl !py-1 !w-full"
+                style={{ fontSize: "13px" }}
+                loading={isUpdatingLogicAddress}
+                onClick={handleUpdateLogicAddress}
+              >
+                执行步骤 1: setExtendLogic
+              </Button>
+            </div>
+
+            {/* 步骤 2: 授权 StorageExtend */}
+            <div className="mb-3 p-2 bg-green-50 rounded-xl border border-green-200">
+              <h3 className="text-[13px] font-bold mb-2 text-green-700">
+                步骤 2: 授权 StorageExtend
+              </h3>
+              <div className="text-[11px] text-gray-600 mb-2">
+                授权新 LogicExtend 访问 StorageExtend
+              </div>
+              <Button
+                className="!bg-green-600 !text-white !rounded-3xl !py-1 !w-full"
+                style={{ fontSize: "13px" }}
+                loading={isAuthorizingStorageExtend}
+                onClick={handleAuthorizeStorageExtend}
+              >
+                执行步骤 2: 授权 StorageExtend
+              </Button>
+            </div>
+
+            {/* 步骤 3: 授权 HistoryExtend */}
+            <div className="mb-3 p-2 bg-purple-50 rounded-xl border border-purple-200">
+              <h3 className="text-[13px] font-bold mb-2 text-purple-700">
+                步骤 3: 授权 HistoryExtend
+              </h3>
+              <div className="text-[11px] text-gray-600 mb-2">
+                授权新 LogicExtend 访问 HistoryExtend
+              </div>
+              <Button
+                className="!bg-purple-600 !text-white !rounded-3xl !py-1 !w-full"
+                style={{ fontSize: "13px" }}
+                loading={isAuthorizingHistoryExtend}
+                onClick={handleAuthorizeHistoryExtend}
+              >
+                执行步骤 3: 授权 HistoryExtend
+              </Button>
+            </div>
+
+            {/* 步骤 4: 从旧合约提取 IDX */}
+            <div className="mb-3 p-2 bg-orange-50 rounded-xl border border-orange-200">
+              <h3 className="text-[13px] font-bold mb-2 text-orange-700">
+                步骤 4: 从旧合约提取 IDX
+              </h3>
+              <div className="text-[11px] text-gray-600 mb-2">
+                旧 LogicExtend 地址:{" "}
+                <span className="font-mono text-[10px]">
+                  {OLD_LOGIC_EXTEND_ADDRESS}
+                </span>
+              </div>
+              <div className="mb-2 p-2 bg-white rounded-xl">
+                <div className="text-[12px] text-gray-600 mb-1">
+                  旧合约 IDX 余额:
+                </div>
+                <div className="text-[14px] font-bold text-orange-600">
+                  {isLoadingOldIdxBalance ? (
+                    <div className="animate-pulse">加载中...</div>
+                  ) : (
+                    `${oldLogicExtendIdxBalance} IDX`
+                  )}
+                </div>
+              </div>
+              <Button
+                className="!bg-orange-600 !text-white !rounded-3xl !py-1 !w-full"
+                style={{ fontSize: "13px" }}
+                loading={isWithdrawingOldIdx}
+                onClick={handleWithdrawOldIdx}
+              >
+                执行步骤 4: 提取旧合约 IDX
+              </Button>
+            </div>
+
+            {/* 步骤 5: 转移 IDX 到新合约 */}
+            <div className="mb-3 p-2 bg-pink-50 rounded-xl border border-pink-200">
+              <h3 className="text-[13px] font-bold mb-2 text-pink-700">
+                步骤 5: 转移 IDX 到新合约
+              </h3>
+              <div className="text-[11px] text-gray-600 mb-2">
+                从管理员地址转移所有 IDX 到新 LogicExtend 合约
+              </div>
+              <div className="mb-2 p-2 bg-white rounded-xl">
+                <div className="text-[12px] text-gray-600 mb-1">
+                  管理员 IDX 余额:
+                </div>
+                <div className="text-[14px] font-bold text-pink-600">
+                  {isLoadingAdminIdxBalance ? (
+                    <div className="animate-pulse">加载中...</div>
+                  ) : (
+                    `${adminIdxBalance} IDX`
+                  )}
+                </div>
+              </div>
+              <Button
+                className="!bg-pink-600 !text-white !rounded-3xl !py-1 !w-full"
+                style={{ fontSize: "13px" }}
+                loading={isTransferringIdxToNew}
+                onClick={handleTransferAllIdxToNewContract}
+              >
+                执行步骤 5: 转移 IDX 到新合约
+              </Button>
+            </div>
           </div>
         </div>
       )}
