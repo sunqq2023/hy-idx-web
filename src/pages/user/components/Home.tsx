@@ -1202,6 +1202,19 @@ export const Home = ({
     navigate("/user/exchangeIdx");
   };
 
+  const handleMixTransfer = () => {
+    navigate("/user/transferMix");
+  };
+
+  const handleStockExchange = () => {
+    Toast.show({
+      content: "暂未开放",
+      position: "center",
+      duration: 2000,
+    });
+    // navigate("/user/exchangeStock");
+  };
+
   const handleSyntheticMachine = () => {
     navigate("/user/syntheticMachine");
   };
@@ -1545,6 +1558,18 @@ export const Home = ({
               className="flex-[1] text-center bg-[#09090a] border border-[#212122] rounded-3xl py-1 text-[.7rem]"
             >
               兑换IDX
+            </div>
+            <div
+              onClick={handleMixTransfer}
+              className="flex-[1] text-center bg-[#09090a] border border-[#212122] rounded-3xl py-1 text-[.7rem]"
+            >
+              MIX转账
+            </div>
+            <div
+              onClick={handleStockExchange}
+              className="flex-[1] text-center bg-[#09090a] border border-[#212122] rounded-3xl py-1 text-[.7rem]"
+            >
+              兑换股权
             </div>
           </div>
 

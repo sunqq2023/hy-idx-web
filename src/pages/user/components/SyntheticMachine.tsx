@@ -81,9 +81,9 @@ const SyntheticMachine = () => {
       setIsSyntheticLoading(true);
 
       // 动态计算 Gas Limit
-      // 优化：提高安全余量，确保交易成功
-      const baseGas = 350000n; // 200000n → 350000n (+75%)⚠️ 已提高
-      const perMachineGas = 150000n; // 100000n → 150000n (+50%)⚠️ 已提高
+      // 合成矿机涉及大量存储操作，需要充足的 gas
+      const baseGas = 400000n; // 基础 gas
+      const perMachineGas = 300000n; // 每台矿机额外 gas（包含所有存储操作）
       const gasLimit = baseGas + BigInt(count) * perMachineGas;
 
       const hash = await writeContract(config, {

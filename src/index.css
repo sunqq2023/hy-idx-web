@@ -41,16 +41,20 @@ body {
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
+
 /* Hide scrollbar for IE, Edge and Firefox */
 .no-scrollbar {
-  -ms-overflow-style: none; /* IE and Edge */
-  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none;
+  /* IE and Edge */
+  scrollbar-width: none;
+  /* Firefox */
 }
 
 .customSkeleton {
   width: 100%;
   height: 450px;
   border-radius: 20px;
+
   .adm-skeleton.adm-skeleton-paragraph-line {
     border-radius: 10px;
     border: 0;
@@ -59,17 +63,26 @@ body {
   }
 }
 
+
 @keyframes bounce {
+
   0%,
   100% {
     transform: translateY(-25%);
     animation-timing-function: cubic-bezier(0.8, 0, 1, 1);
   }
+
   50% {
     transform: none;
     animation-timing-function: cubic-bezier(0, 0, 0.2, 1);
   }
 }
+
 .animate-bounce {
   animation: bounce 1s infinite;
+}
+
+/* 确保转账 Dialog 居中显示 */
+.adm-center-popup:has(.transfer-mix-dialog) {
+  width: 90vw;
 }

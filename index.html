@@ -1,226 +1,220 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
-    />
 
-    <!-- Android WebView 兼容性优化 -->
-    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
-    <meta name="format-detection" content="telephone=no" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta
-      name="apple-mobile-web-app-status-bar-style"
-      content="black-translucent"
-    />
-    <meta name="mobile-web-app-capable" content="yes" />
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
 
-    <!-- 预连接到常用域名，减少 DNS 查询时间 -->
-    <link rel="dns-prefetch" href="https://idmix.app" />
-    <link rel="preconnect" href="https://idmix.app" crossorigin />
+  <!-- Android WebView 兼容性优化 -->
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+  <meta name="format-detection" content="telephone=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="mobile-web-app-capable" content="yes" />
 
-    <title>IDmix</title>
+  <!-- 预连接到常用域名，减少 DNS 查询时间 -->
+  <link rel="dns-prefetch" href="https://idmix.app" />
+  <link rel="preconnect" href="https://idmix.app" crossorigin />
 
-    <!-- Chunk 加载失败自动重载脚本 -->
-    <script src="/reload-on-chunk-error.js"></script>
+  <title>IDmix</title>
 
-    <!-- 早期错误处理：在扩展脚本加载之前设置，以捕获 WalletConnect 和 TokenPocket 的错误 -->
-    <script>
-      (function () {
-        // 处理未捕获的 Promise rejection
-        window.addEventListener(
-          "unhandledrejection",
-          function (event) {
-            var error = event.reason;
-            var errorMessage =
-              error?.message || error?.toString() || String(error);
-            var errorName = error?.name || "";
+  <!-- Chunk 加载失败自动重载脚本 -->
+  <script src="/reload-on-chunk-error.js"></script>
 
-            // 静默处理 WalletConnect 跨域安全错误
-            if (
-              errorName === "SecurityError" ||
-              errorMessage.includes("SecurityError") ||
-              errorMessage.includes("verify.walletconnect.org") ||
-              errorMessage.includes(
-                "Failed to read a named property 'origin' from 'Location'",
-              ) ||
-              errorMessage.includes("Blocked a frame with origin") ||
-              errorMessage.includes("cross-origin")
-            ) {
-              event.preventDefault();
-              event.stopPropagation();
-              return;
-            }
+  <!-- 早期错误处理：在扩展脚本加载之前设置，以捕获 WalletConnect 和 TokenPocket 的错误 -->
+  <script>
+    (function () {
+      // 处理未捕获的 Promise rejection
+      window.addEventListener(
+        "unhandledrejection",
+        function (event) {
+          var error = event.reason;
+          var errorMessage =
+            error?.message || error?.toString() || String(error);
+          var errorName = error?.name || "";
 
-            // 静默处理 TokenPocket 深度链接错误
-            if (
-              errorMessage.includes("Failed to launch") &&
-              (errorMessage.includes("tpoutside://") ||
-                errorMessage.includes(
-                  "scheme does not have a registered handler",
-                ))
-            ) {
-              event.preventDefault();
-              event.stopPropagation();
-              return;
-            }
-
-            // 静默处理 Google Analytics 连接错误（来自浏览器扩展）
-            if (
-              errorMessage.includes("google-analytics.com") ||
-              errorMessage.includes("Failed to fetch") ||
-              errorMessage.includes("ERR_CONNECTION_CLOSED")
-            ) {
-              event.preventDefault();
-              event.stopPropagation();
-              return;
-            }
-
-            // 静默处理钱包扩展尝试重新定义属性的错误
-            if (
-              errorName === "TypeError" &&
-              (errorMessage.includes("Cannot redefine property") ||
-                errorMessage.includes("Cannot assign to read only property")) &&
-              (errorMessage.includes("ethereum") ||
-                errorMessage.includes("solana") ||
-                errorMessage.includes("tokenpocket") ||
-                errorMessage.includes("tp"))
-            ) {
-              event.preventDefault();
-              event.stopPropagation();
-              return;
-            }
-          },
-          true,
-        );
-
-        // 处理全局错误
-        window.addEventListener(
-          "error",
-          function (event) {
-            var errorMessage = event.message || String(event.error || "");
-            var errorName = event.error?.name || "";
-            var filename = event.filename || "";
-
-            // 静默处理 TokenPocket 扩展尝试设置只读属性的错误
-            if (
-              errorName === "TypeError" &&
-              (errorMessage.includes("Cannot assign to read only property") ||
-                errorMessage.includes("Cannot redefine property")) &&
-              (errorMessage.includes("solana") ||
-                errorMessage.includes("ethereum") ||
-                errorMessage.includes("tokenpocket") ||
-                errorMessage.includes("tp") ||
-                filename.includes("inpage.js"))
-            ) {
-              event.preventDefault();
-              event.stopPropagation();
-              return false;
-            }
-
-            // 静默处理 WalletConnect 跨域安全错误
-            if (
-              errorName === "SecurityError" ||
-              errorMessage.includes("SecurityError") ||
-              errorMessage.includes("verify.walletconnect.org") ||
-              errorMessage.includes(
-                "Failed to read a named property 'origin' from 'Location'",
-              ) ||
-              errorMessage.includes("Blocked a frame with origin") ||
-              errorMessage.includes("cross-origin") ||
-              filename.includes("verify.walletconnect.org")
-            ) {
-              event.preventDefault();
-              event.stopPropagation();
-              return false;
-            }
-
-            // 静默处理 Google Analytics 和其他第三方脚本的网络错误
-            if (
-              errorMessage.includes("google-analytics.com") ||
-              (errorMessage.includes("Failed to fetch") &&
-                filename.includes("contentScript")) ||
-              filename.includes("contentScript.bundle.js")
-            ) {
-              event.preventDefault();
-              event.stopPropagation();
-              return false;
-            }
-          },
-          true,
-        );
-      })();
-    </script>
-  </head>
-  <body>
-    <div
-      id="root"
-      class="no-scrollbar"
-      style="max-height: 100vh; overflow: auto"
-    ></div>
-    <script type="module" src="/src/main.tsx"></script>
-
-    <!-- 版本检测和缓存清除脚本 -->
-    <script>
-      (function () {
-        // 当前版本号（每次部署时更新）
-        var CURRENT_VERSION = "2.0.0"; // 更新这个版本号
-        var VERSION_KEY = "app-version";
-
-        try {
-          var storedVersion = localStorage.getItem(VERSION_KEY);
-
-          // 如果版本不匹配，清除所有缓存
-          if (storedVersion && storedVersion !== CURRENT_VERSION) {
-            console.log(
-              "检测到版本更新: " + storedVersion + " -> " + CURRENT_VERSION,
-            );
-            console.log("清除缓存...");
-
-            // 清除 localStorage
-            localStorage.clear();
-
-            // 清除 sessionStorage
-            sessionStorage.clear();
-
-            // 清除 Service Worker
-            if ("serviceWorker" in navigator) {
-              navigator.serviceWorker.getRegistrations().then(function (regs) {
-                for (var i = 0; i < regs.length; i++) {
-                  regs[i].unregister();
-                }
-              });
-            }
-
-            // 清除所有 cookies（可选）
-            document.cookie.split(";").forEach(function (c) {
-              document.cookie = c
-                .replace(/^ +/, "")
-                .replace(
-                  /=.*/,
-                  "=;expires=" + new Date().toUTCString() + ";path=/",
-                );
-            });
-
-            // 保存新版本号
-            localStorage.setItem(VERSION_KEY, CURRENT_VERSION);
-
-            // 强制刷新页面（不使用缓存）
-            console.log("刷新页面...");
-            setTimeout(function () {
-              window.location.reload(true);
-            }, 500);
-          } else {
-            // 首次访问或版本匹配，保存版本号
-            localStorage.setItem(VERSION_KEY, CURRENT_VERSION);
+          // 静默处理 WalletConnect 跨域安全错误
+          if (
+            errorName === "SecurityError" ||
+            errorMessage.includes("SecurityError") ||
+            errorMessage.includes("verify.walletconnect.org") ||
+            errorMessage.includes(
+              "Failed to read a named property 'origin' from 'Location'",
+            ) ||
+            errorMessage.includes("Blocked a frame with origin") ||
+            errorMessage.includes("cross-origin")
+          ) {
+            event.preventDefault();
+            event.stopPropagation();
+            return;
           }
-        } catch (e) {
-          console.warn("版本检测失败:", e);
+
+          // 静默处理 TokenPocket 深度链接错误
+          if (
+            errorMessage.includes("Failed to launch") &&
+            (errorMessage.includes("tpoutside://") ||
+              errorMessage.includes(
+                "scheme does not have a registered handler",
+              ))
+          ) {
+            event.preventDefault();
+            event.stopPropagation();
+            return;
+          }
+
+          // 静默处理 Google Analytics 连接错误（来自浏览器扩展）
+          if (
+            errorMessage.includes("google-analytics.com") ||
+            errorMessage.includes("Failed to fetch") ||
+            errorMessage.includes("ERR_CONNECTION_CLOSED")
+          ) {
+            event.preventDefault();
+            event.stopPropagation();
+            return;
+          }
+
+          // 静默处理钱包扩展尝试重新定义属性的错误
+          if (
+            errorName === "TypeError" &&
+            (errorMessage.includes("Cannot redefine property") ||
+              errorMessage.includes("Cannot assign to read only property")) &&
+            (errorMessage.includes("ethereum") ||
+              errorMessage.includes("solana") ||
+              errorMessage.includes("tokenpocket") ||
+              errorMessage.includes("tp"))
+          ) {
+            event.preventDefault();
+            event.stopPropagation();
+            return;
+          }
+        },
+        true,
+      );
+
+      // 处理全局错误
+      window.addEventListener(
+        "error",
+        function (event) {
+          var errorMessage = event.message || String(event.error || "");
+          var errorName = event.error?.name || "";
+          var filename = event.filename || "";
+
+          // 静默处理 TokenPocket 扩展尝试设置只读属性的错误
+          if (
+            errorName === "TypeError" &&
+            (errorMessage.includes("Cannot assign to read only property") ||
+              errorMessage.includes("Cannot redefine property")) &&
+            (errorMessage.includes("solana") ||
+              errorMessage.includes("ethereum") ||
+              errorMessage.includes("tokenpocket") ||
+              errorMessage.includes("tp") ||
+              filename.includes("inpage.js"))
+          ) {
+            event.preventDefault();
+            event.stopPropagation();
+            return false;
+          }
+
+          // 静默处理 WalletConnect 跨域安全错误
+          if (
+            errorName === "SecurityError" ||
+            errorMessage.includes("SecurityError") ||
+            errorMessage.includes("verify.walletconnect.org") ||
+            errorMessage.includes(
+              "Failed to read a named property 'origin' from 'Location'",
+            ) ||
+            errorMessage.includes("Blocked a frame with origin") ||
+            errorMessage.includes("cross-origin") ||
+            filename.includes("verify.walletconnect.org")
+          ) {
+            event.preventDefault();
+            event.stopPropagation();
+            return false;
+          }
+
+          // 静默处理 Google Analytics 和其他第三方脚本的网络错误
+          if (
+            errorMessage.includes("google-analytics.com") ||
+            (errorMessage.includes("Failed to fetch") &&
+              filename.includes("contentScript")) ||
+            filename.includes("contentScript.bundle.js")
+          ) {
+            event.preventDefault();
+            event.stopPropagation();
+            return false;
+          }
+        },
+        true,
+      );
+    })();
+  </script>
+</head>
+
+<body>
+  <div id="root" class="no-scrollbar" style="max-height: 100vh; overflow: auto"></div>
+  <script type="module" src="/src/main.tsx"></script>
+
+  <!-- 版本检测和缓存清除脚本 -->
+  <script>
+    (function () {
+      // 当前版本号（每次部署时更新）
+      var CURRENT_VERSION = "2.0.1"; // 更新这个版本号
+      var VERSION_KEY = "app-version";
+
+      try {
+        var storedVersion = localStorage.getItem(VERSION_KEY);
+
+        // 如果版本不匹配，清除所有缓存
+        if (storedVersion && storedVersion !== CURRENT_VERSION) {
+          console.log(
+            "检测到版本更新: " + storedVersion + " -> " + CURRENT_VERSION,
+          );
+          console.log("清除缓存...");
+
+          // 清除 localStorage
+          localStorage.clear();
+
+          // 清除 sessionStorage
+          sessionStorage.clear();
+
+          // 清除 Service Worker
+          if ("serviceWorker" in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function (regs) {
+              for (var i = 0; i < regs.length; i++) {
+                regs[i].unregister();
+              }
+            });
+          }
+
+          // 清除所有 cookies（可选）
+          document.cookie.split(";").forEach(function (c) {
+            document.cookie = c
+              .replace(/^ +/, "")
+              .replace(
+                /=.*/,
+                "=;expires=" + new Date().toUTCString() + ";path=/",
+              );
+          });
+
+          // 保存新版本号
+          localStorage.setItem(VERSION_KEY, CURRENT_VERSION);
+
+          // 强制刷新页面（不使用缓存）
+          console.log("刷新页面...");
+          setTimeout(function () {
+            window.location.reload(true);
+          }, 500);
+        } else {
+          // 首次访问或版本匹配，保存版本号
+          localStorage.setItem(VERSION_KEY, CURRENT_VERSION);
         }
-      })();
-    </script>
-  </body>
+      } catch (e) {
+        console.warn("版本检测失败:", e);
+      }
+    })();
+  </script>
+</body>
+
 </html>
