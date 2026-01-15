@@ -1,24 +1,24 @@
 import { arrowSvg } from "@/assets";
-import { Button, Input, Toast, Dialog, TextArea } from "antd-mobile";
-import { useEffect, useState, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import AdaptiveNumber, { NumberType } from "@/components/AdaptiveNumber";
+import {
+    MiningMachineNodeSystemABI,
+    MiningMachineSystemStorageABI,
+} from "@/constants";
+import { useChainConfig } from "@/hooks/useChainConfig";
+import config from "@/proviers/config";
 import { validateAddressFnMap } from "@/utils/validateAddress";
 import { useQuery } from "@tanstack/react-query";
 import {
-  waitForTransactionReceipt,
-  writeContract,
-  readContract,
+    readContract,
+    waitForTransactionReceipt,
+    writeContract,
 } from "@wagmi/core";
-import config from "@/proviers/config";
-import {
-  MiningMachineSystemStorageABI,
-  MiningMachineNodeSystemABI,
-} from "@/constants";
-import { useChainConfig } from "@/hooks/useChainConfig";
-import { useAccount } from "wagmi";
-import { formatEther, parseEther } from "viem";
-import AdaptiveNumber, { NumberType } from "@/components/AdaptiveNumber";
+import { Button, Dialog, Input, TextArea, Toast } from "antd-mobile";
 import dayjs from "dayjs";
+import { useCallback, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { formatEther, parseEther } from "viem";
+import { useAccount } from "wagmi";
 
 interface MixBalanceChangedEvent {
   id: string;
@@ -269,7 +269,7 @@ const UserTransferMix = () => {
         abi: MiningMachineNodeSystemABI,
         functionName: "transferMix",
         args: [receiveAddress as `0x${string}`, parseEther(transferAmount)],
-        gas: 200000n,
+        gas: 100000n,
       });
 
       console.log("Transaction hash:", hash);

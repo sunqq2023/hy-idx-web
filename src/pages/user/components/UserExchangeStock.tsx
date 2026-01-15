@@ -18,7 +18,7 @@ import dayjs from "dayjs";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { formatEther, parseEther } from "viem";
-import { useAccount, useChainId } from "wagmi";
+import { useAccount } from "wagmi";
 
 interface StockExchangedEvent {
   id: string;
@@ -44,7 +44,6 @@ const SUBGRAPH_URL =
 const UserExchangeStock = () => {
   const { address } = useAccount();
   const chainConfig = useChainConfig();
-  const chainId = useChainId();
   const navigate = useNavigate();
 
   const StockLogicAddress = chainConfig.STOCK_LOGIC_ADDRESS as `0x${string}`;
@@ -416,10 +415,10 @@ const UserExchangeStock = () => {
                     abi: StockSystemLogicABI,
                     functionName: "exchangeMixForStock",
                     args: [parseEther(mixAmount)],
-                    gas: 500000n,
+                    gas: 150000n,
                   });
 
-                  await waitForTransactionReceipt(config, { hash, chainId });
+                  await waitForTransactionReceipt(config, { hash });
 
                   // 立即添加到本地待确认记录（乐观更新）
                   const newRecord: StockExchangedEvent = {
@@ -574,10 +573,10 @@ const UserExchangeStock = () => {
                     abi: StockSystemLogicABI,
                     functionName: "exchangeStockForMix",
                     args: [parseEther(stockAmount)],
-                    gas: 500000n,
+                    gas: 150000n,
                   });
 
-                  await waitForTransactionReceipt(config, { hash, chainId });
+                  await waitForTransactionReceipt(config, { hash });
 
                   // 立即添加到本地待确认记录（乐观更新）
                   const newRecord: StockExchangedEvent = {
@@ -850,10 +849,10 @@ const UserExchangeStock = () => {
                     address: StockLogicAddress,
                     abi: StockSystemLogicABI,
                     functionName: "claimDividend",
-                    gas: 500000n,
+                    gas: 300000n,
                   });
 
-                  await waitForTransactionReceipt(config, { hash, chainId });
+                  await waitForTransactionReceipt(config, { hash });
 
                   // 立即添加到本地待确认记录（乐观更新）
                   const newRecord: DividendClaimedEvent = {
@@ -1071,7 +1070,6 @@ const UserExchangeStock = () => {
                       tempBankCardNumber={tempBankCardNumber}
                       stockStorageAddress={StockStorageAddress}
                       userAddress={address!}
-                      chainId={chainId}
                       onSuccess={() => {
                         // 关闭所有弹窗
                         Modal.clear();
@@ -1502,7 +1500,6 @@ const ConfirmSaveBankInfo: React.FC<{
   tempBankCardNumber: string;
   stockStorageAddress: `0x${string}`;
   userAddress: `0x${string}`;
-  chainId: number;
   onSuccess: () => void;
   onCancel: () => void;
 }> = ({
@@ -1511,7 +1508,6 @@ const ConfirmSaveBankInfo: React.FC<{
   tempBankCardNumber,
   stockStorageAddress,
   userAddress,
-  chainId,
   onSuccess,
   onCancel,
 }) => {
@@ -1526,12 +1522,11 @@ const ConfirmSaveBankInfo: React.FC<{
         abi: StockSystemStorageABI,
         functionName: "setUserBankInfo",
         args: [userAddress, tempBankName, tempBankCardNumber, tempName],
-        gas: 300000n,
+        gas: 200000n,
       });
 
       await waitForTransactionReceipt(config, {
         hash,
-        chainId,
       });
 
       Toast.show({
