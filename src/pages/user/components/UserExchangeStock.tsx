@@ -81,6 +81,25 @@ const UserExchangeStock = () => {
     DividendClaimedEvent[]
   >([]);
 
+  // 过滤输入，只允许数字和小数点
+  const filterNumericInput = (value: string): string => {
+    // 移除所有非数字和非小数点的字符
+    let filtered = value.replace(/[^\d.]/g, "");
+
+    // 确保只有一个小数点
+    const parts = filtered.split(".");
+    if (parts.length > 2) {
+      filtered = parts[0] + "." + parts.slice(1).join("");
+    }
+
+    // 限制小数点后最多2位
+    if (parts.length === 2 && parts[1].length > 2) {
+      filtered = parts[0] + "." + parts[1].slice(0, 2);
+    }
+
+    return filtered;
+  };
+
   // 查询用户 MIX 余额
   const queryMixBalance = useCallback(async () => {
     if (!address) return;
@@ -1121,15 +1140,16 @@ const UserExchangeStock = () => {
           </div>
           <div className="relative">
             <Input
-              type="number"
+              type="text"
               value={exchangeMode === "mixToStock" ? mixAmount : stockAmount}
               onChange={(val) => {
+                const filtered = filterNumericInput(val);
                 if (exchangeMode === "mixToStock") {
-                  setMixAmount(val);
-                  handlePreviewExchange(val, "mixToStock");
+                  setMixAmount(filtered);
+                  handlePreviewExchange(filtered, "mixToStock");
                 } else {
-                  setStockAmount(val);
-                  handlePreviewExchange(val, "stockToMix");
+                  setStockAmount(filtered);
+                  handlePreviewExchange(filtered, "stockToMix");
                 }
               }}
               placeholder={
@@ -1210,15 +1230,16 @@ const UserExchangeStock = () => {
           </div>
           <div className="relative">
             <Input
-              type="number"
+              type="text"
               value={exchangeMode === "mixToStock" ? stockAmount : mixAmount}
               onChange={(val) => {
+                const filtered = filterNumericInput(val);
                 if (exchangeMode === "mixToStock") {
-                  setStockAmount(val);
-                  handlePreviewExchange(val, "stockToMix");
+                  setStockAmount(filtered);
+                  handlePreviewExchange(filtered, "stockToMix");
                 } else {
-                  setMixAmount(val);
-                  handlePreviewExchange(val, "mixToStock");
+                  setMixAmount(filtered);
+                  handlePreviewExchange(filtered, "mixToStock");
                 }
               }}
               placeholder={
@@ -1301,11 +1322,7 @@ const UserExchangeStock = () => {
         {/* 分红累计 */}
         <div className="text-center mb-6">
           <div className="text-[48px] font-bold mb-1">
-            <AdaptiveNumber
-              type={NumberType.BALANCE}
-              value={unclaimedDividend}
-              decimalSubLen={2}
-            />
+            {Number(unclaimedDividend || 0).toFixed(2)}
           </div>
           <div className="text-[14px] text-[#999]">分红累计（元）</div>
         </div>
