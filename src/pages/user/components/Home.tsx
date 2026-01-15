@@ -1,40 +1,40 @@
 import {
-  chainsSvgs,
-  gasSvg,
-  idxBackgroundSvg,
-  selectedSvg,
-  usdtSvg,
+    chainsSvgs,
+    gasSvg,
+    idxBackgroundSvg,
+    selectedSvg,
+    usdtSvg,
 } from "@/assets";
+import AdaptiveNumber, { NumberType } from "@/components/AdaptiveNumber";
+import { BindWalletModal } from "@/components/BindWalletModal";
+import EmptyComp from "@/components/EmptyComp";
+import {
+    MiningMachineNodeSystemABI,
+    MiningMachineProductionLogicABI,
+    MiningMachineSystemLogicExtendABI,
+    MiningMachineSystemStorageABI,
+    MiningMachineSystemStorageExtendABI,
+} from "@/constants";
+import { isAddressBlacklisted } from "@/constants/boundblacklist";
+import { MachineInfo } from "@/constants/types";
+import { useChainConfig } from "@/hooks/useChainConfig";
+import config from "@/proviers/config";
+import { getExplorerUrl } from "@/utils/helper";
+import { sendSignedRequest } from "@/utils/rsaSignature";
+import {
+    getBalance,
+    multicall,
+    readContract,
+    waitForTransactionReceipt,
+} from "@wagmi/core";
 import { Button, Checkbox, Divider, Skeleton, Tabs, Toast } from "antd-mobile";
 import React, { memo, useCallback, useEffect, useRef, useState } from "react";
-import config from "@/proviers/config";
+import { useLocation, useNavigate } from "react-router-dom";
 import { FixedSizeList as List } from "react-window";
-import { useNavigate, useLocation } from "react-router-dom";
+import { erc20Abi, formatEther, formatUnits } from "viem";
+import { useAccount, useChainId, useWriteContract } from "wagmi";
 import styles from "./Home.module.css";
 import UserPageCheckableItem from "./UserPageCheckableItem";
-import { MachineInfo } from "@/constants/types";
-import { useAccount, useWriteContract, useChainId } from "wagmi";
-import {
-  readContract,
-  multicall,
-  getBalance,
-  waitForTransactionReceipt,
-} from "@wagmi/core";
-import { erc20Abi, formatEther, formatUnits, parseGwei } from "viem";
-import AdaptiveNumber, { NumberType } from "@/components/AdaptiveNumber";
-import {
-  MiningMachineProductionLogicABI,
-  MiningMachineSystemStorageABI,
-  MiningMachineSystemStorageExtendABI,
-  MiningMachineSystemLogicExtendABI,
-  MiningMachineNodeSystemABI,
-} from "@/constants";
-import { useChainConfig } from "@/hooks/useChainConfig";
-import EmptyComp from "@/components/EmptyComp";
-import { BindWalletModal } from "@/components/BindWalletModal";
-import { sendSignedRequest } from "@/utils/rsaSignature";
-import { isAddressBlacklisted } from "@/constants/boundblacklist";
-import { getExplorerUrl } from "@/utils/helper";
 
 // 导入调试工具（仅开发环境）
 if (import.meta.env.DEV) {
@@ -1207,12 +1207,7 @@ export const Home = ({
   };
 
   const handleStockExchange = () => {
-    Toast.show({
-      content: "暂未开放",
-      position: "center",
-      duration: 2000,
-    });
-    // navigate("/user/exchangeStock");
+    navigate("/user/exchangeStock");
   };
 
   const handleSyntheticMachine = () => {

@@ -1,25 +1,34 @@
 import {
-  MiningMachineNodeSystemABI,
-  MiningMachineProductionLogicABI,
-  MiningMachineSystemLogicABI,
-  MiningMachineSystemStorageABI,
-  SelluserManagerABI,
-  MiningMachineSystemStorageExtendABI,
-  MiningMachineSystemLogicExtendABI,
+    MiningMachineNodeSystemABI,
+    MiningMachineProductionLogicABI,
+    MiningMachineSystemLogicABI,
+    MiningMachineSystemLogicExtendABI,
+    MiningMachineSystemStorageABI,
+    MiningMachineSystemStorageExtendABI,
+    SelluserManagerABI,
+    StockSystemStorageABI,
 } from "@/constants";
 import { useChainConfig } from "@/hooks/useChainConfig";
-import { validateAddressFnMap } from "@/utils/validateAddress";
-import { Button, Input, TextArea, Toast, Dialog, Checkbox } from "antd-mobile";
-import { useEffect, useState } from "react";
-import { useWriteContract, useAccount } from "wagmi";
-import {
-  waitForTransactionReceipt,
-  multicall,
-  readContract,
-  getBalance,
-} from "@wagmi/core";
 import config from "@/proviers/config";
-import { parseEther, erc20Abi, formatEther, getAddress } from "viem";
+import { validateAddressFnMap } from "@/utils/validateAddress";
+import {
+    getBalance,
+    multicall,
+    readContract,
+    waitForTransactionReceipt,
+} from "@wagmi/core";
+import {
+    Button,
+    Checkbox,
+    Dialog,
+    Input,
+    Picker,
+    TextArea,
+    Toast,
+} from "antd-mobile";
+import { useEffect, useState } from "react";
+import { erc20Abi, formatEther, getAddress, parseEther } from "viem";
+import { useAccount, useWriteContract } from "wagmi";
 
 const Setting = () => {
   const { address: currentWalletAddress, chainId: walletChainId } =
@@ -42,6 +51,10 @@ const Setting = () => {
   const MiningMachineSystemLogicExtendAddress =
     chainConfig.EXTEND_LOGIC_ADDRESS as `0x${string}`;
   const IDX_CONTRACTS_ADDRESS = chainConfig.IDX_TOKEN as `0x${string}`;
+  const StockSystemStorageAddress =
+    chainConfig.STOCK_STORAGE_ADDRESS as `0x${string}`;
+  const StockSystemLogicAddress =
+    chainConfig.STOCK_LOGIC_ADDRESS as `0x${string}`;
 
   /* ===== 新增：本地登录态 ===== */
   const [passed, setPassed] = useState(false); // 是否已通过
@@ -128,6 +141,12 @@ const Setting = () => {
   const [studioMarkerAddress, setStudioMarkerAddress] = useState("");
   const [studioMarkerLoading, setStudioMarkerLoading] = useState(false);
 
+  // 升级后授权相关状态
+  const [isAuthorizingStockLogic, setIsAuthorizingStockLogic] = useState(false);
+  const [isAuthorizingNodeSystem, setIsAuthorizingNodeSystem] = useState(false);
+  const [isSettingNodeAddress, setIsSettingNodeAddress] = useState(false);
+  const [isSettingLogicAddresses, setIsSettingLogicAddresses] = useState(false);
+
   // 奖励池管理相关状态
   const [addIdxAmount, setAddIdxAmount] = useState(""); // 往奖励池增加IDX数量
   const [withdrawIdxAmount, setWithdrawIdxAmount] = useState(""); // 从奖励池提取IDX数量
@@ -166,6 +185,30 @@ const Setting = () => {
     useState<boolean | null>(null); // 激活奖励开关状态
   const [isLoadingRewardsEnabled, setIsLoadingRewardsEnabled] = useState(false); // 加载开关状态
   const [isSettingRewardsEnabled, setIsSettingRewardsEnabled] = useState(false); // 设置开关中状态
+
+  // 股权兑换配置相关状态
+  const [companyMarketValue, setCompanyMarketValue] = useState(""); // 当前公司市值
+  const [totalStockIssued, setTotalStockIssued] = useState(""); // 公司发行股份数
+  const [mixPrice, setMixPrice] = useState(""); // MIX价格
+  const [dividendYear, setDividendYear] = useState(() => {
+    const now = new Date();
+    return String(now.getFullYear());
+  }); // 分红年份
+  const [dividendMonth, setDividendMonth] = useState(() => {
+    const now = new Date();
+    return String(now.getMonth() + 1);
+  }); // 分红月份
+  const [dividendAmount, setDividendAmount] = useState("0"); // 本月分红金额
+  const [yearPickerVisible, setYearPickerVisible] = useState(false); // 年份选择器可见性
+  const [monthPickerVisible, setMonthPickerVisible] = useState(false); // 月份选择器可见性
+  const [mixHoldingRatio, setMixHoldingRatio] = useState("0"); // MIX持股当月总占比
+  const [isSettingMarketValue, setIsSettingMarketValue] = useState(false); // 设置市值中状态
+  const [isSettingStockIssued, setIsSettingStockIssued] = useState(false); // 设置股份数中状态
+  const [isSettingMixPrice, setIsSettingMixPrice] = useState(false); // 设置MIX价格中状态
+  const [isSettingDividend, setIsSettingDividend] = useState(false); // 设置分红中状态
+  const [currentMarketValue, setCurrentMarketValue] = useState("0"); // 当前链上市值
+  const [currentStockIssued, setCurrentStockIssued] = useState("0"); // 当前链上股份数
+  const [currentMixPrice, setCurrentMixPrice] = useState("0"); // 当前链上MIX价格
 
   const handleModifyAdmin = async () => {
     const isValid = validateAddressFnMap?.["EVM"]?.(adminAddress);
@@ -696,12 +739,430 @@ const Setting = () => {
     }
   };
 
+  // ===== 股权兑换配置相关函数 =====
+
+  // 查询股权系统配置
+  // 查询股权系统配置
+  const fetchStockSystemConfig = async () => {
+    try {
+      const contracts = [
+        {
+          address: StockSystemStorageAddress,
+          abi: StockSystemStorageABI,
+          functionName: "totalMarketValue",
+          args: [],
+        },
+        {
+          address: StockSystemStorageAddress,
+          abi: StockSystemStorageABI,
+          functionName: "totalStockIssued",
+          args: [],
+        },
+        {
+          address: StockSystemStorageAddress,
+          abi: StockSystemStorageABI,
+          functionName: "mixValue",
+          args: [],
+        },
+      ];
+
+      const res = await multicall(config, {
+        contracts,
+      });
+
+      const marketValue = formatEther(res[0].result as bigint);
+      const stockIssued = formatEther(res[1].result as bigint);
+      const mixPriceValue = formatEther(res[2].result as bigint);
+
+      setCurrentMarketValue(marketValue);
+      setCurrentStockIssued(stockIssued);
+      setCurrentMixPrice(mixPriceValue);
+
+      // 设置输入框的默认值为链上的当前值
+      setCompanyMarketValue(marketValue);
+      setTotalStockIssued(stockIssued);
+      setMixPrice(mixPriceValue);
+    } catch (error) {
+      console.error("获取股权系统配置失败:", error);
+    }
+  };
+
+  // 同时设置市值和股份数（合约只提供批量设置函数）
+  const handleSetMarketValueAndStock = async () => {
+    // 验证输入 - 两个值都必须填写
+    if (!companyMarketValue || !totalStockIssued) {
+      Toast.show({
+        content: "请同时输入公司市值和发行股份数",
+        position: "center",
+        duration: 2000,
+      });
+      return;
+    }
+
+    if (+companyMarketValue <= 0) {
+      Toast.show({
+        content: "公司市值必须大于0",
+        position: "center",
+        duration: 2000,
+      });
+      return;
+    }
+
+    if (+totalStockIssued <= 0) {
+      Toast.show({
+        content: "股份数必须大于0",
+        position: "center",
+        duration: 2000,
+      });
+      return;
+    }
+
+    try {
+      setIsSettingMarketValue(true);
+      setIsSettingStockIssued(true);
+
+      const hash = await writeContractAsync({
+        address: StockSystemStorageAddress,
+        abi: StockSystemStorageABI,
+        functionName: "setTotalMarketValueAndStockIssued",
+        args: [parseEther(companyMarketValue), parseEther(totalStockIssued)],
+        gas: 400000n,
+        chainId: walletChainId,
+      });
+
+      await waitForTransactionReceipt(config, {
+        hash,
+        chainId: walletChainId,
+      });
+      Toast.show({
+        content: "设置成功",
+        position: "center",
+      });
+
+      // 刷新配置（会自动更新输入框的值为新的链上值）
+      fetchStockSystemConfig();
+    } catch (error) {
+      Toast.show({
+        content: "设置失败",
+        position: "center",
+      });
+      console.error("设置失败:", error);
+    } finally {
+      setIsSettingMarketValue(false);
+      setIsSettingStockIssued(false);
+    }
+  };
+
+  // 设置MIX价格
+  const handleSetMixPrice = async () => {
+    if (!mixPrice || +mixPrice <= 0) {
+      Toast.show({
+        content: "请输入有效的MIX价格",
+        position: "center",
+        duration: 2000,
+      });
+      return;
+    }
+
+    try {
+      setIsSettingMixPrice(true);
+      const hash = await writeContractAsync({
+        address: StockSystemStorageAddress,
+        abi: StockSystemStorageABI,
+        functionName: "setMixValue",
+        args: [parseEther(mixPrice)],
+        gas: 400000n,
+        chainId: walletChainId,
+      });
+
+      await waitForTransactionReceipt(config, {
+        hash,
+        chainId: walletChainId,
+      });
+      Toast.show({
+        content: "设置MIX价格成功",
+        position: "center",
+      });
+      // 刷新配置（会自动更新输入框的值为新的链上值）
+      fetchStockSystemConfig();
+    } catch (error) {
+      Toast.show({
+        content: "设置失败",
+        position: "center",
+      });
+      console.error("设置MIX价格失败:", error);
+    } finally {
+      setIsSettingMixPrice(false);
+    }
+  };
+
+  // 设置分红
+  const handleSetDividend = async () => {
+    if (!dividendYear || !dividendMonth || dividendAmount === "") {
+      Toast.show({
+        content: "请填写完整的分红信息",
+        position: "center",
+        duration: 2000,
+      });
+      return;
+    }
+
+    if (+dividendAmount <= 0) {
+      Toast.show({
+        content: "分红金额必须大于0",
+        position: "center",
+        duration: 2000,
+      });
+      return;
+    }
+
+    try {
+      setIsSettingDividend(true);
+
+      // 将年份和月份组合成 YYYYMM 格式（如 202601）
+      const monthValue = BigInt(dividendYear) * 100n + BigInt(dividendMonth);
+
+      const hash = await writeContractAsync({
+        address: StockSystemStorageAddress,
+        abi: StockSystemStorageABI,
+        functionName: "addMonthlyDividend",
+        args: [monthValue, parseEther(dividendAmount)],
+        gas: 400000n,
+        chainId: walletChainId,
+      });
+
+      await waitForTransactionReceipt(config, {
+        hash,
+        chainId: walletChainId,
+      });
+      Toast.show({
+        content: "设置分红成功",
+        position: "center",
+      });
+      // 不清空输入框，保持当前值
+    } catch (error) {
+      Toast.show({
+        content: "设置失败",
+        position: "center",
+      });
+      console.error("设置分红失败:", error);
+    } finally {
+      setIsSettingDividend(false);
+    }
+  };
+
+  // 计算MIX持股占比
+  const calculateMixHoldingRatio = async () => {
+    try {
+      const mixValue = await readContract(config, {
+        address: StockSystemStorageAddress,
+        abi: StockSystemStorageABI,
+        functionName: "mixValue",
+        args: [],
+      });
+
+      const totalMarketValue = await readContract(config, {
+        address: StockSystemStorageAddress,
+        abi: StockSystemStorageABI,
+        functionName: "totalMarketValue",
+        args: [],
+      });
+
+      if (totalMarketValue && BigInt(totalMarketValue as bigint) > 0n) {
+        const mixValueNum = Number(formatEther(mixValue as bigint));
+        const totalMarketValueNum = Number(
+          formatEther(totalMarketValue as bigint),
+        );
+        const ratio = (mixValueNum / totalMarketValueNum) * 100;
+
+        // 打印原值用于调试
+        console.log("MIX持股占比计算:", {
+          mixValue: mixValueNum,
+          totalMarketValue: totalMarketValueNum,
+          ratio: ratio,
+          ratioFormatted: ratio.toFixed(2),
+        });
+
+        setMixHoldingRatio(ratio.toFixed(2));
+      } else {
+        setMixHoldingRatio("0");
+      }
+    } catch (error) {
+      console.error("计算MIX持股占比失败:", error);
+      setMixHoldingRatio("0");
+    }
+  };
+
+  // 当分红信息变化时，重新计算占比
+  useEffect(() => {
+    if (dividendYear && dividendMonth && dividendAmount) {
+      calculateMixHoldingRatio();
+    }
+  }, [dividendYear, dividendMonth, dividendAmount]);
+
+  // 千分位格式化函数
+  const formatNumberWithCommas = (value: string | number): string => {
+    if (!value) return "0";
+    const num = typeof value === "string" ? parseFloat(value) : value;
+    if (isNaN(num)) return "0";
+    return num.toLocaleString("en-US", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    });
+  };
+
+  // ===== 升级后授权相关函数 =====
+
+  // 1. 授权 StockLogic 访问 StockStorage
+  const handleAuthorizeStockStorage = async () => {
+    try {
+      setIsAuthorizingStockLogic(true);
+
+      // 授权 StockLogic 访问 StockStorage
+      const hash = await writeContractAsync({
+        address: StockSystemStorageAddress,
+        abi: StockSystemStorageABI,
+        functionName: "setAuthorizedContract",
+        args: [StockSystemLogicAddress, true],
+        gas: 400000n,
+        chainId: walletChainId,
+      });
+
+      await waitForTransactionReceipt(config, {
+        hash,
+        chainId: walletChainId,
+      });
+
+      Toast.show({
+        content: "StockStorage 授权成功",
+        position: "center",
+      });
+    } catch (error) {
+      Toast.show({
+        content: "授权失败",
+        position: "center",
+      });
+      console.error("授权 StockStorage 失败:", error);
+    } finally {
+      setIsAuthorizingStockLogic(false);
+    }
+  };
+
+  // 2. 授权 StockLogic 访问 NodeSystem
+  const handleAuthorizeNodeSystem = async () => {
+    try {
+      setIsAuthorizingNodeSystem(true);
+
+      // 授权 StockLogic 访问 NodeSystem
+      const hash = await writeContractAsync({
+        address: MiningMachineNodeSystemAddress,
+        abi: MiningMachineNodeSystemABI,
+        functionName: "setAuthorizedContract",
+        args: [StockSystemLogicAddress, true],
+        gas: 400000n,
+        chainId: walletChainId,
+      });
+
+      await waitForTransactionReceipt(config, {
+        hash,
+        chainId: walletChainId,
+      });
+
+      Toast.show({
+        content: "NodeSystem 授权成功",
+        position: "center",
+      });
+    } catch (error) {
+      Toast.show({
+        content: "授权失败",
+        position: "center",
+      });
+      console.error("授权 NodeSystem 失败:", error);
+    } finally {
+      setIsAuthorizingNodeSystem(false);
+    }
+  };
+
+  // 3. 设置 NodeSystem 地址到 ProductionLogic
+  const handleSetNodeAddressToProduction = async () => {
+    try {
+      setIsSettingNodeAddress(true);
+
+      // AddressType.NodeContract 的值是 2
+      const hash = await writeContractAsync({
+        address: MiningMachineProductionLogicAddress,
+        abi: MiningMachineProductionLogicABI,
+        functionName: "setCriticalAddress",
+        args: [2, MiningMachineNodeSystemAddress], // 2 = AddressType.NodeContract
+        gas: 400000n,
+        chainId: walletChainId,
+      });
+
+      await waitForTransactionReceipt(config, {
+        hash,
+        chainId: walletChainId,
+      });
+
+      Toast.show({
+        content: "设置 NodeSystem 地址成功",
+        position: "center",
+      });
+    } catch (error) {
+      Toast.show({
+        content: "设置失败",
+        position: "center",
+      });
+      console.error("设置 NodeSystem 地址失败:", error);
+    } finally {
+      setIsSettingNodeAddress(false);
+    }
+  };
+
+  // 4. 设置多个 Logic 地址到 Storage
+  const handleSetLogicAddresses = async () => {
+    try {
+      setIsSettingLogicAddresses(true);
+
+      const hash = await writeContractAsync({
+        address: MiningMachineSystemStorageAddress,
+        abi: MiningMachineSystemStorageABI,
+        functionName: "setLogicAddress",
+        args: [
+          MiningMachineSystemLogicAddress,
+          MiningMachineProductionLogicAddress,
+          MiningMachineNodeSystemAddress,
+        ],
+        gas: 400000n,
+        chainId: walletChainId,
+      });
+
+      await waitForTransactionReceipt(config, {
+        hash,
+        chainId: walletChainId,
+      });
+
+      Toast.show({
+        content: "设置 Logic 地址成功",
+        position: "center",
+      });
+    } catch (error) {
+      Toast.show({
+        content: "设置失败",
+        position: "center",
+      });
+      console.error("设置 Logic 地址失败:", error);
+    } finally {
+      setIsSettingLogicAddresses(false);
+    }
+  };
+
   useEffect(() => {
     queryActiveAndGasFee();
     fetchRewardPoolBalance();
     fetchOperatorMixBalance();
     queryPowerLimits();
     fetchActiveMachineRewardsEnabled();
+    fetchStockSystemConfig();
   }, []);
 
   const handleChangeMachineProduct = async () => {
@@ -2356,7 +2817,7 @@ const Setting = () => {
 
           {/* ===== LogicExtend 升级管理 ===== */}
 
-          {/* 激活奖励开关（放在最前面） */}
+          {/* 激活奖励开关 */}
           <div className="bg-white p-3 rounded-2xl mt-2 flex flex-col gap-1">
             <h2 className="mb-2 font-bold">激活矿机奖励开关</h2>
             <div className="mb-2 p-2 bg-[#f3f3f3] rounded-xl">
@@ -2390,6 +2851,267 @@ const Setting = () => {
             >
               {activeMachineRewardsEnabled ? "关闭奖励" : "开启奖励"}
             </Button>
+          </div>
+
+          {/* 股权兑换配置 */}
+          <div className="bg-white p-3 rounded-2xl mt-2 flex flex-col gap-1">
+            <h2 className="mb-2 font-bold">MIX股权兑换配置</h2>
+
+            {/* 显示当前市值 */}
+            <div className="mb-2">
+              <div className="text-[13px] text-gray-600 mb-1">
+                当前公司市值: {formatNumberWithCommas(currentMarketValue)} 元
+              </div>
+              <Input
+                placeholder="输入新的公司市值"
+                style={{
+                  "--font-size": "13px",
+                }}
+                className="!bg-[#f3f3f3] rounded-3xl px-4 py-2 !flex !items-center !justify-center"
+                value={companyMarketValue}
+                type="number"
+                onChange={(val) => setCompanyMarketValue(val)}
+              />
+            </div>
+
+            {/* 显示当前股份数 */}
+            <div className="mb-2">
+              <div className="text-[13px] text-gray-600 mb-1">
+                公司发行股份数: {formatNumberWithCommas(currentStockIssued)} 股
+              </div>
+              <Input
+                placeholder="输入新的发行股份数"
+                style={{
+                  "--font-size": "13px",
+                }}
+                className="!bg-[#f3f3f3] rounded-3xl px-4 py-2 !flex !items-center !justify-center"
+                value={totalStockIssued}
+                type="number"
+                onChange={(val) => setTotalStockIssued(val)}
+              />
+            </div>
+
+            <Button
+              className="!bg-black !text-white !rounded-3xl !py-1 !w-full"
+              style={{
+                fontSize: "13px",
+              }}
+              loading={isSettingMarketValue || isSettingStockIssued}
+              onClick={handleSetMarketValueAndStock}
+            >
+              保存设置
+            </Button>
+          </div>
+
+          <div className="bg-white p-3 rounded-2xl mt-2 flex flex-col gap-1">
+            <div className="flex justify-between items-center mb-2">
+              <h2 className="font-bold">MIX价格设置</h2>
+              <span className="text-[13px] text-gray-600">
+                当前: {currentMixPrice} 元/MIX
+              </span>
+            </div>
+
+            <Input
+              placeholder="输入新的MIX价格"
+              style={{
+                "--font-size": "13px",
+              }}
+              className="!bg-[#f3f3f3] rounded-3xl px-4 py-2 !flex !items-center !justify-center mb-2"
+              value={mixPrice}
+              type="number"
+              onChange={(val) => setMixPrice(val)}
+            />
+            <Button
+              className="!bg-black !text-white !rounded-3xl !py-1 !w-full"
+              style={{
+                fontSize: "13px",
+              }}
+              loading={isSettingMixPrice}
+              onClick={handleSetMixPrice}
+            >
+              设置MIX价格
+            </Button>
+          </div>
+
+          {/* 公司红利分红配置 */}
+          <div className="bg-white p-3 rounded-2xl mt-2 flex flex-col gap-1">
+            <h2 className="mb-2 font-bold">公司红利分红配置</h2>
+
+            <div className="flex gap-2 mb-2">
+              <div className="flex-1">
+                <div className="text-[13px] text-gray-600 mb-1">选择年份</div>
+                <div
+                  onClick={() => setYearPickerVisible(true)}
+                  className="bg-[#f3f3f3] rounded-3xl px-4 py-2 flex items-center justify-center text-center cursor-pointer"
+                  style={{ fontSize: "13px", minHeight: "40px" }}
+                >
+                  {dividendYear}
+                </div>
+                <Picker
+                  columns={[
+                    Array.from({ length: 25 }, (_, i) => ({
+                      label: String(2026 + i),
+                      value: String(2026 + i),
+                    })),
+                  ]}
+                  visible={yearPickerVisible}
+                  onClose={() => setYearPickerVisible(false)}
+                  value={[dividendYear]}
+                  onConfirm={(value) => {
+                    setDividendYear(value[0] as string);
+                  }}
+                />
+              </div>
+              <div className="flex-1">
+                <div className="text-[13px] text-gray-600 mb-1">选择月份</div>
+                <div
+                  onClick={() => setMonthPickerVisible(true)}
+                  className="bg-[#f3f3f3] rounded-3xl px-4 py-2 flex items-center justify-center text-center cursor-pointer"
+                  style={{ fontSize: "13px", minHeight: "40px" }}
+                >
+                  {dividendMonth}
+                </div>
+                <Picker
+                  columns={[
+                    Array.from({ length: 12 }, (_, i) => ({
+                      label: String(i + 1),
+                      value: String(i + 1),
+                    })),
+                  ]}
+                  visible={monthPickerVisible}
+                  onClose={() => setMonthPickerVisible(false)}
+                  value={[dividendMonth]}
+                  onConfirm={(value) => {
+                    setDividendMonth(value[0] as string);
+                  }}
+                />
+              </div>
+            </div>
+
+            <div className="mb-2">
+              <div className="text-[13px] text-gray-600 mb-1">本月分红</div>
+              <Input
+                placeholder="输入该月分红金额"
+                style={{
+                  "--font-size": "13px",
+                }}
+                className="!bg-[#f3f3f3] rounded-3xl px-4 py-2 !flex !items-center !justify-center"
+                value={dividendAmount}
+                type="number"
+                onChange={(val) => setDividendAmount(val)}
+              />
+            </div>
+
+            <Button
+              className="!bg-black !text-white !rounded-3xl !py-1 !w-full mb-2"
+              style={{
+                fontSize: "13px",
+              }}
+              loading={isSettingDividend}
+              onClick={handleSetDividend}
+            >
+              保存设置
+            </Button>
+
+            {/* 显示MIX持股占比 */}
+            <div className="text-center py-2">
+              <span className="text-[13px] text-gray-600">MIX持股总占比:</span>
+              <span className="text-[14px] font-bold text-[#895EFE] ml-1">
+                {mixHoldingRatio}%
+              </span>
+            </div>
+          </div>
+
+          {/* ===== LogicExtend 升级管理 ===== */}
+
+          {/* 升级后授权功能 */}
+          <div className="bg-white p-3 rounded-2xl mt-2 flex flex-col gap-1">
+            <h2 className="mb-2 font-bold">🔧 升级后授权配置</h2>
+            <div className="text-[12px] text-gray-600 mb-2">
+              升级合约后需要执行以下授权操作，确保新合约正常工作
+            </div>
+
+            {/* 授权 StockLogic 访问 StockStorage */}
+            <div className="mb-2">
+              <div className="text-[13px] font-semibold mb-1">
+                1. 授权 StockLogic 访问 StockStorage
+              </div>
+              <div className="text-[12px] text-gray-500 mb-2">
+                stockStorage.setAuthorizedContract(address(stockLogic), true)
+              </div>
+              <Button
+                className="!bg-[#895EFE] !text-white !rounded-3xl !py-1 !w-full"
+                style={{
+                  fontSize: "13px",
+                }}
+                loading={isAuthorizingStockLogic}
+                onClick={handleAuthorizeStockStorage}
+              >
+                执行授权
+              </Button>
+            </div>
+
+            {/* 授权 StockLogic 访问 NodeSystem */}
+            <div className="mb-2">
+              <div className="text-[13px] font-semibold mb-1">
+                2. 授权 StockLogic 访问 NodeSystem
+              </div>
+              <div className="text-[12px] text-gray-500 mb-2">
+                nodeSystem.setAuthorizedContract(address(stockLogic), true)
+              </div>
+              <Button
+                className="!bg-[#895EFE] !text-white !rounded-3xl !py-1 !w-full"
+                style={{
+                  fontSize: "13px",
+                }}
+                loading={isAuthorizingNodeSystem}
+                onClick={handleAuthorizeNodeSystem}
+              >
+                执行授权
+              </Button>
+            </div>
+
+            {/* 设置 NodeSystem 地址 */}
+            <div className="mb-2">
+              <div className="text-[13px] font-semibold mb-1">
+                3. 设置 NodeSystem 地址
+              </div>
+              <div className="text-[12px] text-gray-500 mb-2">
+                productionLogic.setCriticalAddress(AddressType.NodeContract,
+                address(nodeSystem))
+              </div>
+              <Button
+                className="!bg-[#895EFE] !text-white !rounded-3xl !py-1 !w-full"
+                style={{
+                  fontSize: "13px",
+                }}
+                loading={isSettingNodeAddress}
+                onClick={handleSetNodeAddressToProduction}
+              >
+                设置地址
+              </Button>
+            </div>
+
+            {/* 设置 Logic 地址 */}
+            <div className="mb-2">
+              <div className="text-[13px] font-semibold mb-1">
+                4. 设置 Logic 地址
+              </div>
+              <div className="text-[12px] text-gray-500 mb-2">
+                store.setLogicAddress(logicAddress, productionLogicAddress,
+                address(nodeSystem))
+              </div>
+              <Button
+                className="!bg-[#895EFE] !text-white !rounded-3xl !py-1 !w-full"
+                style={{
+                  fontSize: "13px",
+                }}
+                loading={isSettingLogicAddresses}
+                onClick={handleSetLogicAddresses}
+              >
+                设置地址
+              </Button>
+            </div>
           </div>
         </div>
       )}

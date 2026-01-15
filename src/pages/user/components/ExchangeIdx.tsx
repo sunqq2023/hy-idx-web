@@ -1,28 +1,27 @@
 import { arrowSvg, blackExchangeSvg, whiteExchangeSvg } from "@/assets";
 import AdaptiveNumber, { NumberType } from "@/components/AdaptiveNumber";
+import EmptyComp from "@/components/EmptyComp";
 import {
   MiningMachineProductionLogicABI,
   MiningMachineSystemLogicABI,
   MiningMachineSystemStorageABI,
 } from "@/constants";
 import { useChainConfig } from "@/hooks/useChainConfig";
-import { useChainId, useAccount } from "wagmi";
-import { MachineInfo } from "@/constants/types";
 import { useSequentialContractWrite } from "@/hooks/useSequentialContractWrite";
+import config from "@/proviers/config";
+import { formatTime } from "@/utils/helper";
+import {
+  multicall,
+  readContract,
+  waitForTransactionReceipt,
+  writeContract,
+} from "@wagmi/core";
 import { Button, Divider, Modal, ProgressBar, Toast } from "antd-mobile";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FixedSizeList as List } from "react-window";
-import { formatEther, parseEther, parseGwei, TransactionReceipt } from "viem";
-import config from "@/proviers/config";
-import {
-  readContract,
-  writeContract,
-  waitForTransactionReceipt,
-  multicall,
-} from "@wagmi/core";
-import { formatTime } from "@/utils/helper";
-import EmptyComp from "@/components/EmptyComp";
+import { formatEther, TransactionReceipt } from "viem";
+import { useAccount, useChainId } from "wagmi";
 
 interface IReleaseInfo {
   //  锁仓 IDX 总数量。
@@ -247,14 +246,15 @@ const ExchangeIdx = () => {
           ) {
             errorMessage = "兑换失败：合约IDX余额不足，请联系管理员";
           } else if (errorMsg.includes("gas") || errorMsg.includes("Gas")) {
-            errorMessage = "Gas估算失败，可能是合约状态不允许兑换";
+            // Gas估算失败通常是因为合约余额不足导致交易会失败
+            errorMessage = "兑换失败：合约IDX余额不足，请联系管理员";
           } else if (errorMsg.includes("execution reverted")) {
             // 提取revert原因
             const revertMatch = errorMsg.match(/execution reverted: (.+)/);
             if (revertMatch) {
               errorMessage = `兑换失败: ${revertMatch[1]}`;
             } else {
-              errorMessage = "兑换失败：合约执行被回退，请检查余额和权限";
+              errorMessage = "兑换失败：合约执行被回退，可能是合约余额不足";
             }
           } else {
             errorMessage = `兑换失败: ${errorMsg}`;
@@ -372,7 +372,9 @@ const ExchangeIdx = () => {
             icon: "loading",
           });
 
-          console.log(`✅ 第 ${callIndex + 1}/${totalReleases} 个 IDX 领取成功`);
+          console.log(
+            `✅ 第 ${callIndex + 1}/${totalReleases} 个 IDX 领取成功`,
+          );
         },
       }));
 

@@ -32,8 +32,15 @@ const UserMixBill = lazy(() => import("@/pages/user/components/MixBill"));
 const UserExchangeIdx = lazy(
   () => import("@/pages/user/components/ExchangeIdx"),
 );
-const UserTransferMix = lazy(() => import("@/pages/user/components/UserTransferMix"));
-const UserExchangeStock = lazy(() => import("@/pages/user/components/UserExchangeStock"));
+const UserTransferMix = lazy(
+  () => import("@/pages/user/components/UserTransferMix"),
+);
+const UserExchangeStock = lazy(
+  () => import("@/pages/user/components/UserExchangeStock"),
+);
+const UserClaimDividend = lazy(
+  () => import("@/pages/user/components/ClaimDividend"),
+);
 const UserOrders = lazy(() => import("@/pages/user/components/MyOrders"));
 const UserPublishMachineTx = lazy(
   () => import("@/pages/user/components/MyPublishMachineTx"),
@@ -164,6 +171,11 @@ const routes: RouteConfig[] = [
       {
         path: "/user/exchangeStock",
         element: <UserExchangeStock />,
+        auth: true,
+      },
+      {
+        path: "/user/claimDividend",
+        element: <UserClaimDividend />,
         auth: true,
       },
       {

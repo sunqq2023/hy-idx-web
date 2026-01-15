@@ -15,15 +15,17 @@
  */
 export const MIX_API_KEY = "5rLeqyHtwwMzZ1CD4YlXBg/qSfKDbrpDCNkAvS186F4=";
 
-import MiningMachineSystemStorageABI from "./MiningMachineSystemStorage";
-import MiningMachineSystemLogicABI from "./MiningMachineSystemLogic";
-import MiningMachineProductionLogicABI from "./MiningMachineProductionLogic";
 import MiningMachineHistoryABI from "./MiningMachineHistory";
-import MiningMachineNodeSystemABI from "./MiningMachineNodeSystem";
-import SelluserManagerABI from "./user";
-import MiningMachineSystemStorageExtendABI from "./MiningMachineSystemStorageExtend";
-import MiningMachineSystemLogicExtendABI from "./MiningMachineSystemLogicExtend";
 import MiningMachineHistoryExtendABI from "./MiningMachineHistoryExtend";
+import { MiningMachineNodeSystemABI } from "./MiningMachineNodeSystem";
+import MiningMachineProductionLogicABI from "./MiningMachineProductionLogic";
+import MiningMachineSystemLogicABI from "./MiningMachineSystemLogic";
+import MiningMachineSystemLogicExtendABI from "./MiningMachineSystemLogicExtend";
+import MiningMachineSystemStorageABI from "./MiningMachineSystemStorage";
+import MiningMachineSystemStorageExtendABI from "./MiningMachineSystemStorageExtend";
+import { StockSystemLogicABI } from "./StockSystemLogic";
+import { StockSystemStorageABI } from "./StockSystemStorage";
+import SelluserManagerABI from "./user";
 
 export interface ChainContractAddresses {
   // Token Addresses
@@ -49,6 +51,10 @@ export interface ChainContractAddresses {
   // Mix Operator
   MIX_OPERATOR_ADDRESS: string;
 
+  // Stock
+  STOCK_STORAGE_ADDRESS: string;
+  STOCK_LOGIC_ADDRESS: string;
+
   // App Configuration
   ALLOWANCE_QUOTA: string;
   RPC_URL?: string;
@@ -57,7 +63,7 @@ export interface ChainContractAddresses {
 
 // ==================== 四种配置 ====================
 
-// 1. BSC 主网配置 (Chain ID: 56, 已升级 - 2025-12-26)
+// 1. BSC 主网配置 (Chain ID: 56, 已升级 - 2025-01-15)
 const BSC_MAINNET_CONFIG: ChainContractAddresses = {
   IDX_TOKEN: "0xc98F60B3F98E8Bf860436746db637e13B0e17458",
   USDT_TOKEN: "0x55d398326f99059fF775485246999027B3197955",
@@ -65,12 +71,14 @@ const BSC_MAINNET_CONFIG: ChainContractAddresses = {
   LOGIC_ADDRESS: "0x895e8B68D93b2cD5fF4F2bf22cCb3697235C7AfD",
   PRODUCTION_LOGIC_ADDRESS: "0x90531429c182707190de682Ed345e3577D44C3d6",
   HISTORY_ADDRESS: "0x367f5FaE08dC307B3Ac8A9A7AA26AC3005C6B51f",
-  NODE_SYSTEM_ADDRESS: "0x065010ad76a285a0618fd45668c4973fea363a14", // ✅ 升级后新地址
+  NODE_SYSTEM_ADDRESS: "0xe04b049185bC002209ACEeDd51F8799A7b2deA54",
   EXTEND_STORAGE_ADDRESS: "0xdc567714763206341aC1d90C0d2fc58c57739412",
-  EXTEND_LOGIC_ADDRESS: "0x2bB0DaD447Db767dA7693DB9562A65CcdCD25948", // ✅ 升级后新地址
+  EXTEND_LOGIC_ADDRESS: "0x2bB0DaD447Db767dA7693DB9562A65CcdCD25948",
   EXTEND_HISTORY_ADDRESS: "0x6e426AFED0cF32d6E00b29c791199441658E4f73",
   SELLUSER_MANAGER_ADDRESS: "0x8e10b9ba4c78fe8d6a2ecf3fa6307f5e6c1ceebe",
   MIX_OPERATOR_ADDRESS: "0x1cea1dc56Be6ab13Ad590Ff367c3Af375DA98A7d",
+  STOCK_STORAGE_ADDRESS: "0xC453A5189C7023E6119ACa59382f09Ea4334D1d4",
+  STOCK_LOGIC_ADDRESS: "0x52c5B9c15bFbA0AE92537dd1F6E7fd5e0aB57385",
   ALLOWANCE_QUOTA: "10000000",
   RPC_URL: "https://bsc.publicnode.com",
   BIND_ADDRESS_URL: "https://www.ihealth.vip/app",
@@ -85,12 +93,14 @@ const BSC_TESTNET_CONFIG: ChainContractAddresses = {
   LOGIC_ADDRESS: "0xbD1f0Fb5aaDc22201d1d3e7bb5F66D6a75C9E567",
   PRODUCTION_LOGIC_ADDRESS: "0x288F6339FA31bda1A02fA07ef572f241B2f8f579",
   HISTORY_ADDRESS: "0xf97dcCf449941c6FB255e12B72E27c9ceEd165AE",
-  NODE_SYSTEM_ADDRESS: "0x122bf7E0613763E45cadf6045004845BF4e95985",
+  NODE_SYSTEM_ADDRESS: "0xc23c2986d80eb230af2b7fb4a79b77c728236898",
   EXTEND_STORAGE_ADDRESS: "0x065010AD76A285A0618fd45668c4973fEa363A14",
   EXTEND_LOGIC_ADDRESS: "0x353d3526b7627756902bBBb793d4A0Ac99B8Bc16",
   EXTEND_HISTORY_ADDRESS: "0xe58b6777fC1c39D3e5DaaAfF09261F6c528BB5AB",
   SELLUSER_MANAGER_ADDRESS: "0x09012C1a6955fD76603453011F058f8567d1cbA3",
   MIX_OPERATOR_ADDRESS: "0x1cea1dc56Be6ab13Ad590Ff367c3Af375DA98A7d",
+  STOCK_STORAGE_ADDRESS: "0x1a5d659b9e7b3de9016dca0dc2dea79ea9a06bf1",
+  STOCK_LOGIC_ADDRESS: "0x0d6b85e446edcab6f97b3a9349268914a9742e75",
   ALLOWANCE_QUOTA: "10000000",
   RPC_URL: "https://bsc-testnet.publicnode.com",
   BIND_ADDRESS_URL: "https://www.ihealth.vip/api",
@@ -107,12 +117,14 @@ const ANVIL_FORK_CONFIG: ChainContractAddresses = {
   LOGIC_ADDRESS: "0x895e8B68D93b2cD5fF4F2bf22cCb3697235C7AfD",
   PRODUCTION_LOGIC_ADDRESS: "0x90531429c182707190de682Ed345e3577D44C3d6",
   HISTORY_ADDRESS: "0x367f5FaE08dC307B3Ac8A9A7AA26AC3005C6B51f",
-  NODE_SYSTEM_ADDRESS: "0x065010ad76a285a0618fd45668c4973fea363a14",
+  NODE_SYSTEM_ADDRESS: "0xe04b049185bC002209ACEeDd51F8799A7b2deA54",
   EXTEND_STORAGE_ADDRESS: "0xdc567714763206341aC1d90C0d2fc58c57739412",
   EXTEND_LOGIC_ADDRESS: "0x2bB0DaD447Db767dA7693DB9562A65CcdCD25948",
   EXTEND_HISTORY_ADDRESS: "0x6e426AFED0cF32d6E00b29c791199441658E4f73",
   SELLUSER_MANAGER_ADDRESS: "0x8e10b9ba4c78fe8d6a2ecf3fa6307f5e6c1ceebe",
   MIX_OPERATOR_ADDRESS: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+  STOCK_STORAGE_ADDRESS: "0xC453A5189C7023E6119ACa59382f09Ea4334D1d4",
+  STOCK_LOGIC_ADDRESS: "0x52c5B9c15bFbA0AE92537dd1F6E7fd5e0aB57385",
   ALLOWANCE_QUOTA: "10000000",
   RPC_URL: import.meta.env.VITE_RPC_URL || "http://127.0.0.1:8545",
   BIND_ADDRESS_URL: "https://www.ihealth.vip/api",
@@ -158,6 +170,8 @@ const ANVIL_LOCAL_CONFIG: ChainContractAddresses = {
   MIX_OPERATOR_ADDRESS:
     import.meta.env.VITE_MIX_OPERATOR_ADDRESS ||
     "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+  STOCK_STORAGE_ADDRESS: "0xa3245fae3e3d7c92591c175d19c2fd7d1fe58677",
+  STOCK_LOGIC_ADDRESS: "0xb90a7fdd69810f49cef8d58a1cf84d09829af0ce",
   ALLOWANCE_QUOTA: import.meta.env.VITE_ALLOWANCE_QUOTA || "10000000",
   RPC_URL: import.meta.env.VITE_RPC_URL || "http://127.0.0.1:8545",
   BIND_ADDRESS_URL: "https://www.ihealth.vip/api",
@@ -270,23 +284,25 @@ export const CHAIN_CONFIGS = {
 
 // 导出配置常量（供需要直接访问配置的地方使用）
 export {
-  BSC_MAINNET_CONFIG,
-  BSC_TESTNET_CONFIG,
-  ANVIL_FORK_CONFIG,
-  ANVIL_LOCAL_CONFIG,
+    ANVIL_FORK_CONFIG,
+    ANVIL_LOCAL_CONFIG,
+    BSC_MAINNET_CONFIG,
+    BSC_TESTNET_CONFIG
 };
 
-export {
-  MiningMachineSystemStorageABI,
-  MiningMachineSystemLogicABI,
-  MiningMachineProductionLogicABI,
-  MiningMachineHistoryABI,
-  MiningMachineNodeSystemABI,
-  SelluserManagerABI,
-  MiningMachineSystemStorageExtendABI,
-  MiningMachineSystemLogicExtendABI,
-  MiningMachineHistoryExtendABI,
-};
+    export {
+        MiningMachineHistoryABI,
+        MiningMachineHistoryExtendABI,
+        MiningMachineNodeSystemABI,
+        MiningMachineProductionLogicABI,
+        MiningMachineSystemLogicABI,
+        MiningMachineSystemLogicExtendABI,
+        MiningMachineSystemStorageABI,
+        MiningMachineSystemStorageExtendABI,
+        SelluserManagerABI,
+        StockSystemLogicABI,
+        StockSystemStorageABI
+    };
 
 export default {
   getChainConfig,
