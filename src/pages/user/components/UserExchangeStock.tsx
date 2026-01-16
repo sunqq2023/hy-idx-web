@@ -785,152 +785,158 @@ const UserExchangeStock = () => {
 
   // 一键提现处理函数
   const handleWithdraw = async () => {
-    // 检查是否有银行卡信息
-    if (
-      !bankInfo ||
-      !bankInfo.bankName ||
-      !bankInfo.bankCardNumber ||
-      !bankInfo.name
-    ) {
-      Toast.show({
-        content: "请先添加银行卡信息",
-        position: "center",
-        duration: 2000,
-      });
-      return;
-    }
-
-    // 检查是否有可提现的分红
-    if (!unclaimedDividend || Number(unclaimedDividend) <= 0) {
-      Toast.show({
-        content: "暂无可提现的分红",
-        position: "center",
-      });
-      return;
-    }
-
-    // 显示确认弹窗
-    Modal.show({
-      bodyStyle: {
-        background: "#000000",
-        color: "#ffffff",
-        width: "75vw",
-        padding: "20px",
-        borderRadius: "20px",
-      },
-      bodyClassName: "!m-auto",
-      showCloseButton: false,
-      closeOnMaskClick: false,
-      content: (
-        <div className="text-white">
-          <div className="text-[#B195FF] text-[16px] mb-6 text-center">
-            分红提现申请:
-          </div>
-          <div className="space-y-3 text-[14px] mb-6">
-            <div className="flex justify-between">
-              <span className="text-[#999]">提现金额:</span>
-              <span className="text-white font-medium">
-                -{Number(unclaimedDividend).toFixed(2)} 元
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-[#999]">收款银行:</span>
-              <span className="text-white font-medium">
-                {bankInfo.bankName}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-[#999]">收款账号:</span>
-              <span className="text-white font-medium">
-                {bankInfo.bankCardNumber}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-[#999]">收款姓名:</span>
-              <span className="text-white font-medium">{bankInfo.name}</span>
-            </div>
-          </div>
-          <div className="flex gap-3">
-            <button
-              className="flex-1 bg-[#333] rounded-3xl text-white py-3 text-[15px]"
-              onClick={() => Modal.clear()}
-            >
-              取消
-            </button>
-            <button
-              className="flex-1 bg-[#895EFF] rounded-3xl text-white py-3 text-[15px]"
-              onClick={async () => {
-                Modal.clear();
-                try {
-                  setIsWithdrawing(true);
-
-                  const hash = await writeContract(config, {
-                    address: StockLogicAddress,
-                    abi: StockSystemLogicABI,
-                    functionName: "claimDividend",
-                    gas: 300000n,
-                  });
-
-                  await waitForTransactionReceipt(config, { hash });
-
-                  // 立即添加到本地待确认记录（乐观更新）
-                  const newRecord: DividendClaimedEvent = {
-                    id: `local-${hash}`,
-                    user: address!.toLowerCase(),
-                    amount: parseEther(unclaimedDividend).toString(),
-                    blockTimestamp: Math.floor(Date.now() / 1000).toString(),
-                    transactionHash: hash,
-                  };
-                  setPendingWithdrawRecords((prev) => [newRecord, ...prev]);
-
-                  Toast.show({
-                    content: "提现申请已提交，请等待财务审核",
-                    position: "center",
-                    duration: 3000,
-                  });
-
-                  // 刷新分红数据
-                  queryUnclaimedDividend();
-                } catch (error) {
-                  console.error("提现失败:", error);
-                  // 检测错误类型
-                  const errorMessage =
-                    error instanceof Error ? error.message : "提现失败";
-                  const isUserRejected =
-                    errorMessage.toLowerCase().includes("user rejected") ||
-                    errorMessage.toLowerCase().includes("user denied");
-                  const isNotAuthorized = errorMessage
-                    .toLowerCase()
-                    .includes("not authorized");
-                  const isNoDividend = errorMessage
-                    .toLowerCase()
-                    .includes("no dividend");
-
-                  let displayMessage = "提现失败";
-                  if (isUserRejected) {
-                    displayMessage = "用户取消";
-                  } else if (isNotAuthorized) {
-                    displayMessage = "合约未授权，请联系管理员";
-                  } else if (isNoDividend) {
-                    displayMessage = "暂无可提现的分红";
-                  }
-
-                  Toast.show({
-                    content: displayMessage,
-                    position: "center",
-                    duration: isNotAuthorized ? 3000 : 2000,
-                  });
-                } finally {
-                  setIsWithdrawing(false);
-                }
-              }}
-            >
-              提交申请
-            </button>
-          </div>
-        </div>
-      ),
+    Toast.show({
+      content: "开发中，敬请期待",
+      position: "center",
+      duration: 2000,
     });
+
+    // // 检查是否有银行卡信息
+    // if (
+    //   !bankInfo ||
+    //   !bankInfo.bankName ||
+    //   !bankInfo.bankCardNumber ||
+    //   !bankInfo.name
+    // ) {
+    //   Toast.show({
+    //     content: "请先添加银行卡信息",
+    //     position: "center",
+    //     duration: 2000,
+    //   });
+    //   return;
+    // }
+
+    // // 检查是否有可提现的分红
+    // if (!unclaimedDividend || Number(unclaimedDividend) <= 0) {
+    //   Toast.show({
+    //     content: "暂无可提现的分红",
+    //     position: "center",
+    //   });
+    //   return;
+    // }
+
+    // // 显示确认弹窗
+    // Modal.show({
+    //   bodyStyle: {
+    //     background: "#000000",
+    //     color: "#ffffff",
+    //     width: "75vw",
+    //     padding: "20px",
+    //     borderRadius: "20px",
+    //   },
+    //   bodyClassName: "!m-auto",
+    //   showCloseButton: false,
+    //   closeOnMaskClick: false,
+    //   content: (
+    //     <div className="text-white">
+    //       <div className="text-[#B195FF] text-[16px] mb-6 text-center">
+    //         分红提现申请:
+    //       </div>
+    //       <div className="space-y-3 text-[14px] mb-6">
+    //         <div className="flex justify-between">
+    //           <span className="text-[#999]">提现金额:</span>
+    //           <span className="text-white font-medium">
+    //             -{Number(unclaimedDividend).toFixed(2)} 元
+    //           </span>
+    //         </div>
+    //         <div className="flex justify-between">
+    //           <span className="text-[#999]">收款银行:</span>
+    //           <span className="text-white font-medium">
+    //             {bankInfo.bankName}
+    //           </span>
+    //         </div>
+    //         <div className="flex justify-between">
+    //           <span className="text-[#999]">收款账号:</span>
+    //           <span className="text-white font-medium">
+    //             {bankInfo.bankCardNumber}
+    //           </span>
+    //         </div>
+    //         <div className="flex justify-between">
+    //           <span className="text-[#999]">收款姓名:</span>
+    //           <span className="text-white font-medium">{bankInfo.name}</span>
+    //         </div>
+    //       </div>
+    //       <div className="flex gap-3">
+    //         <button
+    //           className="flex-1 bg-[#333] rounded-3xl text-white py-3 text-[15px]"
+    //           onClick={() => Modal.clear()}
+    //         >
+    //           取消
+    //         </button>
+    //         <button
+    //           className="flex-1 bg-[#895EFF] rounded-3xl text-white py-3 text-[15px]"
+    //           onClick={async () => {
+    //             Modal.clear();
+    //             try {
+    //               setIsWithdrawing(true);
+
+    //               const hash = await writeContract(config, {
+    //                 address: StockLogicAddress,
+    //                 abi: StockSystemLogicABI,
+    //                 functionName: "claimDividend",
+    //                 gas: 300000n,
+    //               });
+
+    //               await waitForTransactionReceipt(config, { hash });
+
+    //               // 立即添加到本地待确认记录（乐观更新）
+    //               const newRecord: DividendClaimedEvent = {
+    //                 id: `local-${hash}`,
+    //                 user: address!.toLowerCase(),
+    //                 amount: parseEther(unclaimedDividend).toString(),
+    //                 blockTimestamp: Math.floor(Date.now() / 1000).toString(),
+    //                 transactionHash: hash,
+    //               };
+    //               setPendingWithdrawRecords((prev) => [newRecord, ...prev]);
+
+    //               Toast.show({
+    //                 content: "提现申请已提交，请等待财务审核",
+    //                 position: "center",
+    //                 duration: 3000,
+    //               });
+
+    //               // 刷新分红数据
+    //               queryUnclaimedDividend();
+    //             } catch (error) {
+    //               console.error("提现失败:", error);
+    //               // 检测错误类型
+    //               const errorMessage =
+    //                 error instanceof Error ? error.message : "提现失败";
+    //               const isUserRejected =
+    //                 errorMessage.toLowerCase().includes("user rejected") ||
+    //                 errorMessage.toLowerCase().includes("user denied");
+    //               const isNotAuthorized = errorMessage
+    //                 .toLowerCase()
+    //                 .includes("not authorized");
+    //               const isNoDividend = errorMessage
+    //                 .toLowerCase()
+    //                 .includes("no dividend");
+
+    //               let displayMessage = "提现失败";
+    //               if (isUserRejected) {
+    //                 displayMessage = "用户取消";
+    //               } else if (isNotAuthorized) {
+    //                 displayMessage = "合约未授权，请联系管理员";
+    //               } else if (isNoDividend) {
+    //                 displayMessage = "暂无可提现的分红";
+    //               }
+
+    //               Toast.show({
+    //                 content: displayMessage,
+    //                 position: "center",
+    //                 duration: isNotAuthorized ? 3000 : 2000,
+    //               });
+    //             } finally {
+    //               setIsWithdrawing(false);
+    //             }
+    //           }}
+    //         >
+    //           提交申请
+    //         </button>
+    //       </div>
+    //     </div>
+    //   ),
+    // });
   };
 
   // 显示银行信息编辑弹窗
@@ -1116,7 +1122,7 @@ const UserExchangeStock = () => {
   return (
     <div className="min-h-screen bg-[#F5F5F5] pb-6">
       {/* 头部 */}
-      <div className="flex items-center px-[21px] pt-4 mb-4 bg-white">
+      <div className="flex items-center px-[21px] pt-4 mb-4">
         <Button onClick={handleBack} className="p-0! rounded-2xl!">
           <img src={arrowSvg} alt="" />
         </Button>
@@ -1128,7 +1134,7 @@ const UserExchangeStock = () => {
         {/* 支付金额 */}
         <div className="mb-4">
           <div className="flex justify-between items-center mb-2">
-            <span className="text-[14px] text-[#666]">
+            <span className="text-[14px] text-[#111]">
               {exchangeMode === "mixToStock" ? "支付金额" : "撤回股权"}
             </span>
             <span className="text-[12px] text-[#999]">
@@ -1206,25 +1212,26 @@ const UserExchangeStock = () => {
         )}
 
         {/* 兑换比例提示 */}
-        {mixAmount &&
-          stockAmount &&
-          Number(mixAmount) > 0 &&
-          Number(stockAmount) > 0 && (
-            <div className="text-center text-[12px] text-[#999] mb-4">
-              兑换股数 1股 ={" "}
-              {(Number(mixAmount) / Number(stockAmount)).toFixed(3)}MIX ={" "}
-              {(
-                (Number(mixAmount) * Number(mixValue)) /
-                Number(stockAmount)
-              ).toFixed(3)}
-              CNY
-            </div>
-          )}
+        <div className="text-center text-[12px] text-[#999] mb-4">
+          兑换股数 1股 ={" "}
+          {totalStockIssued && totalStockIssued !== "0"
+            ? (
+                Number(totalMarketValue) /
+                Number(totalStockIssued) /
+                Number(mixValue)
+              ).toFixed(3)
+            : "0.000"}
+          MIX ={" "}
+          {totalStockIssued && totalStockIssued !== "0"
+            ? (Number(totalMarketValue) / Number(totalStockIssued)).toFixed(3)
+            : "0.000"}
+          CYN
+        </div>
 
         {/* 兑换股数/获得金额 */}
         <div className="mb-6">
           <div className="flex justify-between items-center mb-2">
-            <span className="text-[14px] text-[#666]">
+            <span className="text-[14px] text-[#111]">
               {exchangeMode === "mixToStock" ? "兑换股数" : "获得金额"}
             </span>
           </div>
@@ -1284,8 +1291,8 @@ const UserExchangeStock = () => {
         {/* 持股数和估值 */}
         <div className="flex justify-between items-center mb-6">
           <div className="flex items-center gap-2">
-            <span className="text-[14px] text-[#666]">我的持股数:</span>
-            <span className="text-[20px] font-bold">
+            <span className="text-[14px] text-[#666]">持股数:</span>
+            <span className="text-[14px] font-bold">
               <AdaptiveNumber
                 type={NumberType.BALANCE}
                 value={stockBalance}
@@ -1295,7 +1302,7 @@ const UserExchangeStock = () => {
           </div>
           <div className="flex items-center gap-2">
             <span className="text-[14px] text-[#666]">估值:</span>
-            <span className="text-[20px] font-bold text-[#333]">
+            <span className="text-[14px] font-bold text-[#333]">
               <AdaptiveNumber
                 type={NumberType.BALANCE}
                 value={
@@ -1445,13 +1452,6 @@ const UserExchangeStock = () => {
                           .format("YYYY年M月DD日 HH:mm:ss")}
                       </span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-[#666]">交易哈希:</span>
-                      <span className="text-[#999] text-[11px] break-all">
-                        {record.transactionHash.slice(0, 10)}...
-                        {record.transactionHash.slice(-8)}
-                      </span>
-                    </div>
                   </div>
                 </div>
               ))
@@ -1487,13 +1487,6 @@ const UserExchangeStock = () => {
                     <div className="flex justify-between">
                       <span className="text-[#666]">提现状态:</span>
                       <span className="text-orange-500">待财务审核</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-[#666]">交易哈希:</span>
-                      <span className="text-[#999] text-[11px] break-all">
-                        {record.transactionHash.slice(0, 10)}...
-                        {record.transactionHash.slice(-8)}
-                      </span>
                     </div>
                   </div>
                 </div>

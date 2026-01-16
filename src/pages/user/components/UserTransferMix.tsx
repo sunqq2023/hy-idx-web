@@ -521,7 +521,7 @@ const UserTransferMix = () => {
                           ? "用户转账"
                           : record.action === "addMixForUser" ||
                               record.action === "subMixForUser"
-                            ? "积分兑换"
+                            ? "兑换"
                             : "系统转账"}
                       </span>
                     </div>
