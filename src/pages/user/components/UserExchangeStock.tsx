@@ -1225,7 +1225,7 @@ const UserExchangeStock = () => {
           {totalStockIssued && totalStockIssued !== "0"
             ? (Number(totalMarketValue) / Number(totalStockIssued)).toFixed(3)
             : "0.000"}
-          CYN
+          CNY
         </div>
 
         {/* 兑换股数/获得金额 */}
