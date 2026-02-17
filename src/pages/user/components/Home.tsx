@@ -1,19 +1,19 @@
 import {
-    chainsSvgs,
-    gasSvg,
-    idxBackgroundSvg,
-    selectedSvg,
-    usdtSvg,
+  chainsSvgs,
+  gasSvg,
+  idxBackgroundSvg,
+  selectedSvg,
+  usdtSvg,
 } from "@/assets";
 import AdaptiveNumber, { NumberType } from "@/components/AdaptiveNumber";
 import { BindWalletModal } from "@/components/BindWalletModal";
 import EmptyComp from "@/components/EmptyComp";
 import {
-    MiningMachineNodeSystemABI,
-    MiningMachineProductionLogicABI,
-    MiningMachineSystemLogicExtendABI,
-    MiningMachineSystemStorageABI,
-    MiningMachineSystemStorageExtendABI,
+  MiningMachineNodeSystemABI,
+  MiningMachineProductionLogicABI,
+  MiningMachineSystemLogicExtendABI,
+  MiningMachineSystemStorageABI,
+  MiningMachineSystemStorageExtendABI,
 } from "@/constants";
 import { isAddressBlacklisted } from "@/constants/boundblacklist";
 import { MachineInfo } from "@/constants/types";
@@ -22,10 +22,10 @@ import config from "@/proviers/config";
 import { getExplorerUrl } from "@/utils/helper";
 import { sendSignedRequest } from "@/utils/rsaSignature";
 import {
-    getBalance,
-    multicall,
-    readContract,
-    waitForTransactionReceipt,
+  getBalance,
+  multicall,
+  readContract,
+  waitForTransactionReceipt,
 } from "@wagmi/core";
 import { Button, Checkbox, Divider, Skeleton, Tabs, Toast } from "antd-mobile";
 import React, { memo, useCallback, useEffect, useRef, useState } from "react";
@@ -1542,12 +1542,12 @@ export const Home = ({
           </div>
 
           <div className="flex gap-2 text-[#c6c6c6] mt-4">
-            <div
+            {/* <div
               onClick={handleSyntheticMachine}
               className="flex-[1] text-center bg-[#09090a] border border-[#212122] rounded-3xl py-1 text-[.7rem]"
             >
               合成矿机
-            </div>
+            </div> */}
             <div
               onClick={handleExchangeIdxClick}
               className="flex-[1] text-center bg-[#09090a] border border-[#212122] rounded-3xl py-1 text-[.7rem]"

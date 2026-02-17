@@ -4,6 +4,7 @@ import tailwindcss from "@tailwindcss/vite";
 import tsconfigPaths from "vite-tsconfig-paths";
 import svgr from "vite-plugin-svgr";
 import { nodePolyfills } from "vite-plugin-node-polyfills";
+import path from "path";
 // import { visualizer } from "rollup-plugin-visualizer";
 
 // https://vite.dev/config/
@@ -56,6 +57,9 @@ export default defineConfig({
   resolve: {
     // 确保只有一个 React 实例
     dedupe: ["react", "react-dom"],
+    alias: {
+      "@": path.resolve(__dirname, "src"),
+    },
   },
   optimizeDeps: {
     // 确保 React 相关库按正确顺序预构建
