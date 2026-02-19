@@ -1,17 +1,17 @@
 import { arrowSvg } from "@/assets";
 import AdaptiveNumber, { NumberType } from "@/components/AdaptiveNumber";
 import {
-    MiningMachineNodeSystemABI,
-    StockSystemLogicABI,
-    StockSystemStorageABI,
+  MiningMachineNodeSystemABI,
+  StockSystemLogicABI,
+  StockSystemStorageABI,
 } from "@/constants";
 import { useChainConfig } from "@/hooks/useChainConfig";
 import config from "@/proviers/config";
 import { useQuery } from "@tanstack/react-query";
 import {
-    readContract,
-    waitForTransactionReceipt,
-    writeContract,
+  readContract,
+  waitForTransactionReceipt,
+  writeContract,
 } from "@wagmi/core";
 import { Button, Input, Modal, Tabs, Toast } from "antd-mobile";
 import dayjs from "dayjs";
@@ -80,6 +80,14 @@ const UserExchangeStock = () => {
   const [pendingWithdrawRecords, setPendingWithdrawRecords] = useState<
     DividendClaimedEvent[]
   >([]);
+
+  // 统一的余额精度处理函数，避免浮点数精度问题
+  const formatBalanceForDisplay = (balance: string): string => {
+    return Math.min(
+      Number(balance),
+      Math.floor(Number(balance) * 100) / 100,
+    ).toFixed(2);
+  };
 
   // 过滤输入，只允许数字和小数点
   const filterNumericInput = (value: string): string => {
@@ -1140,8 +1148,8 @@ const UserExchangeStock = () => {
             <span className="text-[12px] text-[#999]">
               余额:{" "}
               {exchangeMode === "mixToStock"
-                ? `${Number(mixBalance).toFixed(2)}MIX`
-                : `${Number(stockBalance).toFixed(2)}股`}
+                ? `${formatBalanceForDisplay(mixBalance)} MIX`
+                : `${formatBalanceForDisplay(stockBalance)} 股`}
             </span>
           </div>
           <div className="relative">
@@ -1167,11 +1175,13 @@ const UserExchangeStock = () => {
             <button
               onClick={() => {
                 if (exchangeMode === "mixToStock") {
-                  const balance = Number(mixBalance).toFixed(2);
+                  // 确保不超过实际余额，避免浮点数精度问题
+                  const balance = formatBalanceForDisplay(mixBalance);
                   setMixAmount(balance);
                   handlePreviewExchange(balance, "mixToStock");
                 } else {
-                  const balance = Number(stockBalance).toFixed(2);
+                  // 确保不超过实际余额，避免浮点数精度问题
+                  const balance = formatBalanceForDisplay(stockBalance);
                   setStockAmount(balance);
                   handlePreviewExchange(balance, "stockToMix");
                 }
