@@ -7,6 +7,7 @@ import {
 } from "@/assets";
 import AdaptiveNumber, { NumberType } from "@/components/AdaptiveNumber";
 import { BindWalletModal } from "@/components/BindWalletModal";
+import { MallAccountBindModal } from "@/components/MallAccountBindModal";
 import EmptyComp from "@/components/EmptyComp";
 import {
   MiningMachineNodeSystemABI,
@@ -27,7 +28,15 @@ import {
   readContract,
   waitForTransactionReceipt,
 } from "@wagmi/core";
-import { Button, Checkbox, Divider, Skeleton, Tabs, Toast } from "antd-mobile";
+import {
+  Button,
+  Checkbox,
+  Dialog,
+  Divider,
+  Skeleton,
+  Tabs,
+  Toast,
+} from "antd-mobile";
 import React, { memo, useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { FixedSizeList as List } from "react-window";
@@ -86,6 +95,7 @@ export const Home = ({
   const [isBinding, setIsBinding] = useState(false);
   const [lastBindingTxHash, setLastBindingTxHash] = useState<string>("");
   const [boundPhone, setBoundPhone] = useState<string>(""); // 已绑定的手机号
+  const [showMallAccountModal, setShowMallAccountModal] = useState(false);
 
   const navigate = useNavigate();
   const location = useLocation(); // 添加路由位置监听
@@ -209,115 +219,44 @@ export const Home = ({
   const checkPendingBinding = useCallback(async () => {
     if (!userAddress) return;
 
-    // 检查 BIND_ADDRESS_URL 是否配置
-    if (!chainConfig.BIND_ADDRESS_URL) {
+    const mixApiBase = (() => {
+      if (import.meta.env.DEV) return "/api";
+      const raw = (chainConfig.BIND_ADDRESS_URL || "").replace(/\/$/, "");
+      if (!raw) return "";
+      return raw.endsWith("/api") ? raw : `${raw}/api`;
+    })();
+
+    // 生产环境需要配置 BIND_ADDRESS_URL；开发环境走 Vite /api 代理
+    if (!mixApiBase) {
       console.warn("⚠️ BIND_ADDRESS_URL 未配置，跳过绑定检查");
       return;
     }
 
     try {
-      // 使用配置的 BIND_ADDRESS_URL（外部 API，不是 idmix.app 的接口）
-      const response = await fetch(
-        `${chainConfig.BIND_ADDRESS_URL}/mix/getPhoneByAddress/${userAddress}`,
-      );
-      const result = await response.json();
+      // 绑定状态以链上为准：能读到 phone => 已绑定；读不到 => 未绑定（phone 为空字符串）
+      let onChainPhoneForCheck = "";
+      try {
+        const onChainPhone = await readContract(config, {
+          address: chainConfig.NODE_SYSTEM_ADDRESS as `0x${string}`,
+          abi: MiningMachineNodeSystemABI,
+          functionName: "getUserPhone",
+          args: [userAddress],
+        });
+        onChainPhoneForCheck = typeof onChainPhone === "string" ? onChainPhone : "";
+      } catch (e) {
+        // 不阻塞：链上读取失败时仍尝试走后端检查
+        console.debug("读取链上手机号失败（用于 checkBinding 入参）:", e);
+        onChainPhoneForCheck = "";
+      }
 
-      if (
-        result.data?.success === false &&
-        result.data?.errorCode === "BINDING_PENDING" &&
-        result.data?.phone
-      ) {
-        const pendingPhoneNumber = result.data.phone;
+      setBoundPhone(onChainPhoneForCheck || "");
 
-        // 检查地址是否在黑名单中
-        if (isAddressBlacklisted(userAddress)) {
-          console.warn("⚠️ 地址在黑名单中，禁止绑定");
-          Toast.show({
-            content: "此地址不可绑定，已删除绑定申请",
-            position: "center",
-            duration: 3000,
-          });
-
-          // 调用接口删除数据库中的绑定记录
-          try {
-            await sendSignedRequest<{
-              code: number;
-              message?: string;
-              data?: {
-                success: boolean;
-                message?: string;
-              };
-            }>("POST", `${chainConfig.BIND_ADDRESS_URL}/mix/deleteBinding`, {
-              address: userAddress,
-            });
-            console.log("✅ 已删除黑名单地址的绑定记录");
-          } catch (error) {
-            console.error("❌ 删除绑定记录失败:", error);
-          }
-          return;
-        }
-
-        // 在显示弹窗前，先检查链上是否已经绑定
-        console.log("🔍 检查链上绑定状态...");
-        try {
-          const onChainPhone = await readContract(config, {
-            address: chainConfig.NODE_SYSTEM_ADDRESS as `0x${string}`,
-            abi: MiningMachineNodeSystemABI,
-            functionName: "getUserPhone",
-            args: [userAddress],
-          });
-
-          if (onChainPhone && onChainPhone === pendingPhoneNumber) {
-            // 链上已绑定，直接调用后端同步
-            console.log("✅ 链上已绑定，直接同步到后端");
-            Toast.show({
-              content: "检测到链上已绑定，正在同步...",
-              position: "center",
-              duration: 2000,
-            });
-
-            // 使用配置的 BIND_ADDRESS_URL（外部 API）
-            const syncResult = await sendSignedRequest<{
-              code: number;
-              message?: string;
-              data?: {
-                success: boolean;
-                message?: string;
-                errorCode?: string;
-              };
-            }>("POST", `${chainConfig.BIND_ADDRESS_URL}/mix/confirmBinding`, {
-              phone: pendingPhoneNumber,
-              address: userAddress,
-            });
-
-            if (syncResult.code === 200 && syncResult.data?.success) {
-              console.log("✅ 后端同步成功");
-              Toast.show({
-                content: "绑定同步成功",
-                position: "center",
-                duration: 2000,
-              });
-              // 同步成功后，保存已绑定的手机号
-              setBoundPhone(pendingPhoneNumber);
-            } else {
-              console.warn("⚠️ 后端同步失败:", syncResult);
-              // 同步失败仍然显示弹窗，让用户手动确认
-              setPendingPhone(pendingPhoneNumber);
-              setShowBindModal(true);
-            }
-            return;
-          }
-        } catch (onChainError) {
-          console.warn("⚠️ 检查链上状态失败:", onChainError);
-          // 检查失败，继续显示弹窗
-        }
-
-        // 链上未绑定，显示弹窗让用户确认
-        setPendingPhone(pendingPhoneNumber);
-        setShowBindModal(true);
-      } else if (result.data?.success === true && result.data?.phone) {
-        // 已经绑定成功，保存手机号用于显示
-        setBoundPhone(result.data.phone);
+      // 仅在链上已绑定手机号时才调用 checkBinding
+      if (onChainPhoneForCheck) {
+        await sendSignedRequest("POST", `${mixApiBase}/mix/checkBinding`, {
+          phone: onChainPhoneForCheck,
+          address: userAddress,
+        });
       }
     } catch (error) {
       // 静默处理错误，不阻塞 UI
@@ -327,6 +266,237 @@ export const Home = ({
     userAddress,
     chainConfig.BIND_ADDRESS_URL,
     chainConfig.NODE_SYSTEM_ADDRESS,
+  ]);
+
+  const getMixApiBase = useCallback(() => {
+    if (import.meta.env.DEV) return "/api";
+    const raw = (chainConfig.BIND_ADDRESS_URL || "").replace(/\/$/, "");
+    if (!raw) return "";
+    return raw.endsWith("/api") ? raw : `${raw}/api`;
+  }, [chainConfig.BIND_ADDRESS_URL]);
+
+  const handleSendSmsCode = useCallback(
+    async (phone: string) => {
+      const apiBase = getMixApiBase();
+      if (!apiBase) {
+        Toast.show({ content: "绑定服务未配置", position: "center" });
+        return;
+      }
+
+      // 发送验证码：按新接口流程（无需签名）
+      // 1) GET /api/verify_code -> { data: { key } }
+      const keyRes = await fetch(`${apiBase}/verify_code`);
+      const keyJson = await keyRes.json().catch(() => ({}));
+      const key = keyJson?.data?.key as string | undefined;
+      if (!key) {
+        throw new Error(keyJson?.msg || keyJson?.message || "获取验证码 Key 失败");
+      }
+
+      // 2) POST /api/register/verify -> { phone, type: 'binding', key }
+      const smsRes = await fetch(`${apiBase}/register/verify`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          phone,
+          type: "binding",
+          key,
+        }),
+      });
+      const smsJson = await smsRes.json().catch(() => ({}));
+      const ok =
+        smsRes.ok &&
+        (typeof smsJson?.code === "number" ? smsJson.code === 200 : true) &&
+        (typeof smsJson?.data?.success === "boolean" ? smsJson.data.success : true);
+      if (!ok) {
+        throw new Error(
+          smsJson?.data?.message ||
+            smsJson?.data?.errorCode ||
+            smsJson?.msg ||
+            smsJson?.message ||
+            "发送验证码失败",
+        );
+      }
+
+      Toast.show({ content: "验证码已发送", position: "center" });
+    },
+    [getMixApiBase],
+  );
+
+  const handleBindFromModal = useCallback(
+    async ({ phone, smsCode }: { phone: string; smsCode: string }) => {
+      if (!userAddress) return;
+      if (!phone) {
+        Toast.show({ content: "请输入手机号", position: "center" });
+        return;
+      }
+      if (!smsCode) {
+        Toast.show({ content: "请输入验证码", position: "center" });
+        return;
+      }
+
+      const confirmed = await Dialog.confirm({
+        content: "确认绑定该手机号到当前钱包地址？",
+        cancelText: "取消",
+        confirmText: "确认绑定",
+      });
+      if (!confirmed) return;
+
+      try {
+        Toast.show({ content: "正在链上绑定...", position: "center" });
+
+        const isPhoneBound = await readContract(config, {
+          address: chainConfig.NODE_SYSTEM_ADDRESS as `0x${string}`,
+          abi: MiningMachineNodeSystemABI,
+          functionName: "isPhoneBound",
+          args: [phone],
+        });
+        if (isPhoneBound) {
+          Toast.show({
+            content: "该手机号已被其他地址绑定",
+            position: "center",
+            duration: 3000,
+          });
+          return;
+        }
+
+        const isAddressBound = await readContract(config, {
+          address: chainConfig.NODE_SYSTEM_ADDRESS as `0x${string}`,
+          abi: MiningMachineNodeSystemABI,
+          functionName: "isAddressBound",
+          args: [userAddress],
+        });
+        if (isAddressBound) {
+          Toast.show({
+            content: "该地址已绑定其他手机号",
+            position: "center",
+            duration: 3000,
+          });
+          return;
+        }
+
+        const hash = await writeContractAsync({
+          address: chainConfig.NODE_SYSTEM_ADDRESS as `0x${string}`,
+          abi: MiningMachineNodeSystemABI,
+          functionName: "boundUserPhone",
+          args: [phone],
+          gas: 150000n,
+        });
+
+        Toast.clear();
+        Toast.show({
+          content: "交易已发送，等待区块确认...",
+          position: "center",
+          duration: 0,
+        });
+
+        const receipt = await waitForTransactionReceipt(config, {
+          hash,
+          chainId: chainId,
+          confirmations: 1,
+          timeout: 60_000,
+        });
+
+        Toast.clear();
+        if (receipt.status !== "success") {
+          Toast.show({ content: "链上绑定失败", position: "center" });
+          return;
+        }
+
+        setBoundPhone(phone);
+        // 链上成功后再调用接口；接口结果可忽略（不影响绑定成功提示）
+        const mixApiBase = getMixApiBase();
+        setShowMallAccountModal(false);
+        Toast.show({ content: "绑定成功", position: "center" });
+
+        if (mixApiBase) {
+          sendSignedRequest("POST", `${mixApiBase}/mix/bindWallet`, {
+            phone,
+            address: userAddress,
+            sms_code: smsCode,
+          }).catch((err) => {
+            console.debug("bindWallet 接口失败（忽略）:", err);
+          });
+        }
+      } catch (e) {
+        Toast.clear();
+        const msg = e instanceof Error ? e.message : String(e);
+        if (msg.includes("User rejected") || msg.includes("User denied")) {
+          Toast.show({ content: "用户取消了交易", position: "center" });
+          return;
+        }
+        Toast.show({ content: `绑定失败: ${msg}`, position: "center", duration: 3000 });
+      }
+    },
+    [
+      userAddress,
+      chainConfig.NODE_SYSTEM_ADDRESS,
+      writeContractAsync,
+      chainId,
+      getMixApiBase,
+    ],
+  );
+
+  const handleUnbindFromModal = useCallback(async () => {
+    if (!userAddress) return;
+    if (!boundPhone) return;
+
+    const confirmed = await Dialog.confirm({
+      content: "确认解绑当前手机号？",
+      cancelText: "取消",
+      confirmText: "确认解绑",
+    });
+    if (!confirmed) return;
+
+    const phoneToUnbind = boundPhone;
+
+    try {
+      const mixApiBase = getMixApiBase();
+      if (!mixApiBase) {
+        Toast.show({ content: "绑定服务未配置", position: "center" });
+        return;
+      }
+
+      Toast.show({ content: "正在解绑...", position: "center" });
+      const result = await sendSignedRequest<{
+        status?: number;
+        code?: number;
+        msg?: string;
+        message?: string;
+        data?: { success?: boolean; message?: string; errorCode?: string };
+      }>("POST", `${mixApiBase}/mix/unbindWallet`, {
+        phone: phoneToUnbind,
+        address: userAddress,
+      });
+
+      Toast.clear();
+      const ok =
+        (typeof result?.status === "number" ? result.status === 200 : true) &&
+        (typeof result?.code === "number" ? result.code === 200 : true) &&
+        (typeof result?.data?.success === "boolean" ? result.data.success : true);
+      if (!ok) {
+        const errMsg =
+          result?.data?.message ||
+          result?.data?.errorCode ||
+          result?.msg ||
+          result?.message ||
+          "解绑失败";
+        Toast.show({ content: errMsg, position: "center", duration: 3000 });
+        return;
+      }
+      setBoundPhone("");
+      setShowMallAccountModal(false);
+      Toast.show({ content: "解绑成功", position: "center" });
+    } catch (e) {
+      Toast.clear();
+      const msg = e instanceof Error ? e.message : String(e);
+      Toast.show({ content: `解绑失败: ${msg}`, position: "center", duration: 3000 });
+    }
+  }, [
+    userAddress,
+    boundPhone,
+    getMixApiBase,
   ]);
 
   // 处理同意绑定
@@ -1203,7 +1373,11 @@ export const Home = ({
   };
 
   const handleMixTransfer = () => {
-    navigate("/user/transferMix");
+    navigate("/user/transferMix", {
+      state: {
+        boundPhone,
+      },
+    });
   };
 
   const handleStockExchange = () => {
@@ -1448,11 +1622,12 @@ export const Home = ({
         <div className="bg-[#09090a] rounded-2xl text-white px-4 py-2 text-[1rem] relative">
           <div className="text-[#c6c6c6] text-[12px] font-[400] flex justify-between items-center">
             <span>钱包余额</span>
-            {boundPhone && (
-              <span className="text-[10px]">
-                已绑定商城账号: {maskPhone(boundPhone)}
-              </span>
-            )}
+            <span
+              className="text-[10px] cursor-pointer"
+              onClick={() => setShowMallAccountModal(true)}
+            >
+              {boundPhone ? `商城账号: ${maskPhone(boundPhone)}` : "绑定商城账号"}
+            </span>
           </div>
 
           <div className="flex mt-1 mb-1 items-center gap-1">
@@ -1823,6 +1998,16 @@ export const Home = ({
           setShowBindModal(false);
           setPendingPhone("");
         }}
+      />
+
+      <MallAccountBindModal
+        visible={showMallAccountModal}
+        address={userAddress}
+        boundPhone={boundPhone}
+        onClose={() => setShowMallAccountModal(false)}
+        onSendSmsCode={handleSendSmsCode}
+        onBind={handleBindFromModal}
+        onUnbind={handleUnbindFromModal}
       />
     </div>
   );

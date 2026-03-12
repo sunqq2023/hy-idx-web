@@ -6,6 +6,7 @@ import {
 } from "@/constants";
 import { useChainConfig } from "@/hooks/useChainConfig";
 import config from "@/proviers/config";
+import { sendSignedRequest } from "@/utils/rsaSignature";
 import { validateAddressFnMap } from "@/utils/validateAddress";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -16,7 +17,7 @@ import {
 import { Button, Dialog, Input, TextArea, Toast } from "antd-mobile";
 import dayjs from "dayjs";
 import { useCallback, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { formatEther, parseEther } from "viem";
 import { useAccount } from "wagmi";
 
@@ -35,23 +36,34 @@ const SUBGRAPH_URL =
 
 const UserTransferMix = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const chainConfig = useChainConfig();
   const { address: userAddress } = useAccount();
+  const boundPhone =
+    (location.state as { boundPhone?: string } | undefined)?.boundPhone || "";
 
   const MiningMachineSystemStorageAddress =
     chainConfig.STORAGE_ADDRESS as `0x${string}`;
   const MiningMachineNodeSystemAddress =
     chainConfig.NODE_SYSTEM_ADDRESS as `0x${string}`;
 
+  const [activeTab, setActiveTab] = useState<"mall" | "wallet">("mall");
+  const [mallTransferType, setMallTransferType] = useState<"in" | "out">("in");
   const [receiveAddress, setReceiveAddress] = useState("");
   const [transferAmount, setTransferAmount] = useState("");
+  const [mallAmount, setMallAmount] = useState("");
   const [mixBalance, setMixBalance] = useState("0");
+  const [mallTransferLoading, setMallTransferLoading] = useState(false);
   const [transferLoading, setTransferLoading] = useState(false);
   const [pendingRecords, setPendingRecords] = useState<
     MixBalanceChangedEvent[]
   >([]);
 
   const handlBack = () => {
+    navigate("/user");
+  };
+
+  const handleGoBind = () => {
     navigate("/user");
   };
 
@@ -76,7 +88,7 @@ const UserTransferMix = () => {
   }, [queryMIXBalance]);
 
   // 从 The Graph 查询转账记录（from 或 to 等于当前钱包地址）
-  const { data: transferRecords = [], refetch: refetchRecords } = useQuery({
+  const { data: transferRecords = [] } = useQuery({
     queryKey: ["mixTransferRecords", userAddress],
     queryFn: async () => {
       if (!userAddress) return [];
@@ -359,6 +371,114 @@ const UserTransferMix = () => {
       : record.from;
   };
 
+  // 商城提交处理
+  const handleMallSubmit = async () => {
+    if (!userAddress) return;
+
+    if (!boundPhone) {
+      Toast.show({
+        content: "请绑定钱包",
+        position: "center",
+        duration: 2000,
+      });
+      return;
+    }
+
+    if (!mallAmount || +mallAmount <= 0) {
+      Toast.show({
+        content: "请输入有效的数量",
+        position: "center",
+        duration: 2000,
+      });
+      return;
+    }
+
+    if (mallTransferType === "in" && +mallAmount > +mixBalance) {
+      Toast.show({
+        content: "MIX余额不足",
+        position: "center",
+        duration: 2000,
+      });
+      return;
+    }
+
+    const mixApiBase = (() => {
+      if (import.meta.env.DEV) return "/api";
+      const raw = (chainConfig.BIND_ADDRESS_URL || "").replace(/\/$/, "");
+      if (!raw) return "";
+      return raw.endsWith("/api") ? raw : `${raw}/api`;
+    })();
+
+    if (!mixApiBase) {
+      Toast.show({
+        content: "商城服务未配置",
+        position: "center",
+        duration: 2000,
+      });
+      return;
+    }
+
+    const confirmed = await Dialog.confirm({
+      content: `确认${mallTransferType === "in" ? "转出" : "转入"} ${mallAmount} MIX？`,
+      cancelText: "取消",
+      confirmText: "确认",
+    });
+    if (!confirmed) return;
+
+    setMallTransferLoading(true);
+    Toast.show({
+      content: `${mallTransferType === "in" ? "转出" : "转入"}处理中...`,
+      position: "center",
+      duration: 0,
+    });
+
+    try {
+      const amountValue =
+        mallTransferType === "in" ? mallAmount : `-${mallAmount}`;
+
+      await sendSignedRequest("POST", `${mixApiBase}/mix/transferMix`, {
+        phone: boundPhone,
+        address: userAddress,
+        amount: amountValue,
+      });
+
+      const numericAmount = Number(mallAmount || 0);
+      if (!Number.isNaN(numericAmount) && numericAmount > 0) {
+        const delta = mallTransferType === "in" ? -numericAmount : numericAmount;
+        setMixBalance((prev) => {
+          const current = Number(prev || 0);
+          const nextValue = Number.isNaN(current) ? 0 : current + delta;
+          return nextValue.toString();
+        });
+      }
+
+      const nextBalance =
+        mallTransferType === "in"
+          ? +mixBalance - +mallAmount
+          : +mixBalance + +mallAmount;
+      setMixBalance(nextBalance.toString());
+
+      Toast.clear();
+      Toast.show({
+        content: "提交成功",
+        position: "center",
+        duration: 2000,
+      });
+
+      setMallAmount("");
+    } catch (error) {
+      Toast.clear();
+      const message = error instanceof Error ? error.message : "提交失败";
+      Toast.show({
+        content: message || "提交失败",
+        position: "center",
+        duration: 3000,
+      });
+    } finally {
+      setMallTransferLoading(false);
+    }
+  };
+
   // 合并 The Graph 数据和本地待确认记录
   const allRecords = [...pendingRecords, ...transferRecords];
 
@@ -376,91 +496,230 @@ const UserTransferMix = () => {
         <span className="m-auto text-[17px] font-bold text-black">MIX转账</span>
       </div>
 
-      {/* 转账表单 */}
-      <div className="bg-white rounded-2xl p-4 mb-3 shadow-sm flex-shrink-0">
-        {/* 接收钱包地址 */}
-        <div className="mb-3">
-          <div className="text-[14px] font-medium mb-1.5 text-black flex items-center">
-            <span className="w-2 h-2 bg-black rounded-full mr-2"></span>
-            接收钱包地址
-          </div>
-          <TextArea
-            value={receiveAddress}
-            onChange={(val) => setReceiveAddress(val)}
-            placeholder="输入钱包地址..."
-            rows={2}
-            autoSize={{ minRows: 2, maxRows: 2 }}
-            className="!bg-[#f5f5f7] !rounded-2xl !p-3 !border-none"
-            style={{
-              fontSize: "14px",
-              "--placeholder-color": "#999",
-            }}
-          />
-        </div>
+      {/* 标签切换 */}
+      <div className="flex mb-4 flex-shrink-0 border-b border-gray-200">
+        <button
+          onClick={() => setActiveTab("mall")}
+          className={`flex-1 pb-2 text-[16px] transition-all text-center ${
+            activeTab === "mall"
+              ? "font-bold text-black border-b-2 border-black"
+              : "font-normal text-gray-500"
+          }`}
+        >
+          商城
+        </button>
+        <button
+          onClick={() => setActiveTab("wallet")}
+          className={`flex-1 pb-2 text-[16px] transition-all text-center ${
+            activeTab === "wallet"
+              ? "font-bold text-black border-b-2 border-black"
+              : "font-normal text-gray-500"
+          }`}
+        >
+          钱包
+        </button>
+      </div>
 
-        {/* 转账金额 */}
-        <div className="mb-3">
-          <div className="flex items-center justify-between mb-1.5">
-            <div className="text-[14px] font-medium text-black flex items-center">
+      {/* 商城标签内容 */}
+      {activeTab === "mall" && (
+        <div className="bg-white rounded-2xl p-4 mb-3 shadow-sm flex-shrink-0">
+          {boundPhone ? (
+            <>
+              {/* 转入/转出切换 */}
+              <div className="flex gap-2 mb-4">
+                <button
+                  onClick={() => setMallTransferType("in")}
+                  className={`flex-1 py-2 rounded-xl text-[14px] font-medium transition-all ${
+                    mallTransferType === "in"
+                      ? "bg-[#7334FE] text-white"
+                      : "bg-[#f5f5f7] text-gray-600"
+                  }`}
+                >
+                钱包 -&gt; 商城
+                </button>
+                <button
+                  onClick={() => setMallTransferType("out")}
+                  className={`flex-1 py-2 rounded-xl text-[14px] font-medium transition-all ${
+                    mallTransferType === "out"
+                      ? "bg-[#7334FE] text-white"
+                      : "bg-[#f5f5f7] text-gray-600"
+                  }`}
+                >
+                  商城 -&gt; 钱包
+                </button>
+              </div>
+
+              {/* 输入数量 */}
+              <div className="mb-3">
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="text-[14px] font-medium text-black flex items-center">
+                    <span className="w-2 h-2 bg-black rounded-full mr-2"></span>
+                    数量
+                  </div>
+                  <div className="text-[12px] text-gray-500">
+                    余额:{" "}
+                    <AdaptiveNumber
+                      type={NumberType.BALANCE}
+                      value={mixBalance}
+                      decimalSubLen={2}
+                      className="font-semibold text-black"
+                    />
+                    MIX
+                  </div>
+                </div>
+                <div className="relative">
+                  <Input
+                    value={mallAmount}
+                    onChange={(val) => {
+                      const filtered = val.replace(/[^\d.]/g, "");
+                      const parts = filtered.split(".");
+                      const result =
+                        parts.length > 2
+                          ? parts[0] + "." + parts.slice(1).join("")
+                          : filtered;
+                      setMallAmount(result);
+                    }}
+                    placeholder={mallTransferType === "in" ? "输入转出数量" : "输入转入数量"}
+                    className="!bg-[#f5f5f7] !rounded-2xl !p-3 !pr-24 !border-none"
+                    style={{
+                      fontSize: "14px",
+                      "--placeholder-color": "#999",
+                    }}
+                    type="text"
+                    inputMode="decimal"
+                  />
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2 z-10">
+                    {mallTransferType === "in" && (
+                      <button
+                        type="button"
+                        onClick={() => setMallAmount(mixBalance)}
+                        className="px-4 py-1 text-[12px] bg-[#7334FE] text-white rounded-full border-none"
+                      >
+                        全部
+                      </button>
+                    )}
+                    <span className="text-[13px] text-gray-500 font-medium">MIX</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 提交按钮 */}
+              <Button
+                onClick={handleMallSubmit}
+                loading={mallTransferLoading}
+                disabled={mallTransferLoading || !mallAmount}
+                className="w-full !bg-black !text-white !rounded-3xl !py-2.5 !text-[15px] !font-medium !h-auto disabled:!bg-gray-300"
+              >
+                提交
+              </Button>
+            </>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <div className="text-[15px] font-medium text-gray-700">
+                请先绑定商城账号
+              </div>
+              <div className="text-[12px] text-gray-400 mt-2">
+                绑定后即可进行 MIX 转入/转出
+              </div>
+              <button
+                type="button"
+                onClick={handleGoBind}
+                className="mt-5 px-6 py-2 text-[13px] font-medium rounded-full bg-[#7334FE] text-white"
+              >
+                去绑定
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 钱包标签内容 */}
+      {activeTab === "wallet" && (
+        <div className="bg-white rounded-2xl p-4 mb-3 shadow-sm flex-shrink-0">
+          {/* 接收钱包地址 */}
+          <div className="mb-3">
+            <div className="text-[14px] font-medium mb-1.5 text-black flex items-center">
               <span className="w-2 h-2 bg-black rounded-full mr-2"></span>
-              转账金额
+              接收钱包地址
             </div>
-            <div className="text-[12px] text-gray-500">
-              余额:{" "}
-              <AdaptiveNumber
-                type={NumberType.BALANCE}
-                value={mixBalance}
-                decimalSubLen={2}
-                className="font-semibold text-black"
-              />
-              MIX
-            </div>
-          </div>
-          <div className="relative">
-            <Input
-              value={transferAmount}
-              onChange={(val) => {
-                // 只允许数字和小数点
-                const filtered = val.replace(/[^\d.]/g, "");
-                // 确保只有一个小数点
-                const parts = filtered.split(".");
-                const result =
-                  parts.length > 2
-                    ? parts[0] + "." + parts.slice(1).join("")
-                    : filtered;
-                setTransferAmount(result);
-              }}
-              placeholder="输入转账金额"
-              className="!bg-[#f5f5f7] !rounded-2xl !p-3 !pr-24 !border-none"
+            <TextArea
+              value={receiveAddress}
+              onChange={(val) => setReceiveAddress(val)}
+              placeholder="输入钱包地址..."
+              rows={2}
+              autoSize={{ minRows: 2, maxRows: 2 }}
+              className="!bg-[#f5f5f7] !rounded-2xl !p-3 !border-none"
               style={{
                 fontSize: "14px",
                 "--placeholder-color": "#999",
               }}
-              type="text"
-              inputMode="decimal"
             />
-            <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
-              <Button
-                onClick={handleSetAllBalance}
-                className="!px-4 !py-1 !h-auto !text-[12px] !bg-[#7334FE] !text-white !rounded-full !border-none"
-              >
-                全部
-              </Button>
-              <span className="text-[13px] text-gray-500 font-medium">MIX</span>
+          </div>
+
+          {/* 转账金额 */}
+          <div className="mb-3">
+            <div className="flex items-center justify-between mb-1.5">
+              <div className="text-[14px] font-medium text-black flex items-center">
+                <span className="w-2 h-2 bg-black rounded-full mr-2"></span>
+                数量
+              </div>
+              <div className="text-[12px] text-gray-500">
+                余额:{" "}
+                <AdaptiveNumber
+                  type={NumberType.BALANCE}
+                  value={mixBalance}
+                  decimalSubLen={2}
+                  className="font-semibold text-black"
+                />
+                MIX
+              </div>
+            </div>
+            <div className="relative">
+              <Input
+                value={transferAmount}
+                onChange={(val) => {
+                  // 只允许数字和小数点
+                  const filtered = val.replace(/[^\d.]/g, "");
+                  // 确保只有一个小数点
+                  const parts = filtered.split(".");
+                  const result =
+                    parts.length > 2
+                      ? parts[0] + "." + parts.slice(1).join("")
+                      : filtered;
+                  setTransferAmount(result);
+                }}
+                placeholder="输入转账金额"
+                className="!bg-[#f5f5f7] !rounded-2xl !p-3 !pr-24 !border-none"
+                style={{
+                  fontSize: "14px",
+                  "--placeholder-color": "#999",
+                }}
+                type="text"
+                inputMode="decimal"
+              />
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                <Button
+                  onClick={handleSetAllBalance}
+                  className="!px-4 !py-1 !h-auto !text-[12px] !bg-[#7334FE] !text-white !rounded-full !border-none"
+                >
+                  全部
+                </Button>
+                <span className="text-[13px] text-gray-500 font-medium">MIX</span>
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* 执行转账按钮 */}
-        <Button
-          onClick={handleTransfer}
-          loading={transferLoading}
-          disabled={transferLoading || !receiveAddress || !transferAmount}
-          className="w-full !bg-black !text-white !rounded-3xl !py-2.5 !text-[15px] !font-medium !h-auto disabled:!bg-gray-300"
-        >
-          执行转账
-        </Button>
-      </div>
+          {/* 执行转账按钮 */}
+          <Button
+            onClick={handleTransfer}
+            loading={transferLoading}
+            disabled={transferLoading || !receiveAddress || !transferAmount}
+            className="w-full !bg-black !text-white !rounded-3xl !py-2.5 !text-[15px] !font-medium !h-auto disabled:!bg-gray-300"
+          >
+            提交
+          </Button>
+        </div>
+      )}
 
       {/* 交易记录 */}
       <div className="flex flex-col flex-1 min-h-0">

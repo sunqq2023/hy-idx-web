@@ -9,12 +9,6 @@
  * 4. Anvil Local - Chain ID: 31337 或 1337
  */
 
-/**
- * MIX API Key
- * 从环境变量读取，用于 API 请求认证
- */
-export const MIX_API_KEY = "5rLeqyHtwwMzZ1CD4YlXBg/qSfKDbrpDCNkAvS186F4=";
-
 import MiningMachineHistoryABI from "./MiningMachineHistory";
 import MiningMachineHistoryExtendABI from "./MiningMachineHistoryExtend";
 import { MiningMachineNodeSystemABI } from "./MiningMachineNodeSystem";
@@ -81,7 +75,8 @@ const BSC_MAINNET_CONFIG: ChainContractAddresses = {
   STOCK_LOGIC_ADDRESS: "0x52c5B9c15bFbA0AE92537dd1F6E7fd5e0aB57385",
   ALLOWANCE_QUOTA: "10000000",
   RPC_URL: "https://bsc.publicnode.com",
-  BIND_ADDRESS_URL: "https://www.ihealth.vip/app",
+  BIND_ADDRESS_URL: "https://store.ihealth.vip",
+  // BIND_ADDRESS_URL: "http://192.168.1.173:20699",
 };
 
 // 2. BSC 测试网配置 (Chain ID: 97)
@@ -103,8 +98,8 @@ const BSC_TESTNET_CONFIG: ChainContractAddresses = {
   STOCK_LOGIC_ADDRESS: "0x0d6b85e446edcab6f97b3a9349268914a9742e75",
   ALLOWANCE_QUOTA: "10000000",
   RPC_URL: "https://bsc-testnet.publicnode.com",
-  BIND_ADDRESS_URL: "https://www.ihealth.vip/api",
-  // BIND_ADDRESS_URL: "http://192.168.1.176:8090",
+  BIND_ADDRESS_URL: "https://store.ihealth.vip",
+  // BIND_ADDRESS_URL: "http://192.168.1.173:20699",
 };
 
 // 3. Anvil Fork 配置 (Chain ID: 1056)
@@ -127,8 +122,8 @@ const ANVIL_FORK_CONFIG: ChainContractAddresses = {
   STOCK_LOGIC_ADDRESS: "0x52c5B9c15bFbA0AE92537dd1F6E7fd5e0aB57385",
   ALLOWANCE_QUOTA: "10000000",
   RPC_URL: import.meta.env.VITE_RPC_URL || "http://127.0.0.1:8545",
-  BIND_ADDRESS_URL: "https://www.ihealth.vip/api",
-  // BIND_ADDRESS_URL: "http://192.168.1.176:8090",
+  BIND_ADDRESS_URL: "https://store.ihealth.vip",
+  // BIND_ADDRESS_URL: "http://192.168.1.173:20699",
 };
 
 // 4. Anvil Local 配置 (Chain ID: 31337 或 1337)
@@ -174,7 +169,7 @@ const ANVIL_LOCAL_CONFIG: ChainContractAddresses = {
   STOCK_LOGIC_ADDRESS: "0xb90a7fdd69810f49cef8d58a1cf84d09829af0ce",
   ALLOWANCE_QUOTA: import.meta.env.VITE_ALLOWANCE_QUOTA || "10000000",
   RPC_URL: import.meta.env.VITE_RPC_URL || "http://127.0.0.1:8545",
-  BIND_ADDRESS_URL: "https://www.ihealth.vip/api",
+  BIND_ADDRESS_URL: "https://store.ihealth.vip",
   // BIND_ADDRESS_URL: "http://192.168.1.176:8090",
 };
 

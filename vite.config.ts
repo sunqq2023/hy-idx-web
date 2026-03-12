@@ -98,9 +98,10 @@ export default defineConfig({
     port: 3001,
     proxy: {
       "/api": {
-        target: "http://localhost:8090",
+        target: "http://192.168.1.173:20699",
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, ""),
+        secure: false,
+        rewrite: (path) => path, // 保持 /api 前缀，让服务端收到 /api/xxx
       },
       "/mix": {
         target: process.env.VITE_API_BASE_URL || "https://www.ihealth.vip/api",

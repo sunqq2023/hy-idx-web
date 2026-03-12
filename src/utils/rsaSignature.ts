@@ -1,11 +1,10 @@
 /**
  * RSA 签名工具
  * 用于对 API 请求进行签名
- * 使用 node-forge 库，与后端验证逻辑完全一致
+ * 使用与测试脚本完全一致的签名算法
  */
 
 import forge from "node-forge";
-import { MIX_API_KEY } from "@/constants";
 
 // RSA 私钥（从服务器获取的私钥）
 const PRIVATE_KEY_PEM = `-----BEGIN PRIVATE KEY-----
@@ -38,12 +37,12 @@ e3qWM/uD9fEV9tWrE+//vyo=
 -----END PRIVATE KEY-----`;
 
 /**
- * 使用 node-forge 进行 RSA 签名
- * 与测试脚本完全一致的实现
+ * 使用与测试脚本完全一致的 RSA 签名方法
+ * 在浏览器中使用 polyfill 来模拟 Node.js crypto
  * @param message 待签名的消息
  * @returns Base64 编码的签名
  */
-function signWithNodeForge(message: string): string {
+function signMessage(message: string): string {
   try {
     // 加载私钥
     const privateKey = forge.pki.privateKeyFromPem(PRIVATE_KEY_PEM);
@@ -105,7 +104,7 @@ export function signRequest(
   console.log("请求体长度:", body ? body.length : 0);
 
   // 使用私钥签名（匹配 node-forge 的签名流程）
-  const signature = signWithNodeForge(signString);
+  const signature = signMessage(signString);
 
   console.log("生成的签名（完整）:", signature);
   console.log("生成的签名长度:", signature.length);
@@ -142,16 +141,6 @@ export async function sendSignedRequest<T = unknown>(
       // 只使用 pathname，不包含查询参数
       urlPath = urlObj.pathname;
 
-      // 特殊处理：移除 /api 或 /app 前缀，只保留实际的接口路径
-      // 例如：
-      // https://www.ihealth.vip/api/mix/confirmBinding -> /mix/confirmBinding
-      // https://www.ihealth.vip/app/mix/confirmBinding -> /mix/confirmBinding
-      if (urlPath.startsWith("/api/")) {
-        urlPath = urlPath.substring(4); // 移除 "/api"
-      } else if (urlPath.startsWith("/app/")) {
-        urlPath = urlPath.substring(4); // 移除 "/app"
-      }
-
       console.log("🔍 URL 解析:", {
         原始URL: url,
         完整路径: urlObj.pathname,
@@ -161,13 +150,6 @@ export async function sendSignedRequest<T = unknown>(
       // 如果 URL 解析失败，尝试提取路径部分
       const match = url.match(/^https?:\/\/[^/]+(\/[^?#]*)/);
       urlPath = match ? match[1] : url;
-
-      // 同样处理 /api 和 /app 前缀
-      if (urlPath.startsWith("/api/")) {
-        urlPath = urlPath.substring(4);
-      } else if (urlPath.startsWith("/app/")) {
-        urlPath = urlPath.substring(4);
-      }
 
       console.warn("⚠️ URL parsing failed, extracted path:", urlPath, error);
     }
@@ -180,8 +162,8 @@ export async function sendSignedRequest<T = unknown>(
   // 生成签名（使用 pathname，与 node-forge 测试脚本一致）
   const { signature, timestamp } = signRequest(method, urlPath, bodyString);
 
-  // 获取 API Key（优先使用传入的参数，否则使用环境变量）
-  const finalApiKey = apiKey || MIX_API_KEY;
+  // MIX_API_KEY 已废弃：仅在显式传入 apiKey 时才发送该请求头
+  const finalApiKey = apiKey;
 
   console.log("📤 发送签名请求:", {
     method,
@@ -190,19 +172,24 @@ export async function sendSignedRequest<T = unknown>(
     签名前50字符: signature.substring(0, 50) + "...",
     签名完整: signature,
     时间戳: timestamp,
-    APIKey: finalApiKey,
+    APIKey: finalApiKey || "(未提供)",
     请求体: bodyString,
   });
+
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    "Content-Length": bodyString
+      ? new TextEncoder().encode(bodyString).length.toString()
+      : "0",
+    "X-Timestamp": timestamp,
+    "X-Signature": signature,
+  };
+  if (finalApiKey) headers["MIX-API-Key"] = finalApiKey;
 
   // 发送请求（使用完整 URL）
   const response = await fetch(url, {
     method,
-    headers: {
-      "Content-Type": "application/json",
-      "MIX-API-Key": finalApiKey,
-      "X-Signature": signature,
-      "X-Timestamp": timestamp,
-    },
+    headers,
     body: bodyString,
   });
 
@@ -216,14 +203,16 @@ export async function sendSignedRequest<T = unknown>(
       url: url,
       method: method,
       headers: {
-        "MIX-API-Key": finalApiKey,
+        ...(finalApiKey ? { "MIX-API-Key": finalApiKey } : {}),
         "X-Signature": signature.substring(0, 50) + "...",
         "X-Timestamp": timestamp,
       },
       requestBody: bodyString,
       errorData,
     });
-    throw new Error(errorData.message || `HTTP ${response.status}`);
+    throw new Error(
+      errorData.message || errorData.msg || `HTTP ${response.status}`,
+    );
   }
 
   const result = await response.json();
