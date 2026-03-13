@@ -1,8 +1,8 @@
 import { arrowSvg } from "@/assets";
 import AdaptiveNumber, { NumberType } from "@/components/AdaptiveNumber";
 import {
-    MiningMachineNodeSystemABI,
-    MiningMachineSystemStorageABI,
+  MiningMachineNodeSystemABI,
+  MiningMachineSystemStorageABI,
 } from "@/constants";
 import { useChainConfig } from "@/hooks/useChainConfig";
 import config from "@/proviers/config";
@@ -10,9 +10,9 @@ import { sendSignedRequest } from "@/utils/rsaSignature";
 import { validateAddressFnMap } from "@/utils/validateAddress";
 import { useQuery } from "@tanstack/react-query";
 import {
-    readContract,
-    waitForTransactionReceipt,
-    writeContract,
+  readContract,
+  waitForTransactionReceipt,
+  writeContract,
 } from "@wagmi/core";
 import { Button, Dialog, Input, TextArea, Toast } from "antd-mobile";
 import dayjs from "dayjs";
@@ -436,15 +436,30 @@ const UserTransferMix = () => {
       const amountValue =
         mallTransferType === "in" ? mallAmount : `-${mallAmount}`;
 
-      await sendSignedRequest("POST", `${mixApiBase}/mix/transferMix`, {
-        phone: boundPhone,
-        address: userAddress,
-        amount: amountValue,
-      });
+      const result = await sendSignedRequest(
+        "POST",
+        `${mixApiBase}/mix/transferMix`,
+        {
+          phone: boundPhone,
+          address: userAddress,
+          amount: amountValue,
+        },
+      );
+
+      // 检查API响应状态
+      if (result.status !== 200) {
+        throw new Error(result.msg || "转账失败");
+      }
+
+      // 检查业务逻辑是否成功
+      if (result.data?.success !== true) {
+        throw new Error(result.data?.message || result.msg || "转账失败");
+      }
 
       const numericAmount = Number(mallAmount || 0);
       if (!Number.isNaN(numericAmount) && numericAmount > 0) {
-        const delta = mallTransferType === "in" ? -numericAmount : numericAmount;
+        const delta =
+          mallTransferType === "in" ? -numericAmount : numericAmount;
         setMixBalance((prev) => {
           const current = Number(prev || 0);
           const nextValue = Number.isNaN(current) ? 0 : current + delta;
@@ -535,7 +550,7 @@ const UserTransferMix = () => {
                       : "bg-[#f5f5f7] text-gray-600"
                   }`}
                 >
-                钱包 -&gt; 商城
+                  钱包 -&gt; 商城
                 </button>
                 <button
                   onClick={() => setMallTransferType("out")}
@@ -579,7 +594,11 @@ const UserTransferMix = () => {
                           : filtered;
                       setMallAmount(result);
                     }}
-                    placeholder={mallTransferType === "in" ? "输入转出数量" : "输入转入数量"}
+                    placeholder={
+                      mallTransferType === "in"
+                        ? "输入转出数量"
+                        : "输入转入数量"
+                    }
                     className="!bg-[#f5f5f7] !rounded-2xl !p-3 !pr-24 !border-none"
                     style={{
                       fontSize: "14px",
@@ -598,7 +617,9 @@ const UserTransferMix = () => {
                         全部
                       </button>
                     )}
-                    <span className="text-[13px] text-gray-500 font-medium">MIX</span>
+                    <span className="text-[13px] text-gray-500 font-medium">
+                      MIX
+                    </span>
                   </div>
                 </div>
               </div>
@@ -704,7 +725,9 @@ const UserTransferMix = () => {
                 >
                   全部
                 </Button>
-                <span className="text-[13px] text-gray-500 font-medium">MIX</span>
+                <span className="text-[13px] text-gray-500 font-medium">
+                  MIX
+                </span>
               </div>
             </div>
           </div>
