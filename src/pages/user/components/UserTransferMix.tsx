@@ -55,9 +55,44 @@ const UserTransferMix = () => {
   const [mixBalance, setMixBalance] = useState("0");
   const [mallTransferLoading, setMallTransferLoading] = useState(false);
   const [transferLoading, setTransferLoading] = useState(false);
+  // 定义API响应接口
+  interface ApiResponse {
+    status: number;
+    msg: string;
+    data: {
+      success: boolean;
+      message?: string;
+    };
+  }
+
   const [pendingRecords, setPendingRecords] = useState<
     MixBalanceChangedEvent[]
   >([]);
+
+  // 检查商城服务时间
+  const checkMallServiceTime = (): boolean => {
+    const now = new Date();
+
+    // 转换为北京时间 (UTC+8)
+    const beijingTime = new Date(
+      now.getTime() + (8 - now.getTimezoneOffset() / 60) * 60 * 60 * 1000,
+    );
+    const hours = beijingTime.getHours();
+    const minutes = beijingTime.getMinutes();
+    const currentMinutes = hours * 60 + minutes;
+
+    // 22:58 = 22*60 + 58 = 1378 分钟
+    // 01:01 = 1*60 + 1 = 61 分钟
+    const serviceStart = 61; // 01:01
+    const serviceEnd = 1378; // 22:58
+
+    // 如果当前时间在 22:58-23:59 或 00:00-01:01 之间，暂停服务
+    if (currentMinutes >= serviceEnd || currentMinutes < serviceStart) {
+      return false; // 暂停服务
+    }
+
+    return true; // 正常服务
+  };
 
   const handlBack = () => {
     navigate("/user");
@@ -293,8 +328,6 @@ const UserTransferMix = () => {
         confirmations: 1, // 等待 1 个确认
       });
 
-      console.log("Transaction receipt:", receipt);
-
       // 检查交易状态
       if (receipt.status === "success") {
         Toast.clear();
@@ -425,6 +458,16 @@ const UserTransferMix = () => {
     });
     if (!confirmed) return;
 
+    // 检查商城服务时间
+    if (!checkMallServiceTime()) {
+      Toast.show({
+        content: "商城暂停服务中",
+        position: "center",
+        duration: 3000,
+      });
+      return;
+    }
+
     setMallTransferLoading(true);
     Toast.show({
       content: `${mallTransferType === "in" ? "转出" : "转入"}处理中...`,
@@ -432,65 +475,260 @@ const UserTransferMix = () => {
       duration: 0,
     });
 
-    try {
-      const amountValue =
-        mallTransferType === "in" ? mallAmount : `-${mallAmount}`;
+    if (mallTransferType === "in") {
+      // 钱包转商城：先调用接口，再调用链上，链上失败时回滚
+      const mallContractAddress =
+        "0x1cea1dc56Be6ab13Ad590Ff367c3Af375DA98A7d" as `0x${string}`;
 
-      const result = await sendSignedRequest(
-        "POST",
-        `${mixApiBase}/mix/transferMix`,
-        {
-          phone: boundPhone,
-          address: userAddress,
-          amount: amountValue,
-        },
-      );
-
-      // 检查API响应状态
-      if (result.status !== 200) {
-        throw new Error(result.msg || "转账失败");
-      }
-
-      // 检查业务逻辑是否成功
-      if (result.data?.success !== true) {
-        throw new Error(result.data?.message || result.msg || "转账失败");
-      }
-
-      const numericAmount = Number(mallAmount || 0);
-      if (!Number.isNaN(numericAmount) && numericAmount > 0) {
-        const delta =
-          mallTransferType === "in" ? -numericAmount : numericAmount;
-        setMixBalance((prev) => {
-          const current = Number(prev || 0);
-          const nextValue = Number.isNaN(current) ? 0 : current + delta;
-          return nextValue.toString();
+      try {
+        Toast.show({
+          content: "更新商城余额中...",
+          position: "center",
+          duration: 0,
         });
+
+        // 1. 先调用 /api/mix/updateMix 接口，增加商城余额
+        const updateResult = await sendSignedRequest<ApiResponse>(
+          "POST",
+          `${mixApiBase}/mix/updateMix`,
+          {
+            phone: boundPhone,
+            address: userAddress,
+            amount: mallAmount, // 正数，表示转入商城
+          },
+        );
+
+        // 检查API响应状态
+        if (updateResult.status !== 200) {
+          throw new Error(updateResult.msg || "更新商城余额失败");
+        }
+
+        // 检查业务逻辑是否成功
+        if (updateResult.data?.success !== true) {
+          throw new Error(
+            updateResult.data?.message ||
+              updateResult.msg ||
+              "更新商城余额失败",
+          );
+        }
+
+        Toast.show({
+          content: "链上转账中...",
+          position: "center",
+          duration: 0,
+        });
+
+        // 2. 接口成功后，调用链上 transferMix 方法
+        const hash = await writeContract(config, {
+          address: MiningMachineNodeSystemAddress,
+          abi: MiningMachineNodeSystemABI,
+          functionName: "transferMix",
+          args: [mallContractAddress, parseEther(mallAmount)],
+          gas: 100000n,
+        });
+
+        console.log("Transaction hash:", hash);
+
+        // 等待交易确认
+        const receipt = await waitForTransactionReceipt(config, {
+          hash,
+          timeout: 120000, // 120 秒超时
+          confirmations: 1, // 等待 1 个确认
+        });
+
+        // 检查交易状态
+        if (receipt.status !== "success") {
+          throw new Error("链上转账失败");
+        }
+
+        // 链上成功，完全成功
+        Toast.clear();
+        Toast.show({
+          content: "转账成功",
+          position: "center",
+          duration: 2000,
+        });
+
+        // 立即添加到本地待确认记录（乐观更新）
+        const newRecord: MixBalanceChangedEvent = {
+          id: `local-mall-${hash}`,
+          from: userAddress!.toLowerCase(),
+          to: mallContractAddress.toLowerCase(),
+          amount: parseEther(mallAmount).toString(),
+          action: "transferMix",
+          blockTimestamp: Math.floor(Date.now() / 1000).toString(),
+          transactionHash: hash,
+        };
+        setPendingRecords((prev) => [newRecord, ...prev]);
+
+        // 更新本地余额
+        const numericAmount = Number(mallAmount || 0);
+        if (!Number.isNaN(numericAmount) && numericAmount > 0) {
+          setMixBalance((prev) => {
+            const current = Number(prev || 0);
+            const nextValue = Number.isNaN(current)
+              ? 0
+              : current - numericAmount;
+            return nextValue.toString();
+          });
+        }
+
+        setMallAmount("");
+        queryMIXBalance(); // 刷新链上余额
+      } catch (error) {
+        // 链上调用失败，需要回滚接口
+        console.error("链上转账失败，正在回滚商城余额:", error);
+
+        // 优化错误提示
+        let userFriendlyMessage = "链上转账失败";
+        if (error instanceof Error) {
+          const errorMsg = error.message.toLowerCase();
+
+          if (
+            errorMsg.includes("user rejected") ||
+            errorMsg.includes("rejected")
+          ) {
+            userFriendlyMessage = "用户取消了交易";
+          } else if (
+            errorMsg.includes("execution reverted") ||
+            errorMsg.includes("revert")
+          ) {
+            userFriendlyMessage = "转账失败：合约执行被拒绝";
+          } else if (
+            errorMsg.includes("timeout") ||
+            errorMsg.includes("timed out")
+          ) {
+            userFriendlyMessage = "网络超时，请稍后重试";
+          } else if (
+            errorMsg.includes("network") ||
+            errorMsg.includes("connection")
+          ) {
+            userFriendlyMessage = "网络连接异常，请检查网络后重试";
+          } else if (
+            errorMsg.includes("gas") ||
+            errorMsg.includes("insufficient funds")
+          ) {
+            userFriendlyMessage = "BNB余额不足，无法支付Gas费用";
+          } else {
+            userFriendlyMessage = "未知错误，请联系客服";
+          }
+        }
+
+        Toast.show({
+          content: `${userFriendlyMessage}，正在回滚商城余额...`,
+          position: "center",
+          duration: 0,
+        });
+
+        try {
+          // 调用回滚接口，用负数把商城的MIX减掉
+          const rollbackResult = await sendSignedRequest<ApiResponse>(
+            "POST",
+            `${mixApiBase}/mix/updateMix`,
+            {
+              phone: boundPhone,
+              address: userAddress,
+              amount: `-${mallAmount}`, // 负数，表示从商城减掉
+            },
+          );
+
+          if (rollbackResult.status === 200 && rollbackResult.data?.success) {
+            Toast.clear();
+            Toast.show({
+              content: `${userFriendlyMessage}，商城余额已回滚`,
+              position: "center",
+              duration: 3000,
+            });
+          } else {
+            Toast.clear();
+            Toast.show({
+              content: `${userFriendlyMessage}，商城余额回滚失败，请联系客服`,
+              position: "center",
+              duration: 5000,
+            });
+          }
+        } catch (rollbackError) {
+          console.error("回滚失败:", rollbackError);
+          Toast.clear();
+          Toast.show({
+            content: `${userFriendlyMessage}，商城余额回滚失败，请联系客服`,
+            position: "center",
+            duration: 5000,
+          });
+        }
+      } finally {
+        setMallTransferLoading(false);
       }
+    } else {
+      try {
+        // 商城转钱包：保留现有功能
+        const amountValue = `-${mallAmount}`;
 
-      const nextBalance =
-        mallTransferType === "in"
-          ? +mixBalance - +mallAmount
-          : +mixBalance + +mallAmount;
-      setMixBalance(nextBalance.toString());
+        const result = await sendSignedRequest<ApiResponse>(
+          "POST",
+          `${mixApiBase}/mix/transferMix`,
+          {
+            phone: boundPhone,
+            address: userAddress,
+            amount: amountValue,
+          },
+        );
 
-      Toast.clear();
-      Toast.show({
-        content: "提交成功",
-        position: "center",
-        duration: 2000,
-      });
+        // 检查API响应状态
+        if (result.status !== 200) {
+          throw new Error(result.msg || "转账失败");
+        }
 
-      setMallAmount("");
-    } catch (error) {
-      Toast.clear();
-      const message = error instanceof Error ? error.message : "提交失败";
-      Toast.show({
-        content: message || "提交失败",
-        position: "center",
-        duration: 3000,
-      });
-    } finally {
-      setMallTransferLoading(false);
+        // 检查业务逻辑是否成功
+        if (result.data?.success !== true) {
+          throw new Error(result.data?.message || result.msg || "转账失败");
+        }
+
+        // 立即添加到本地待确认记录（乐观更新）
+        const mallContractAddress =
+          "0x1cea1dc56Be6ab13Ad590Ff367c3Af375DA98A7d";
+        const newRecord: MixBalanceChangedEvent = {
+          id: `local-mall-${Date.now()}`,
+          from: mallContractAddress.toLowerCase(),
+          to: userAddress!.toLowerCase(),
+          amount: parseEther(mallAmount).toString(),
+          action: "transferMix",
+          blockTimestamp: Math.floor(Date.now() / 1000).toString(),
+          transactionHash: `0x${Math.random().toString(16).slice(2, 66)}`, // 生成模拟hash
+        };
+        setPendingRecords((prev) => [newRecord, ...prev]);
+
+        const numericAmount = Number(mallAmount || 0);
+        if (!Number.isNaN(numericAmount) && numericAmount > 0) {
+          setMixBalance((prev) => {
+            const current = Number(prev || 0);
+            const nextValue = Number.isNaN(current)
+              ? 0
+              : current + numericAmount;
+            return nextValue.toString();
+          });
+        }
+
+        Toast.clear();
+        Toast.show({
+          content: "提交成功",
+          position: "center",
+          duration: 2000,
+        });
+
+        setMallAmount("");
+        queryMIXBalance(); // 刷新链上余额
+      } catch (error) {
+        Toast.clear();
+        const message = error instanceof Error ? error.message : "提交失败";
+        Toast.show({
+          content: message || "提交失败",
+          position: "center",
+          duration: 3000,
+        });
+      } finally {
+        setMallTransferLoading(false);
+      }
     }
   };
 
@@ -799,12 +1037,11 @@ const UserTransferMix = () => {
                       </span>
                       <span className="text-gray-800 flex-1">
                         {record.action === "transferMix" ||
+                        record.action === "addMixForUser" ||
+                        record.action === "subMixForUser" ||
                         record.action === "changeUserAddress"
                           ? "用户转账"
-                          : record.action === "addMixForUser" ||
-                              record.action === "subMixForUser"
-                            ? "兑换"
-                            : "系统转账"}
+                          : "系统转账"}
                       </span>
                     </div>
                   </div>

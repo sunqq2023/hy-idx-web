@@ -2,39 +2,27 @@
  * RSA 签名工具
  * 用于对 API 请求进行签名
  * 使用与测试脚本完全一致的签名算法
+ *
+ * 🔒 安全提醒：
+ * - 生产环境不应该在前端存储私钥
+ * - 开发环境可以从 .env 文件读取
  */
 
 import forge from "node-forge";
 
-// RSA 私钥（从服务器获取的私钥）
-const PRIVATE_KEY_PEM = `-----BEGIN PRIVATE KEY-----
-MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCzof8kmgUXNV7L
-8C4+5mdskh6lr0o+ksvCIKejZ+oRdJZLlcxa9EanzPl+MNZ1LURJQ1N+btHfoEd+
-xntS7pKMCRwVzJejMa0XQ2/utSRzBAsPQBtaycWLY66jw4iEIZ7zzB+cFCRqae8b
-DghgyaBLFfyCR2NpIMu28ZMnXk1C7cJd6t1aLLQT26ipnfJJgNHfPWq1hfZd9vSw
-P86ewfwi31v+1h2mbblbjx7RVFyOypwgdhnXSQSFauRhogKEd6exdZMvzcVTkXCl
-MR1xkIZK50Fk4aLnqkwvg/FDJz0LbvXx1pCbIVSV+/BxDpwm00VQ+l5FndQp79x5
-DXX/FGk9AgMBAAECggEACnjxi8P584AuSmPygkLC+VKsfDrTsIG05NisBUwH2qQq
-JfZx/0R6AQrjab61pgexUTceXULfM/Mfb+3o3y0e+JCIZWHz3jUFcxOAqVFAsn7k
-GSvC3IBiZq21TwFVimR+ZJa8KgiHlfeek7x18xSWJoJ94eeBDW42yi/bxSILjZD/
-a/sa+SLEXEoYWHYhhVGOUxfmd/B0CmJibj+CqYcm9gJcqrbeD5f8zpv20735yeGl
-omZLDVez2uiHW1SG+pzJBgEdm/m3jpeI8JaOgH2SotT2zWNOwa7RunPH6ndjT0sr
-iPCY/Ei7ee8woCS8LNdNuLMtkD2buca0XOUeIGWDgQKBgQDeu9uxDlTuMwHKNCyl
-PXp5S0dB7UrUOebAwQroG2aEbH+j2+oCzIktoPRLHp8fybgOaOnuKvy7B7luEFH4
-+u5lKCSv/n3bTlY3THk8hkNYSW/HorHYoXq+jwLJT6GJhuQzjbOoSrhhT34uSbUN
-ER2XDbRRjQz7K6VMFxFwQ1D5gQKBgQDOdjAB4l1gVQlUzFiyCjoyRqi3irYNB3mX
-8Y5BHWAGSHOKTTLXVPkjlW8HPiMAk90Iw5iaUZODqJUnECTIfDOjZxXImm8eT92z
-/IotQ/DbxDg7o+17PsssL+Os5rifFigcDMomnh5KwLWicGzrBiINm3BgrjxkprCq
-pB4GVeS1vQKBgELeDQ9zqQW15HSrAzg8Y7dkZSkirxNVqrP1gGu8RiO9Wvh7fh6G
-/yvmpVCkCcuGSK5yysAIwcT4ha/IUIO5+bX+vjzj3y7mrrV9TOxhtngb2+YILvJF
-UE9DKef78xgRmhLsGKKOhBoavlvxHtykZcjCgX72JI6HROG6Dy8v1nCBAoGBALyD
-rdIKnrgW7S5AZ7wpGnpNikAMp6295YiXRwythcA250igtItpSxLyny49zjf4yxn1
-fqFpWwgcJhRE6VEmFwBcX8eLO2qyAf0V2hT6tDH2OGI8i9q8u0bdc0WsZWbdFEKI
-awxX09DtpOttPAZc0zsZcsLUVNCSYz1sHP4r72kBAoGAbuHvo4zZAi4p7/Gof0y7
-NuRhEkNYDJlntLVfmXoce2723F9payKOIv1YIpmHt3aPxsDomMqUmFwSnCd9wD0I
-+6Wy7LtD3PlP+OeDvdcgGKvmL/epbHn9e+8SR4u8FfIavvir4jOK9qb7Dnohikv9
-e3qWM/uD9fEV9tWrE+//vyo=
------END PRIVATE KEY-----`;
+/**
+ * 从环境变量获取私钥
+ * 统一从环境变量读取，开发和生产环境都使用相同方式
+ */
+function getPrivateKey(): string {
+  const privateKey = import.meta.env.VITE_RSA_PRIVATE_KEY;
+
+  if (!privateKey) {
+    throw new Error("未找到RSA私钥，请在 .env 文件中设置 VITE_RSA_PRIVATE_KEY");
+  }
+
+  return privateKey;
+}
 
 /**
  * 使用与测试脚本完全一致的 RSA 签名方法
@@ -45,7 +33,8 @@ e3qWM/uD9fEV9tWrE+//vyo=
 function signMessage(message: string): string {
   try {
     // 加载私钥
-    const privateKey = forge.pki.privateKeyFromPem(PRIVATE_KEY_PEM);
+    const privateKeyPem = getPrivateKey();
+    const privateKey = forge.pki.privateKeyFromPem(privateKeyPem);
 
     // 创建 SHA-256 消息摘要
     const md = forge.md.sha256.create();
@@ -56,13 +45,6 @@ function signMessage(message: string): string {
 
     // 转换为 Base64
     const signatureBase64 = forge.util.encode64(signature);
-
-    console.log("✅ 签名生成成功:", {
-      消息长度: message.length,
-      签名长度: signatureBase64.length,
-      签名前50字符: signatureBase64.substring(0, 50),
-    });
-
     return signatureBase64;
   } catch (error) {
     console.error("❌ RSA 签名失败:", error);
@@ -94,22 +76,8 @@ export function signRequest(
   // 构建待签名字符串（完全匹配 node-forge 示例格式）
   const signString = `method=${method}&url=${url}&timestamp=${timestamp}&body=${body || ""}`;
 
-  console.log("========== RSA 签名调试 ==========");
-  console.log("待签名字符串:", signString);
-  console.log("待签名字符串长度:", signString.length);
-  console.log("时间戳（秒）:", timestamp);
-  console.log("方法:", method);
-  console.log("URL:", url);
-  console.log("请求体:", body || "(空)");
-  console.log("请求体长度:", body ? body.length : 0);
-
   // 使用私钥签名（匹配 node-forge 的签名流程）
   const signature = signMessage(signString);
-
-  console.log("生成的签名（完整）:", signature);
-  console.log("生成的签名长度:", signature.length);
-  console.log("========== 签名完成 ==========");
-
   return {
     signature,
     timestamp: timestamp.toString(),
@@ -140,12 +108,6 @@ export async function sendSignedRequest<T = unknown>(
       const urlObj = new URL(url);
       // 只使用 pathname，不包含查询参数
       urlPath = urlObj.pathname;
-
-      console.log("🔍 URL 解析:", {
-        原始URL: url,
-        完整路径: urlObj.pathname,
-        签名路径: urlPath,
-      });
     } catch (error) {
       // 如果 URL 解析失败，尝试提取路径部分
       const match = url.match(/^https?:\/\/[^/]+(\/[^?#]*)/);
@@ -156,7 +118,6 @@ export async function sendSignedRequest<T = unknown>(
   } else {
     // 相对路径直接使用
     urlPath = url.startsWith("/") ? url : `/${url}`;
-    console.log("🔍 相对路径:", { 原始: url, 处理后: urlPath });
   }
 
   // 生成签名（使用 pathname，与 node-forge 测试脚本一致）
@@ -164,17 +125,6 @@ export async function sendSignedRequest<T = unknown>(
 
   // MIX_API_KEY 已废弃：仅在显式传入 apiKey 时才发送该请求头
   const finalApiKey = apiKey;
-
-  console.log("📤 发送签名请求:", {
-    method,
-    完整URL: url,
-    签名路径: urlPath,
-    签名前50字符: signature.substring(0, 50) + "...",
-    签名完整: signature,
-    时间戳: timestamp,
-    APIKey: finalApiKey || "(未提供)",
-    请求体: bodyString,
-  });
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -216,6 +166,5 @@ export async function sendSignedRequest<T = unknown>(
   }
 
   const result = await response.json();
-  console.log("✅ 请求成功:", result);
   return result;
 }

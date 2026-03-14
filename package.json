@@ -10,6 +10,7 @@
     "dev:test": "vite --mode test",
     "build": "vite build --mode production",
     "build:fork": "vite build --mode fork",
+    "build:prod": "RSA_PRIVATE_KEY=\"$RSA_PRIVATE_KEY\" vite build --mode production",
     "build:with-check": "npm run type-check && vite build --mode production",
     "type-check": "tsc --noEmit",
     "lint": "eslint .",

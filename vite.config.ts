@@ -1,4 +1,4 @@
-import { defineConfig } from "vite";
+import { defineConfig, Plugin } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import tailwindcss from "@tailwindcss/vite";
 import tsconfigPaths from "vite-tsconfig-paths";
@@ -6,6 +6,34 @@ import svgr from "vite-plugin-svgr";
 import { nodePolyfills } from "vite-plugin-node-polyfills";
 import path from "path";
 // import { visualizer } from "rollup-plugin-visualizer";
+
+/**
+ * 🔐 RSA私钥注入插件
+ * 在构建时动态注入私钥，避免在代码中硬编码
+ * 开发环境：从环境变量读取
+ * 生产环境：从环境变量读取
+ */
+function rsaPrivateKeyPlugin(): Plugin {
+  return {
+    name: "rsa-private-key-injector",
+    config(config, { command }) {
+      // 从环境变量读取私钥
+      const privateKey = process.env.RSA_PRIVATE_KEY;
+
+      if (privateKey) {
+        // 注入到环境变量
+        process.env.VITE_RSA_PRIVATE_KEY = privateKey;
+        console.log("✅ RSA私钥已注入到构建环境");
+        console.log(`🔑 私钥长度: ${privateKey.length} 字符`);
+      } else {
+        console.warn("⚠️ 警告: 未设置 RSA_PRIVATE_KEY 环境变量");
+        if (command === "build") {
+          console.warn("生产环境构建需要设置 RSA_PRIVATE_KEY 环境变量");
+        }
+      }
+    },
+  };
+}
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -74,6 +102,7 @@ export default defineConfig({
     ],
   },
   plugins: [
+    rsaPrivateKeyPlugin(), // 🔐 RSA私钥注入插件
     nodePolyfills({
       include: ["crypto", "stream", "buffer", "process"],
       globals: {
