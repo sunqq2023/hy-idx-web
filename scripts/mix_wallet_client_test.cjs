@@ -3,6 +3,7 @@ const http = require("http");
 const https = require("https");
 const fs = require("fs");
 const path = require("path");
+const forge = require("node-forge");
 
 // 读取 .env 文件中的 VITE_RSA_PRIVATE_KEY
 function loadPrivateKeyFromEnv() {
@@ -33,15 +34,15 @@ function loadPrivateKeyFromEnv() {
 }
 
 // 示例：
-// node test\\mix_wallet_client_test.js bindWallet --phone 13800138000 --address 0x12 --sms_code 12345
-// node test\\mix_wallet_client_test.js transferMix --phone 13800138000 --address 0x12 --amount 10
-// node test\\mix_wallet_client_test.js checkBinding --phone 13800138000 --address 0x12
-// node test\\mix_wallet_client_test.js unbindWallet --phone 13800138000 --address 0x12
+// node scripts/mix_wallet_client_test.cjs bindWallet --phone 13800138000 --address 0x12 --sms_code 12345
+// node scripts/mix_wallet_client_test.cjs transferMix --phone 13800138000 --address 0x12 --amount 10
+// node scripts/mix_wallet_client_test.cjs checkBinding --phone 13800138000 --address 0x12
+// node scripts/mix_wallet_client_test.cjs unbindWallet --phone 13800138000 --address 0x12
 
 // ========== 配置区域 ==========
 // 1. 配置服务器地址
-const API_BASE = "http://192.168.1.173:20699";
-// const API_BASE = "https://store.ihealth.vip/api";
+// const API_BASE = "http://192.168.1.173:20699";
+const API_BASE = "https://store.ihealth.vip";
 
 // 3. 配置私钥（从 .env 文件读取 VITE_RSA_PRIVATE_KEY）
 const PRIVATE_KEY = loadPrivateKeyFromEnv();
@@ -54,16 +55,33 @@ const ROUTES = {
 };
 
 if (!PRIVATE_KEY) {
-  console.error("缺少环境变量 MIX_RSA_PRIVATE_KEY");
+  console.error("缺少环境变量 VITE_RSA_PRIVATE_KEY");
   process.exit(1);
 }
 
 function buildSignature(method, url, timestamp, body) {
-  const signString = `method=${method}&url=${url}&timestamp=${timestamp}&body=${body || ""}`;
-  const sign = crypto.createSign("RSA-SHA256");
-  sign.update(signString);
-  sign.end();
-  return sign.sign(PRIVATE_KEY, "base64");
+  try {
+    // 构建待签名字符串（与前端完全一致）
+    const signString = `method=${method}&url=${url}&timestamp=${timestamp}&body=${body || ""}`;
+
+    // 加载私钥（与前端完全一致）
+    const privateKey = forge.pki.privateKeyFromPem(PRIVATE_KEY);
+
+    // 创建 SHA-256 消息摘要（与前端完全一致）
+    const md = forge.md.sha256.create();
+    md.update(signString, "utf8");
+
+    // 使用私钥签名（与前端完全一致）
+    const signature = privateKey.sign(md);
+
+    // 转换为 Base64（与前端完全一致）
+    const signatureBase64 = forge.util.encode64(signature);
+
+    return signatureBase64;
+  } catch (error) {
+    console.error("❌ RSA 签名失败:", error);
+    throw new Error("签名失败");
+  }
 }
 
 function parseArgs(argv) {

@@ -5,30 +5,46 @@ import tsconfigPaths from "vite-tsconfig-paths";
 import svgr from "vite-plugin-svgr";
 import { nodePolyfills } from "vite-plugin-node-polyfills";
 import path from "path";
-// import { visualizer } from "rollup-plugin-visualizer";
+import { loadEnv } from "vite";
 
 /**
- * 🔐 RSA私钥注入插件
- * 在构建时动态注入私钥，避免在代码中硬编码
- * 开发环境：从环境变量读取
- * 生产环境：从环境变量读取
+ * 🔐 RSA私钥验证插件
+ * 验证私钥环境变量是否正确设置，避免在代码中硬编码
+ * 开发环境：验证环境变量
+ * 生产环境：验证环境变量
  */
 function rsaPrivateKeyPlugin(): Plugin {
   return {
-    name: "rsa-private-key-injector",
-    config(config, { command }) {
-      // 从环境变量读取私钥
-      const privateKey = process.env.RSA_PRIVATE_KEY;
+    name: "rsa-private-key-validator",
+    config(config, { mode }) {
+      // 手动加载环境变量
+      const env = loadEnv(mode, process.cwd(), "");
+
+      // 验证环境变量
+      const privateKey = env.VITE_RSA_PRIVATE_KEY;
 
       if (privateKey) {
-        // 注入到环境变量
-        process.env.VITE_RSA_PRIVATE_KEY = privateKey;
-        console.log("✅ RSA私钥已注入到构建环境");
+        console.log("✅ VITE_RSA_PRIVATE_KEY 环境变量已设置");
         console.log(`🔑 私钥长度: ${privateKey.length} 字符`);
+
+        // 验证私钥格式
+        if (
+          !privateKey.includes("-----BEGIN PRIVATE KEY-----") ||
+          !privateKey.includes("-----END PRIVATE KEY-----")
+        ) {
+          console.error("❌ 私钥格式不正确，请确保包含完整的 PEM 格式");
+          throw new Error("私钥格式不正确");
+        }
       } else {
-        console.warn("⚠️ 警告: 未设置 RSA_PRIVATE_KEY 环境变量");
-        if (command === "build") {
-          console.warn("生产环境构建需要设置 RSA_PRIVATE_KEY 环境变量");
+        console.warn("⚠️ 警告: 未设置 VITE_RSA_PRIVATE_KEY 环境变量");
+        console.warn(
+          "💡 提示: 开发环境请在 .env 文件中设置 VITE_RSA_PRIVATE_KEY",
+        );
+        if (mode === "production") {
+          console.error(
+            "❌ 生产环境构建必须设置 VITE_RSA_PRIVATE_KEY 环境变量",
+          );
+          throw new Error("生产环境构建需要设置 VITE_RSA_PRIVATE_KEY 环境变量");
         }
       }
     },

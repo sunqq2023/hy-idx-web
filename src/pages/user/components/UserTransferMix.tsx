@@ -1,25 +1,20 @@
 import { arrowSvg } from "@/assets";
 import AdaptiveNumber, { NumberType } from "@/components/AdaptiveNumber";
-import {
-  MiningMachineNodeSystemABI,
-  MiningMachineSystemStorageABI,
-} from "@/constants";
+import { MiningMachineNodeSystemABI } from "@/constants";
 import { useChainConfig } from "@/hooks/useChainConfig";
 import config from "@/proviers/config";
 import { sendSignedRequest } from "@/utils/rsaSignature";
 import { validateAddressFnMap } from "@/utils/validateAddress";
 import { useQuery } from "@tanstack/react-query";
-import {
-  readContract,
-  waitForTransactionReceipt,
-  writeContract,
-} from "@wagmi/core";
+import { waitForTransactionReceipt, writeContract } from "@wagmi/core";
 import { Button, Dialog, Input, TextArea, Toast } from "antd-mobile";
 import dayjs from "dayjs";
-import { useCallback, useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { formatEther, parseEther } from "viem";
 import { useAccount } from "wagmi";
+import { readContract } from "@wagmi/core";
+import { MiningMachineSystemStorageABI } from "@/constants";
 
 interface MixBalanceChangedEvent {
   id: string;
@@ -42,8 +37,6 @@ const UserTransferMix = () => {
   const boundPhone =
     (location.state as { boundPhone?: string } | undefined)?.boundPhone || "";
 
-  const MiningMachineSystemStorageAddress =
-    chainConfig.STORAGE_ADDRESS as `0x${string}`;
   const MiningMachineNodeSystemAddress =
     chainConfig.NODE_SYSTEM_ADDRESS as `0x${string}`;
 
@@ -52,9 +45,30 @@ const UserTransferMix = () => {
   const [receiveAddress, setReceiveAddress] = useState("");
   const [transferAmount, setTransferAmount] = useState("");
   const [mallAmount, setMallAmount] = useState("");
-  const [mixBalance, setMixBalance] = useState("0");
+  const [mixBalance, setMixBalance] = useState("0"); // 本地余额状态
   const [mallTransferLoading, setMallTransferLoading] = useState(false);
   const [transferLoading, setTransferLoading] = useState(false);
+
+  // 查询 MIX 余额
+  useEffect(() => {
+    const queryMIXBalance = async () => {
+      if (!userAddress) return;
+      try {
+        const res = await readContract(config, {
+          address: chainConfig.STORAGE_ADDRESS as `0x${string}`,
+          abi: MiningMachineSystemStorageABI,
+          functionName: "mixBalances",
+          args: [userAddress],
+        });
+        setMixBalance(res ? formatEther(res as bigint) : "0");
+      } catch (error) {
+        console.error("查询MIX余额失败:", error);
+        setMixBalance("0");
+      }
+    };
+
+    queryMIXBalance();
+  }, [userAddress, chainConfig.STORAGE_ADDRESS]);
   // 定义API响应接口
   interface ApiResponse {
     status: number;
@@ -101,26 +115,6 @@ const UserTransferMix = () => {
   const handleGoBind = () => {
     navigate("/user");
   };
-
-  // 查询 MIX 余额
-  const queryMIXBalance = useCallback(async () => {
-    if (!userAddress) return;
-    try {
-      const res = await readContract(config, {
-        address: MiningMachineSystemStorageAddress,
-        abi: MiningMachineSystemStorageABI,
-        functionName: "mixBalances",
-        args: [userAddress],
-      });
-      setMixBalance(res ? formatEther(res as bigint) : "0");
-    } catch (error) {
-      console.error(error);
-    }
-  }, [userAddress, MiningMachineSystemStorageAddress]);
-
-  useEffect(() => {
-    queryMIXBalance();
-  }, [queryMIXBalance]);
 
   // 从 The Graph 查询转账记录（from 或 to 等于当前钱包地址）
   const { data: transferRecords = [] } = useQuery({
@@ -337,6 +331,14 @@ const UserTransferMix = () => {
           duration: 2000,
         });
 
+        // 更新本地余额
+        const numericAmount = Number(transferAmount || 0);
+        if (!Number.isNaN(numericAmount) && numericAmount > 0) {
+          const current = Number(mixBalance || 0);
+          const nextValue = Number.isNaN(current) ? 0 : current - numericAmount;
+          setMixBalance(nextValue.toString());
+        }
+
         // 立即添加到本地待确认记录（乐观更新）
         const newRecord: MixBalanceChangedEvent = {
           id: `local-${hash}`,
@@ -349,10 +351,9 @@ const UserTransferMix = () => {
         };
         setPendingRecords((prev) => [newRecord, ...prev]);
 
-        // 清空表单并刷新余额
+        // 清空表单
         setReceiveAddress("");
         setTransferAmount("");
-        queryMIXBalance();
       } else {
         // 交易失败
         throw new Error("Transaction failed");
@@ -564,17 +565,12 @@ const UserTransferMix = () => {
         // 更新本地余额
         const numericAmount = Number(mallAmount || 0);
         if (!Number.isNaN(numericAmount) && numericAmount > 0) {
-          setMixBalance((prev) => {
-            const current = Number(prev || 0);
-            const nextValue = Number.isNaN(current)
-              ? 0
-              : current - numericAmount;
-            return nextValue.toString();
-          });
+          const current = Number(mixBalance || 0);
+          const nextValue = Number.isNaN(current) ? 0 : current - numericAmount;
+          setMixBalance(nextValue.toString());
         }
 
         setMallAmount("");
-        queryMIXBalance(); // 刷新链上余额
       } catch (error) {
         // 链上调用失败，需要回滚接口
         console.error("链上转账失败，正在回滚商城余额:", error);
@@ -698,15 +694,12 @@ const UserTransferMix = () => {
         };
         setPendingRecords((prev) => [newRecord, ...prev]);
 
+        // 更新本地余额
         const numericAmount = Number(mallAmount || 0);
         if (!Number.isNaN(numericAmount) && numericAmount > 0) {
-          setMixBalance((prev) => {
-            const current = Number(prev || 0);
-            const nextValue = Number.isNaN(current)
-              ? 0
-              : current + numericAmount;
-            return nextValue.toString();
-          });
+          const current = Number(mixBalance || 0);
+          const nextValue = Number.isNaN(current) ? 0 : current + numericAmount;
+          setMixBalance(nextValue.toString());
         }
 
         Toast.clear();
@@ -717,7 +710,6 @@ const UserTransferMix = () => {
         });
 
         setMallAmount("");
-        queryMIXBalance(); // 刷新链上余额
       } catch (error) {
         Toast.clear();
         const message = error instanceof Error ? error.message : "提交失败";
