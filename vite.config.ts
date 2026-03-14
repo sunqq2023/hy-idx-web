@@ -23,30 +23,21 @@ function rsaPrivateKeyPlugin(): Plugin {
       // 验证环境变量
       const privateKey = env.VITE_RSA_PRIVATE_KEY;
 
-      if (privateKey) {
-        console.log("✅ VITE_RSA_PRIVATE_KEY 环境变量已设置");
-        console.log(`🔑 私钥长度: ${privateKey.length} 字符`);
-
-        // 验证私钥格式
-        if (
-          !privateKey.includes("-----BEGIN PRIVATE KEY-----") ||
-          !privateKey.includes("-----END PRIVATE KEY-----")
-        ) {
-          console.error("❌ 私钥格式不正确，请确保包含完整的 PEM 格式");
-          throw new Error("私钥格式不正确");
-        }
-      } else {
-        console.warn("⚠️ 警告: 未设置 VITE_RSA_PRIVATE_KEY 环境变量");
-        console.warn(
-          "💡 提示: 开发环境请在 .env 文件中设置 VITE_RSA_PRIVATE_KEY",
-        );
-        if (mode === "production") {
-          console.error(
-            "❌ 生产环境构建必须设置 VITE_RSA_PRIVATE_KEY 环境变量",
-          );
-          throw new Error("生产环境构建需要设置 VITE_RSA_PRIVATE_KEY 环境变量");
-        }
+      // 直接验证私钥格式
+      if (!privateKey || !privateKey.includes("BEGIN")) {
+        throw new Error("私钥格式不正确，当前长度: " + privateKey?.length);
       }
+
+      console.log("✅ VITE_RSA_PRIVATE_KEY 环境变量已设置");
+      console.log("🔑 私钥长度:", privateKey.length);
+
+      return {
+        ...config,
+        define: {
+          ...config.define,
+          VITE_RSA_PRIVATE_KEY: JSON.stringify(privateKey),
+        },
+      };
     },
   };
 }
