@@ -86,21 +86,16 @@ const UserTransferMix = () => {
   // 检查商城服务时间
   const checkMallServiceTime = (): boolean => {
     const now = new Date();
-
-    // 转换为北京时间 (UTC+8)
-    const beijingTime = new Date(
-      now.getTime() + (8 - now.getTimezoneOffset() / 60) * 60 * 60 * 1000,
-    );
-    const hours = beijingTime.getHours();
-    const minutes = beijingTime.getMinutes();
+    const hours = now.getHours();
+    const minutes = now.getMinutes();
     const currentMinutes = hours * 60 + minutes;
 
     // 22:58 = 22*60 + 58 = 1378 分钟
-    // 01:01 = 1*60 + 1 = 61 分钟
-    const serviceStart = 61; // 01:01
+    // 01:02 = 1*60 + 2 = 62 分钟
     const serviceEnd = 1378; // 22:58
+    const serviceStart = 62; // 01:02
 
-    // 如果当前时间在 22:58-23:59 或 00:00-01:01 之间，暂停服务
+    // 如果当前时间在 22:58-23:59 或 00:00-01:02 之间，暂停服务
     if (currentMinutes >= serviceEnd || currentMinutes < serviceStart) {
       return false; // 暂停服务
     }
